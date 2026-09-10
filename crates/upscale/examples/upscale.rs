@@ -1,7 +1,7 @@
-//! Exercise the same dedicated worker used by the server, with GPU profiling.
+//! Exercise the same dedicated worker used by the server, with execution profiling.
 //! Usage: cargo run -p backend-upscale --example upscale -- MODELS INPUT OUTPUT [DEVICE]
 use anyhow::{Context, Result, bail};
-use backend_upscale::{GpuDevice, UpscaleConfig, UpscaleOutcome, Upscaler};
+use backend_upscale::{UpscaleConfig, UpscaleDevice, UpscaleOutcome, Upscaler};
 use std::path::PathBuf;
 
 #[tokio::main(flavor = "current_thread")]
@@ -18,11 +18,11 @@ async fn main() -> Result<()> {
         .next()
         .map(|name| name.parse())
         .transpose()?
-        .unwrap_or_else(GpuDevice::default);
+        .unwrap_or_else(UpscaleDevice::default);
     let profile_dir = output
         .parent()
         .unwrap_or(std::path::Path::new("."))
-        .join("gpu-profiles");
+        .join("execution-profiles");
     let worker = Upscaler::start(UpscaleConfig {
         models_dir,
         device,

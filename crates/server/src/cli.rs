@@ -44,8 +44,8 @@ struct ServerOptions {
     #[arg(long)]
     models_dir: Option<PathBuf>,
 
-    /// Explicit GPU provider. CPU and automatic fallback are disabled.
-    #[arg(long, value_parser = ["migraphx", "cuda", "openvino", "coreml"])]
+    /// Explicit device. CPU uses two threads; accelerators never fall back to CPU.
+    #[arg(long, value_parser = ["cpu", "migraphx", "cuda", "openvino", "coreml"])]
     upscale_device: Option<String>,
 
     /// HTTP bind address.
@@ -258,7 +258,7 @@ fn print_config_report(report: &ConfigReport) {
     println!("server_addr: {}", report.server_addr);
     println!("models_dir: {}", report.models_dir.display());
     println!(
-        "upscale_device: {} (CPU fallback disabled)",
+        "upscale_device: {} (explicit device; CPU limited to two threads)",
         report.upscale_device
     );
     println!(

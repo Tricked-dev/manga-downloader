@@ -1,4 +1,4 @@
-//! Dedicated GPU inference worker. No automatic provider selection or CPU fallback.
+//! Dedicated inference worker with explicit devices and bounded CPU parallelism.
 //! Model selection/cache follows the vendored CLI's convert::ModelCache.
 use std::{
     collections::HashMap,
@@ -14,42 +14,45 @@ use manga_core::{Device, DeviceOptions, ModelManifest, TileConfig, UpscaleModel}
 use serde::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
-/// Only explicit GPU providers can be represented by the public server API.
+/// Explicit devices only. Accelerator requests never silently fall back to CPU.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum GpuDevice {
+pub enum UpscaleDevice {
+    Cpu,
     MiGraphX,
     Cuda,
     OpenVino,
     CoreMl,
 }
 
-impl Default for GpuDevice {
+impl Default for UpscaleDevice {
     fn default() -> Self {
         if cfg!(target_os = "macos") {
             Self::CoreMl
         } else {
-            Self::MiGraphX
+            Self::Cpu
         }
     }
 }
-impl FromStr for GpuDevice {
+impl FromStr for UpscaleDevice {
     type Err = anyhow::Error;
     fn from_str(value: &str) -> Result<Self> {
         match value.to_ascii_lowercase().as_str() {
+            "cpu" => Ok(Self::Cpu),
             "migraphx" => Ok(Self::MiGraphX),
             "cuda" => Ok(Self::Cuda),
             "openvino" => Ok(Self::OpenVino),
             "coreml" => Ok(Self::CoreMl),
             _ => bail!(
-                "upscaling requires an explicit GPU: migraphx, cuda, openvino, or coreml; CPU and auto are disabled"
+                "choose an explicit device: cpu, migraphx, cuda, openvino, or coreml; auto is disabled"
             ),
         }
     }
 }
-impl GpuDevice {
+impl UpscaleDevice {
     fn device(self) -> Device {
         match self {
+            Self::Cpu => Device::Cpu,
             Self::MiGraphX => Device::MiGraphX,
             Self::Cuda => Device::Cuda,
             Self::OpenVino => Device::OpenVino,
@@ -61,7 +64,7 @@ impl GpuDevice {
 #[derive(Clone, Debug)]
 pub struct UpscaleConfig {
     pub models_dir: PathBuf,
-    pub device: GpuDevice,
+    pub device: UpscaleDevice,
     pub tile_size: u32,
     pub overlap: u32,
     /// Optional ONNX execution profiles for a diagnostic run.
@@ -71,7 +74,7 @@ impl Default for UpscaleConfig {
     fn default() -> Self {
         Self {
             models_dir: "./data/models".into(),
-            device: GpuDevice::default(),
+            device: UpscaleDevice::default(),
             tile_size: 256,
             overlap: 32,
             profile_dir: None,
@@ -89,7 +92,7 @@ pub struct UpscaledPage {
     pub tile_size: u32,
     pub width: u32,
     pub height: u32,
-    pub device: GpuDevice,
+    pub device: UpscaleDevice,
 }
 #[derive(Debug)]
 pub enum UpscaleOutcome {
@@ -123,7 +126,7 @@ impl Upscaler {
         // One inference at a time and at most one queued page, independent of
         // Tokio worker count. ONNX sessions never leave this OS thread.
         let (requests, mut receiver) = mpsc::channel(1);
-        let worker = std::thread::Builder::new().name("manga-upscale-gpu".into()).spawn(move || {
+        let worker = std::thread::Builder::new().name("manga-upscale".into()).spawn(move || {
             let mut models = ModelCache::new(config);
             match models.load_manifest() {
                 Ok(Some(_)) => {},
@@ -139,7 +142,7 @@ impl Upscaler {
                 }
             }
             models.finish_profiles();
-        }).context("start GPU inference worker")?;
+        }).context("start inference worker")?;
         Ok(Self {
             requests,
             worker: Mutex::new(Some(worker)),
@@ -156,24 +159,24 @@ impl Upscaler {
                 response,
             })
             .await
-            .context("GPU worker stopped")?;
+            .context("upscale worker stopped")?;
         result
             .await
-            .context("GPU worker exited before returning the page")?
+            .context("upscale worker exited before returning the page")?
     }
 
     pub async fn shutdown(&self) -> Result<()> {
         let worker = self
             .worker
             .lock()
-            .map_err(|_| anyhow::anyhow!("GPU worker lock poisoned"))?
+            .map_err(|_| anyhow::anyhow!("upscale worker lock poisoned"))?
             .take();
         if let Some(worker) = worker {
             let _ = self.requests.send(Request::Shutdown).await;
             tokio::task::spawn_blocking(move || {
                 worker
                     .join()
-                    .map_err(|_| anyhow::anyhow!("GPU worker panicked"))
+                    .map_err(|_| anyhow::anyhow!("upscale worker panicked"))
             })
             .await??;
         }
@@ -272,7 +275,7 @@ impl ModelCache {
             let device = self.config.device.device();
             ensure!(
                 device.is_available()?,
-                "requested GPU provider {device} is unavailable; CPU fallback is disabled"
+                "requested provider {device} is unavailable; CPU fallback is disabled"
             );
             let options = DeviceOptions {
                 openvino_device_type: Some("GPU".into()),
@@ -284,17 +287,21 @@ impl ModelCache {
                 None
             };
             let started = Instant::now();
-            tracing::info!(model = %name, %device, "Loading GPU upscale model");
-            let model = UpscaleModel::open_gpu(&path, device, &options, profile.as_deref())?;
+            tracing::info!(model = %name, %device, "Loading upscale model");
+            let model = if device == Device::Cpu {
+                UpscaleModel::open_cpu(&path, 2, profile.as_deref())?
+            } else {
+                UpscaleModel::open_gpu(&path, device, &options, profile.as_deref())?
+            };
             ensure!(
                 model.device() == device,
-                "requested GPU provider was not retained"
+                "requested provider was not retained"
             );
             ensure!(
                 model.scale() == scale,
                 "model scale disagrees with manifest selection"
             );
-            tracing::info!(model = %name, %device, load_ms = started.elapsed().as_millis(), "GPU upscale model loaded; CPU fallback disabled");
+            tracing::info!(model = %name, %device, load_ms = started.elapsed().as_millis(), "Upscale model loaded on the requested device");
             self.loaded.insert(
                 path.clone(),
                 CachedModel {
@@ -313,7 +320,7 @@ impl ModelCache {
             tile_size: self.config.tile_size,
             overlap: self.config.overlap,
         };
-        tracing::debug!(model = %name, width = source.width(), height = source.height(), "Starting tiled GPU inference");
+        tracing::debug!(model = %name, width = source.width(), height = source.height(), "Starting tiled inference");
         let upscaled = manga_core::upscale_tiled(&mut cached.model, &source, tile)?;
         ensure!(
             upscaled.width()
@@ -344,8 +351,8 @@ impl ModelCache {
             && let Some(cached) = self.loaded.get_mut(path)
         {
             match cached.model.end_profiling() {
-                Ok(path) => tracing::info!(%path, "GPU execution profile saved"),
-                Err(error) => tracing::warn!(%error, "GPU execution profile could not be saved"),
+                Ok(path) => tracing::info!(%path, "Execution profile saved"),
+                Err(error) => tracing::warn!(%error, "Execution profile could not be saved"),
             }
         }
     }
@@ -361,13 +368,14 @@ impl ModelCache {
 mod tests {
     use super::*;
     #[test]
-    fn cpu_and_auto_cannot_be_requested() {
-        for value in ["cpu", "CPU", "auto", "AUTO", ""] {
-            assert!(value.parse::<GpuDevice>().is_err());
+    fn devices_are_explicit_and_gpu_entry_point_rejects_cpu() {
+        assert_eq!("cpu".parse::<UpscaleDevice>().unwrap(), UpscaleDevice::Cpu);
+        for value in ["auto", "AUTO", ""] {
+            assert!(value.parse::<UpscaleDevice>().is_err());
         }
         assert_eq!(
-            "migraphx".parse::<GpuDevice>().unwrap(),
-            GpuDevice::MiGraphX
+            "migraphx".parse::<UpscaleDevice>().unwrap(),
+            UpscaleDevice::MiGraphX
         );
         assert!(
             UpscaleModel::open_gpu(

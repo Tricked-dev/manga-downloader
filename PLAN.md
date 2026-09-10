@@ -340,11 +340,12 @@ on a dedicated worker thread with a `ModelCache` keyed by model path — port
   Encode it with libavif/libaom in genuine lossless mode, full range, 4:4:4, and an identity
   RGB matrix. Add the required native build dependency and verify a byte-for-byte pixel
   round trip after decoding. The existing ravif quality setting is not a lossless guarantee.
-- **GPU inference is mandatory.** Use an explicit GPU execution provider and disable ONNX
-  Runtime CPU fallback, including unsupported individual operators. No CPU inference is
-  allowed on the development PC. Missing GPU support makes an upscale job unavailable;
-  it must never select CPU automatically. Keep one dedicated worker and bound its queue.
-  The user-authorized Mac mini may be used for builds and GPU-backed model preparation.
+- **Intel CPU deployment.** Use the explicit CPU execution provider with two inference threads
+  on the deployment host. No CPU model inference is allowed on the development PC; tests
+  requiring inference run on the user-authorized Intel host or Mac mini. Linux defaults to CPU,
+  macOS to CoreML. Explicit accelerator selections disable CPU fallback, including unsupported
+  individual operators. Keep one dedicated worker and bound its queue. AMD support is optional
+  and does not require a custom runtime build for the normal package.
 - **Both variants in one container — one `.bbf` per chapter, never two files.** Verified against the
   format: `Page { asset_index, flags }` makes a page a pointer to an asset, so two pages can hold two
   encodings of the same logical page; `Section { title_offset, start_index, parent_offset }` is a
@@ -505,8 +506,8 @@ Functional, end to end:
   `auto_upscale` on by default the job queue runs continuously behind a large library and storage
   roughly doubles (both sections retained). Append keeps this off the download path, so the
   user-visible effect is "upscaled copies appear over time" rather than slow downloads — worth
-  reflecting in the UI. Measure one real chapter before turning it loose on a backfill; GPU
-  execution providers are a follow-up (`mangajenai-rs` PROGRESS.md has them scheduled).
+  reflecting in the UI. Measure one real chapter before turning it loose on a backfill. Explicit GPU
+  providers remain available where the installed ONNX Runtime supports them.
 - **BBF stores payloads uncompressed**, so the `.tar.zst` wrapper goes away. Near-neutral for size
   (already-encoded images barely compress) but worth measuring on a real library before committing
   to the migration.

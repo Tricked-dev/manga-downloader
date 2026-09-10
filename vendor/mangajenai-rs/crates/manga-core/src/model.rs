@@ -80,6 +80,27 @@ impl UpscaleModel {
         Self::from_builder(path, builder, device)
     }
 
+    /// Explicit CPU execution with bounded parallelism and no busy-wait spinning.
+    pub fn open_cpu(path: &Path, threads: usize, profile: Option<&Path>) -> Result<Self> {
+        if threads == 0 || threads > 8 {
+            bail!("CPU thread count must be between 1 and 8");
+        }
+        let option = |result: ort::session::builder::BuilderResult| {
+            result.map_err(|error| anyhow!("ONNX session option failed: {error}"))
+        };
+        let mut builder = Session::builder()?;
+        builder = option(builder.with_no_environment_execution_providers())?;
+        builder = option(builder.with_intra_threads(threads))?;
+        builder = option(builder.with_inter_threads(1))?;
+        builder = option(builder.with_intra_op_spinning(false))?;
+        builder = option(builder.with_inter_op_spinning(false))?;
+        if let Some(profile) = profile {
+            builder = option(builder.with_profiling(profile))?;
+        }
+        device::configure(&mut builder, Device::Cpu, &DeviceOptions::default())?;
+        Self::from_builder(path, builder, Device::Cpu)
+    }
+
     /// Load on an explicit GPU with no CPU execution-provider fallback.
     /// Unsupported operators fail during session creation, before inference.
     pub fn open_gpu(

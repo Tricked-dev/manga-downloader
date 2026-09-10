@@ -67,7 +67,7 @@ fn default_upscale_device() -> String {
     if cfg!(target_os = "macos") {
         "coreml"
     } else {
-        "migraphx"
+        "cpu"
     }
     .into()
 }

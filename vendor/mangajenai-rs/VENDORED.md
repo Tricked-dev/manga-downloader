@@ -17,6 +17,8 @@ Local patches:
 - Add `UpscaleModel::open_gpu`, which requires an explicit accelerator and disables
   ONNX CPU fallback before loading a graph. Session helper threads are bounded and
   spinning is disabled. Optional profiles can be finalized for GPU verification.
+- Add `UpscaleModel::open_cpu` for the Intel deployment, with an explicit CPU provider,
+  bounded inference threads, one inter-op thread, and spinning disabled.
 - Add an explicit export device to `tools/export_onnx.py`, including Metal and ROCm/CUDA.
   The tracing input and reference evaluation use that device, without CPU retries.
 
