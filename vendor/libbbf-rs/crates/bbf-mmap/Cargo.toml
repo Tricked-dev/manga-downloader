@@ -1,0 +1,13 @@
+[package]
+name = "bbf-mmap"
+version = "0.1.0"
+edition = "2024"
+description = "Memory-mapped BBF readers"
+license = "MIT"
+
+[dependencies]
+bbf-io = { path = "../bbf-io" }
+memmap2 = "0.9"
+
+[lints.rust]
+unsafe_code = "allow"

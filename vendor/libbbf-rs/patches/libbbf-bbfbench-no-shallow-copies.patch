@@ -1,0 +1,75 @@
+diff --git a/src/bench/bbfbench.cpp b/src/bench/bbfbench.cpp
+index 80c3bdf..243ed3e 100644
+--- a/src/bench/bbfbench.cpp
++++ b/src/bench/bbfbench.cpp
+@@ -2,0 +3 @@
++#include "dedupemap.h"
+@@ -388 +388,0 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
+-    const std::string hugeAsset = "hugeAsset.png"; // 400MB
+@@ -396 +395,0 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
+-    createTestFile(hugeAsset, 400 * 1024 * 1024, 'h');
+@@ -411,0 +411,53 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
++    const std::vector<uint8_t> hashPayload(4 * 1024 * 1024, 'm');
++    BENCHMARK("BBFComponent - XXH3-128 (4MB payload)")
++    {
++        const XXH128_hash_t hash = XXH3_128bits(hashPayload.data(), hashPayload.size());
++        volatile uint64_t checksum = hash.low64 ^ hash.high64;
++        return checksum;
++    };
++
++    const std::vector<uint8_t> writePayload(4 * 1024 * 1024, 'm');
++    BENCHMARK("BBFComponent - Write Payload (4MB)")
++    {
++        std::ofstream output("component-write.bbf", std::ios::binary | std::ios::trunc);
++        output.write(reinterpret_cast<const char*>(writePayload.data()), writePayload.size());
++        output.close();
++        volatile uint64_t checksum = writePayload.size();
++        return checksum;
++    };
++    deleteFile("component-write.bbf");
++
++    BBFAssetTable dedupLookup;
++    const XXH128_hash_t dedupHash = XXH3_128bits(hashPayload.data(), hashPayload.size());
++    dedupLookup.addAsset(dedupHash, 7);
++    BENCHMARK("BBFComponent - Dedup Lookup (4MB hash)")
++    {
++        return dedupLookup.findAsset(dedupHash);
++    };
++
++    const size_t indexPageCount = (4 * 1024 * 1024) / sizeof(BBFPage);
++    std::vector<BBFPage> indexPages(indexPageCount);
++    for (size_t iterator = 0; iterator < indexPageCount; ++iterator)
++    {
++        indexPages[iterator].assetIndex = iterator % 17;
++        indexPages[iterator].flags = static_cast<uint32_t>(iterator) & 3;
++    }
++    BENCHMARK("BBFComponent - Page Index Encode+Hash (4MB)")
++    {
++        std::vector<uint8_t> encoded(indexPages.size() * sizeof(BBFPage));
++        std::copy(
++            reinterpret_cast<const uint8_t*>(indexPages.data()),
++            reinterpret_cast<const uint8_t*>(indexPages.data()) + encoded.size(),
++            encoded.begin());
++        const uint64_t hash = XXH3_64bits(encoded.data(), encoded.size());
++        volatile uint64_t checksum = hash;
++        return checksum;
++    };
++
++    BENCHMARK("BBFComponent - Cached Page Index Hash (4MB)")
++    {
++        const uint64_t hash = XXH3_64bits(indexPages.data(), indexPages.size() * sizeof(BBFPage));
++        volatile uint64_t checksum = hash;
++        return checksum;
++    };
++
+@@ -415 +467 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
+-        return builder;
++        return builder.getAssetCount();
+@@ -545,0 +598 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
++    builder.addMeta("BenchKey", "BenchVal");
+@@ -551 +604,2 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
+-        return BBFReader(writeOut.c_str());
++        BBFReader reader(writeOut.c_str());
++        return reader.getHeaderView() != nullptr;
+@@ -588 +641,0 @@ TEST_CASE("Performance Benchmarks", "[Benchmark]")
+-    deleteFile(hugeAsset);

@@ -1,0 +1,52 @@
+
+=== HEADER ===
+Signature:    BBF3
+Version:      3
+Flags:        0x00000002
+  [ ] Petrified (Linearized)
+  [x] Variable Alignment (Reams)
+Alignment:    12 (Pow2) -> 4096 bytes
+Ream Size:    16 (Pow2) -> 65536 bytes
+Footer Offset:   324
+
+=== FOOTER ===
+Offsets:
+  Assets:   0x000000000000006f
+  Pages:    0x00000000000000cf
+  Sections: 0x00000000000000ef
+  Meta:     0x000000000000010f
+  Expansion:0x0000000000000000
+  Strings:  0x000000000000012f
+Counts:
+  Assets:   2
+  Pages:    2
+  Metadata: 1
+  Sections: 1
+
+  Footer Hash (Index Hash): 0xdee866e9f659e28b
+
+=== Counts ===
+  Assets:   2
+  Pages:    2
+  Metadata: 1
+  Sections: 1
+
+=== Offsets ===
+  Assets:   0x000000000000006f
+  Pages:    0x00000000000000cf
+  Sections: 0x00000000000000ef
+  Meta:     0x000000000000010f
+  Expansion:0x0000000000000000
+  Strings:  0x000000000000012f
+
+=== Metadata ===
+Source : fixture
+
+=== Sections ===
+Start : 0
+
+=== ASSET TABLE (2 entries) ===
+ID  | Hash (XXH3-128)                  | Offset      | Size     | Type
+----|----------------------------------|-------------|----------|-----
+  0 | e652b2276bce7c9f82a8d95466dea70b |          64 |       22 | 0x00
+  1 | 863c71f0a84126b7ed1ea8ba3b944d19 |          88 |       23 | 0x00

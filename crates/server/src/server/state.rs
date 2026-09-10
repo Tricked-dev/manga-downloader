@@ -140,7 +140,7 @@ pub(crate) async fn build_test_app_state(
             models_dir: root.join("models"),
             ..Default::default()
         })
-        .expect("test GPU worker should start without loading a model"),
+        .expect("test upscale worker should start without loading a model"),
         telemetry: Telemetry::for_test(telemetry_name),
     })
 }

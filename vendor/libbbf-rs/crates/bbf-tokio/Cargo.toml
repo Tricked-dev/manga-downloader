@@ -1,0 +1,19 @@
+[package]
+name = "bbf-tokio"
+version = "0.1.0"
+edition = "2024"
+description = "Tokio-backed asynchronous BBF archive access"
+license = "MIT"
+
+[dependencies]
+bbf-format = { path = "../bbf-format" }
+bbf-mux = { path = "../bbf-mux" }
+tokio = { version = "1", features = ["fs", "io-util", "net", "rt", "sync", "time"] }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[dev-dependencies]
+bbf-io = { path = "../bbf-io" }
+tokio = { version = "1", features = ["fs", "io-util", "macros", "rt-multi-thread"] }
+
+[lints.rust]
+unsafe_code = "forbid"

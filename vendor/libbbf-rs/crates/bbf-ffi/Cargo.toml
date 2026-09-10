@@ -1,0 +1,17 @@
+[package]
+name = "bbf-ffi"
+version = "0.1.0"
+edition = "2024"
+description = "Rust C/WASM-compatible reader exports for BBF"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+bbf-format = { path = "../bbf-format" }
+bbf-io = { path = "../bbf-io" }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints.rust]
+unsafe_code = "allow"

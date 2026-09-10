@@ -1,0 +1,13 @@
+[package]
+name = "bbf-io"
+version = "0.1.0"
+edition = "2024"
+description = "Safe BBF reader views and integrity checks"
+license = "MIT"
+
+[dependencies]
+bbf-format = { path = "../bbf-format" }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints.rust]
+unsafe_code = "forbid"

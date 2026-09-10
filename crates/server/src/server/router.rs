@@ -434,7 +434,10 @@ mod tests {
         for format in ["avif", "webp", "jpeg"] {
             let converted_url = format!("{url}?format={format}");
             let first = server.get(&converted_url).await;
-            first.assert_status_ok().assert_header("X-Cache", "MISS");
+            first
+                .assert_status_ok()
+                .assert_header("X-Cache", "MISS")
+                .assert_header("X-Image-Cache", "MISS");
             assert_eq!(
                 backend_image::decode_image(first.as_bytes())
                     .unwrap()
@@ -442,7 +445,10 @@ mod tests {
                 1600
             );
             let second = server.get(&converted_url).await;
-            second.assert_status_ok().assert_header("X-Cache", "HIT");
+            second
+                .assert_status_ok()
+                .assert_header("X-Cache", "HIT")
+                .assert_header("X-Image-Cache", "HIT");
             assert_eq!(first.as_bytes(), second.as_bytes());
         }
         let resized = server.get(&format!("{url}?width=320")).await;

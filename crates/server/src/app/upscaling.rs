@@ -1,4 +1,4 @@
-//! Chapter jobs seal their originals first, then append a GPU-generated section.
+//! Chapter jobs seal their originals first, then append a model-generated section.
 use crate::AppState;
 use anyhow::{Context, Result, ensure};
 use backend_storage::{PageVariant, UpscaledChapter};
@@ -29,6 +29,15 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
     )
     .await?;
     let before = backend_storage::inspect(archive.archive_path.clone()).await?;
+    let source_width = median_original_width(&archive.archive_path, before.page_count).await?;
+    if source_width >= 2000 {
+        tracing::info!(
+            download_id,
+            source_width,
+            "Upscale skipped: chapter originals are already at least 2000 pixels wide"
+        );
+        return Ok(());
+    }
     let staging = tempfile::tempdir().context("create upscale staging directory")?;
     let mut pages = Vec::with_capacity(before.page_count);
     let mut models = std::collections::BTreeSet::new();
@@ -46,7 +55,7 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
             Some(PageVariant::Original),
         )
         .await?;
-        // Release the mapping before GPU work: one page is staged at a time.
+        // Release the mapping before inference: one page is staged at a time.
         let bytes = original.bytes.to_vec();
         drop(original);
         let page = match state.upscaler.upscale(bytes, scale).await? {
@@ -100,4 +109,64 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
         "Upscaled chapter section published"
     );
     Ok(())
+}
+
+// The median describes chapter quality without treating a wide spread or a narrow
+// credits page as the resolution of the entire chapter. This never resizes originals.
+async fn median_original_width(path: &std::path::Path, page_count: usize) -> Result<u32> {
+    let mut widths = Vec::with_capacity(page_count);
+    for index in 0..page_count {
+        let page =
+            backend_storage::read_page(path.to_path_buf(), index, Some(PageVariant::Original))
+                .await?;
+        widths.push(
+            tokio::task::spawn_blocking(move || -> Result<u32> {
+                Ok(backend_image::image_dimensions(&page.bytes)?.0)
+            })
+            .await??,
+        );
+    }
+    ensure!(!widths.is_empty(), "cannot upscale an empty chapter");
+    widths.sort_unstable();
+    Ok(widths[widths.len() / 2])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn resolution_policy_uses_chapter_pages_and_preserves_originals() {
+        for (widths, expected) in [
+            (vec![1400, 1400, 2800], 1400),
+            (vec![700, 2000, 2200], 2000),
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let mut pages = Vec::new();
+            for (index, width) in widths.iter().enumerate() {
+                let path = directory.path().join(format!("{index}.png"));
+                image::RgbImage::from_pixel(*width, 8, image::Rgb([12, 34, 56]))
+                    .save(&path)
+                    .unwrap();
+                pages.push(path);
+            }
+            let archive = directory.path().join("chapter.bbf");
+            backend_storage::write_originals(
+                archive.clone(),
+                backend_storage::OriginalChapter {
+                    pages,
+                    comicinfo_xml: "<ComicInfo/>".into(),
+                    cover: None,
+                },
+                || false,
+            )
+            .await
+            .unwrap();
+            let before = tokio::fs::read(&archive).await.unwrap();
+            assert_eq!(
+                median_original_width(&archive, widths.len()).await.unwrap(),
+                expected
+            );
+            assert_eq!(tokio::fs::read(archive).await.unwrap(), before);
+        }
+    }
 }

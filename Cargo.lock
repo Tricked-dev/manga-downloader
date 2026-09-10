@@ -796,12 +796,10 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bbf-format"
 version = "0.1.0"
-source = "git+https://github.com/Tricked-dev/libbbf-rs?rev=b19d401b48a9651ecb57032be0abf30b814dce0f#b19d401b48a9651ecb57032be0abf30b814dce0f"
 
 [[package]]
 name = "bbf-io"
 version = "0.1.0"
-source = "git+https://github.com/Tricked-dev/libbbf-rs?rev=b19d401b48a9651ecb57032be0abf30b814dce0f#b19d401b48a9651ecb57032be0abf30b814dce0f"
 dependencies = [
  "bbf-format",
  "xxhash-rust",
@@ -810,7 +808,6 @@ dependencies = [
 [[package]]
 name = "bbf-mmap"
 version = "0.1.0"
-source = "git+https://github.com/Tricked-dev/libbbf-rs?rev=b19d401b48a9651ecb57032be0abf30b814dce0f#b19d401b48a9651ecb57032be0abf30b814dce0f"
 dependencies = [
  "bbf-io",
  "memmap2",
@@ -819,7 +816,6 @@ dependencies = [
 [[package]]
 name = "bbf-mux"
 version = "0.1.0"
-source = "git+https://github.com/Tricked-dev/libbbf-rs?rev=b19d401b48a9651ecb57032be0abf30b814dce0f#b19d401b48a9651ecb57032be0abf30b814dce0f"
 dependencies = [
  "bbf-format",
  "bbf-io",
@@ -3519,7 +3515,6 @@ checksum = "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8"
 [[package]]
 name = "libbbf-rs"
 version = "0.1.0"
-source = "git+https://github.com/Tricked-dev/libbbf-rs?rev=b19d401b48a9651ecb57032be0abf30b814dce0f#b19d401b48a9651ecb57032be0abf30b814dce0f"
 dependencies = [
  "bbf-format",
  "bbf-io",

@@ -1,0 +1,40 @@
+[package]
+name = "libbbf-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Rust implementation of the Bound Book Format"
+license = "MIT"
+repository = "https://github.com/Tricked-dev/libbbf-rs"
+readme = "README.md"
+
+[workspace]
+members = [
+    "crates/bbf-format",
+    "crates/bbf-ffi",
+    "crates/bbf-mux",
+    "crates/bbf-tokio",
+    "crates/bbf-io",
+    "crates/bbf-mmap",
+    "crates/bbfmux",
+    "crates/bbf-bench",
+]
+resolver = "3"
+
+[features]
+default = []
+tokio = ["dep:bbf-tokio"]
+
+[lib]
+name = "libbbf"
+path = "rust/src/lib.rs"
+
+[dependencies]
+bbf-format = { path = "crates/bbf-format" }
+bbf-io = { path = "crates/bbf-io" }
+bbf-mmap = { path = "crates/bbf-mmap" }
+bbf-mux = { path = "crates/bbf-mux" }
+bbf-tokio = { path = "crates/bbf-tokio", optional = true }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,18 @@
+[package]
+name = "bbf-bench"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic BBF Rust/C++ parity benchmark driver"
+license = "MIT"
+
+[dependencies]
+bbf-format = { path = "../bbf-format" }
+bbf-io = { path = "../bbf-io" }
+bbf-mmap = { path = "../bbf-mmap" }
+bbf-mux = { path = "../bbf-mux", features = ["component-bench"] }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[lints.rust]
+# This benchmark intentionally measures the explicit unsafe zero-copy mapping
+# API in addition to safe reader paths.
+unsafe_code = "allow"

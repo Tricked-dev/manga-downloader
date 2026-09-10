@@ -17,6 +17,18 @@ pub fn decode_image(input: &[u8]) -> anyhow::Result<image::DynamicImage> {
     }
 }
 
+/// Reads native page dimensions without decoding pixels when the codec supports it.
+pub fn image_dimensions(input: &[u8]) -> anyhow::Result<(u32, u32)> {
+    if image::guess_format(input)? == image::ImageFormat::Avif {
+        let decoded = decode_avif(input)?;
+        Ok((decoded.width(), decoded.height()))
+    } else {
+        Ok(image::ImageReader::new(std::io::Cursor::new(input))
+            .with_guessed_format()?
+            .into_dimensions()?)
+    }
+}
+
 use anyhow::{Context, Result};
 use image::{ExtendedColorType, ImageEncoder, ImageFormat};
 use std::io::Cursor;

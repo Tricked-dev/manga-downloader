@@ -1,0 +1,9 @@
+[package]
+name = "bbf-format"
+version = "0.1.0"
+edition = "2024"
+description = "BBF v3 wire-format types and codecs"
+license = "MIT"
+
+[lints.rust]
+unsafe_code = "forbid"

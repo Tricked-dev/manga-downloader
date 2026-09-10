@@ -1,12 +1,13 @@
 # Vendored MangaJaNai
 
-Source: https://github.com/Tricked-dev/mangajenai-rs, branch `dev`.
+Source provenance: https://github.com/Tricked-dev/mangajenai-rs, branch `dev`.
+The upstream repository may be deleted; this copy is self-contained.
 Revision: `747d6ac4c3b5e674046fa8632d8ec8cefc889728`.
 License: MIT (see LICENSE).
 
 This directory is a Git archive of that revision. Production model weights are not included.
 The server links `crates/manga-core` directly as a path dependency; no download is needed
-at application startup. The included tools export separately downloaded `.pth` weights
+at build time or application startup. The included tools export separately downloaded `.pth` weights
 and create `models.json` for the runtime model directory.
 
 Local patches:
@@ -25,5 +26,5 @@ Local patches:
 Model preprocessing, tiling, inference tensors, and output quantization retain the
 upstream implementation. The server links ONNX Runtime through pkg-config.
 
-To update, replace this directory with a fresh archive from the desired upstream revision,
-reapply and validate that manifest patch if still necessary, and update this record.
+Maintain this copy in this repository. The Python export environment also imports the local
+`nix/python-env.nix`; no Flake input or development command needs the upstream repository.

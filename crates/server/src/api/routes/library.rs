@@ -302,6 +302,7 @@ async fn get_downloaded_chapter_page(
         .header(axum::http::header::CONTENT_TYPE, page.content_type)
         .header("X-Page-Variant", page.variant.as_str())
         .header("X-Cache", if page.cache_hit { "HIT" } else { "MISS" })
+        .header("X-Image-Cache", if page.cache_hit { "HIT" } else { "MISS" })
         .body(axum::body::Body::from(page.body))
         .map_err(AppError::from)
 }

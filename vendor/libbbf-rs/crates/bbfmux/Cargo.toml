@@ -1,0 +1,15 @@
+[package]
+name = "bbfmux"
+version = "0.1.0"
+edition = "2024"
+description = "Rust BBF muxer and inspection CLI"
+license = "MIT"
+
+[dependencies]
+bbf-format = { path = "../bbf-format" }
+bbf-io = { path = "../bbf-io" }
+bbf-mmap = { path = "../bbf-mmap" }
+bbf-mux = { path = "../bbf-mux" }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -367,6 +367,7 @@ on a dedicated worker thread with a `ModelCache` keyed by model path — port
   serves API-triggered re-runs, model changes, and backfills. Bound its concurrency to 1. Because
   append is the mechanism, a download completes as soon as originals are sealed — upscaling is
   strictly background work.
+- **Quality threshold:** upscale 1400-pixel-wide originals normally; skip chapters whose median original page width is at least 2000 pixels. Keep normal model-scale output without a 1400-pixel cap.
 - **State:** migration `0011` adds `upscaled_at`, `upscale_model`, `upscale_scale` to the
   downloaded-chapter rows so the UI and API can show what has been upscaled and what hasn't.
 - Model files are **not** vendored — `--models-dir` (default `./data/models`), documented as a
@@ -433,7 +434,7 @@ use in both sibling repos):
 - No `devShell` here — `devenv.nix` owns it (see Phase 4b), including postgres, bun, chromium,
   `onnxruntime`, and `bbfmux` for inspecting archives. Reuse `mangajenai-rs`'s `python-env.nix` for
   the one-time `.pth` → `.onnx` export.
-- Inputs: `libbbf-rs`, `mangajenai-rs`.
+- BBF, the upscaler, and model-export tools are fully vendored. Builds and CI must not require access to either upstream repository. BBF uses revision `9a379f3f1dda8417a0cd727b32764f25a53d5626`, the latest when vendored on 2026-09-10.
 - Neither sibling repo has CI today; a single GitHub Actions job running `nix flake check` is worth
   adding here.
 
@@ -475,9 +476,9 @@ Functional, end to end:
    line, the chapter is readable, and nothing retry-loops. Then add models and re-run the job.
 10. `curl localhost:4000/` returns the embedded SPA; `--web-root ./web/build` serves from disk;
     OIDC login completes against a real issuer and the session cookie authorizes `/v1` calls.
-11. **On-device:** build and sideload both extension packages from `/v1/clients/*/package`, then
-    browse → open a manga → read a downloaded chapter in Mihon and in Aidoku. This gate is
-    non-negotiable per the constraint above.
+11. **On-device:** both extension packages build and retain their HTTP contracts. Per the user's
+    2026-09-10 update, Aidoku device testing is deferred to the user after deployment on iron;
+    Mihon is out of scope for further work because it will not be used.
 
 ## Risks and open items
 

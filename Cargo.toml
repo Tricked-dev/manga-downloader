@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["inspo", "clients/aidoku", "vendor/mangajenai-rs", "vendor/sqlx-0.8.6", "vendor/sqlx-macros-core-0.8.6"]
+exclude = ["inspo", "clients/aidoku", "vendor/mangajenai-rs", "vendor/libbbf-rs", "vendor/sqlx-0.8.6", "vendor/sqlx-macros-core-0.8.6"]
 
 [workspace.package]
 version = "0.1.0"
@@ -17,7 +17,7 @@ ulid = "1"
 toasty-driver-postgresql = "=0.7.0"
 apalis-postgres = "=1.0.0-rc.8"
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio-rustls", "postgres"] }
-libbbf = { package = "libbbf-rs", git = "https://github.com/Tricked-dev/libbbf-rs", rev = "b19d401b48a9651ecb57032be0abf30b814dce0f" }
+libbbf = { package = "libbbf-rs", path = "vendor/libbbf-rs" }
 scraper = "0.24"
 async-trait = "0.1.89"
 anyhow = { version = "1.0.102" }
@@ -99,10 +99,6 @@ uuid = { version = "1.23.3", default-features = false, features = ["serde", "v4"
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 zstd = { version = "0.13.3", default-features = false, features = ["zstdmt"] }
 mimalloc = "0.1.48"
-
-# For local BBF development, uncomment after updating the sibling checkout.
-# [patch."https://github.com/Tricked-dev/libbbf-rs"]
-# libbbf-rs = { path = "../libbbf-rs" }
 
 [patch.crates-io]
 sqlx = { path = "vendor/sqlx-0.8.6" }

@@ -243,7 +243,14 @@ impl ModelCache {
         let source = backend_image::decode_image(bytes)
             .context("decode original page for upscaling")?
             .to_rgb8();
-        let entry = manifest.select(source.height(), scale)?;
+        let entry = match manifest.select(source.height(), scale) {
+            Ok(entry) => entry,
+            Err(error) => {
+                return Ok(UpscaleOutcome::MissingModels {
+                    reason: error.to_string(),
+                });
+            }
+        };
         let path = manifest.resolve(entry);
         let name = entry.name.clone();
         let Some(current) = stamp(&path)? else {
@@ -410,5 +417,30 @@ mod tests {
         ));
         worker.shutdown().await.unwrap();
         assert!(worker.upscale(vec![], 2).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn manifest_without_a_matching_band_is_a_terminal_skip() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(
+            root.path().join("models.json"),
+            r#"{"version":1,"models":[]}"#,
+        )
+        .unwrap();
+        let mut input = std::io::Cursor::new(Vec::new());
+        image::RgbImage::new(4, 4)
+            .write_to(&mut input, image::ImageFormat::Png)
+            .unwrap();
+        let worker = Upscaler::start(UpscaleConfig {
+            models_dir: root.path().to_path_buf(),
+            ..Default::default()
+        })
+        .unwrap();
+        let outcome = worker.upscale(input.into_inner(), 2).await;
+        worker.shutdown().await.unwrap();
+        assert!(matches!(
+            outcome.unwrap(),
+            UpscaleOutcome::MissingModels { .. }
+        ));
     }
 }
