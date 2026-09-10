@@ -9,7 +9,7 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
-libbbf = { package = "libbbf-rs", git = "https://github.com/Tricked-dev/libbbf-rs", rev = "9ed7f0be50053a8fce5f098dcec52b365209439b" }
+libbbf = { package = "libbbf-rs", git = "https://github.com/Tricked-dev/libbbf-rs", rev = "b19d401b48a9651ecb57032be0abf30b814dce0f" }
 scraper = "0.24"
 async-trait = "0.1.89"
 anyhow = { version = "1.0.102" }

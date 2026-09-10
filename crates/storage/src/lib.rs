@@ -6,7 +6,7 @@
 //! is dropped, so a later section append cannot invalidate an in-flight response.
 use anyhow::{Context, Result, bail, ensure};
 use bytes::Bytes;
-use libbbf::{FileBuilder, IndexedReader, MappedFile, MediaType};
+use libbbf::{FileAppender, FileBuilder, IndexedReader, MappedFile, MediaType};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -36,6 +36,15 @@ pub struct OriginalChapter {
     pub comicinfo_xml: String,
     pub cover: Option<PathBuf>,
 }
+#[derive(Debug)]
+pub struct UpscaledChapter {
+    pub pages: Vec<PathBuf>,
+    pub model: String,
+    pub scale: u32,
+    pub tile_size: u32,
+    /// Reject inference results if the sealed chapter changed while it ran.
+    pub expected_footer_hash: u64,
+}
 #[derive(Clone, Debug, Serialize)]
 pub struct ChapterInfo {
     pub page_count: usize,
@@ -58,6 +67,9 @@ pub enum ReadError {
     #[error("This chapter has no {0} section")]
     VariantNotFound(&'static str),
 }
+#[derive(Debug, thiserror::Error)]
+#[error("Chapter changed while upscaling; the generated pages were not appended")]
+pub struct ChapterChanged;
 
 struct LockedMapping {
     mapped: MappedFile,
@@ -206,6 +218,130 @@ pub async fn write_originals(
     .context("BBF writer task failed")?
 }
 
+/// Append new payloads and publish a replacement index using libbbf's sealed
+/// file appender. Reruns replace page references, keeping exactly 2N page rows.
+pub async fn append_upscaled(
+    path: PathBuf,
+    chapter: UpscaledChapter,
+    cancelled: impl Fn() -> bool + Send + 'static,
+) -> Result<()> {
+    tokio::task::spawn_blocking(move || {
+        let _lock = lock(&path, true)?;
+        let (original, upscaled) = {
+            // SAFETY: the exclusive companion lock excludes all mutations.
+            // This mapping is dropped at the end of this block, before append.
+            let mapped = unsafe { MappedFile::open(&path) }?;
+            let reader = mapped.reader();
+            let index = reader.indexed()?;
+            validate_index(&index)?;
+            if index.footer().footer_hash != chapter.expected_footer_hash {
+                return Err(ChapterChanged.into());
+            }
+            let (_, original) = selected_range(&index, Some(PageVariant::Original))?;
+            let upscaled = section_range(&index, PageVariant::Upscaled)?;
+            ensure!(
+                original.start == 0 && original.end as usize == chapter.pages.len(),
+                "upscaled pages must match the original section"
+            );
+            ensure!(
+                index.footer().page_count == original.end * if upscaled.is_some() { 2 } else { 1 },
+                "unexpected chapter sections"
+            );
+            (original, upscaled)
+        };
+        ensure!(
+            chapter.scale == 2 || chapter.scale == 4,
+            "upscale scale must be 2 or 4"
+        );
+        ensure!(!cancelled(), "BBF append canceled");
+        let mut writer = FileAppender::open(&path)?;
+        if upscaled.is_none() {
+            writer.add_section("upscaled", original.end, None)?;
+        }
+        for (offset, page) in chapter.pages.into_iter().enumerate() {
+            ensure!(!cancelled(), "BBF append canceled");
+            ensure!(
+                file_media_type(&page)? == MediaType::Avif,
+                "upscaled pages must use canonical AVIF"
+            );
+            let asset = writer.add_asset_file(&page, MediaType::Avif.as_u8(), 0)?;
+            if let Some(range) = &upscaled {
+                writer.replace_page(range.start + offset as u64, asset, 0)?;
+            } else {
+                writer.add_page_asset(asset, 0)?;
+            }
+        }
+        writer.set_meta("upscale.model", &chapter.model, None)?;
+        writer.set_meta("upscale.scale", &chapter.scale.to_string(), None)?;
+        writer.set_meta("upscale.tile_size", &chapter.tile_size.to_string(), None)?;
+        ensure!(!cancelled(), "BBF append canceled");
+        writer.finalize()?;
+        File::open(&path)?.sync_all()?;
+        Ok(())
+    })
+    .await
+    .context("BBF append task failed")?
+}
+
+pub async fn update_comicinfo(path: PathBuf, xml: String) -> Result<()> {
+    tokio::task::spawn_blocking(move || {
+        let _lock = lock(&path, true)?;
+        let mut writer = FileAppender::open(&path)?;
+        writer.set_meta("ComicInfo.xml", &xml, None)?;
+        writer.finalize()?;
+        File::open(&path)?.sync_all()?;
+        Ok(())
+    })
+    .await
+    .context("BBF metadata update task failed")?
+}
+
+pub async fn remove(path: PathBuf) -> Result<u64> {
+    tokio::task::spawn_blocking(move || {
+        if !path.exists() {
+            return Ok(0);
+        }
+        let _lock = lock(&path, true)?;
+        let size = match std::fs::metadata(&path) {
+            Ok(metadata) => metadata.len(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(error.into()),
+        };
+        std::fs::remove_file(path)?;
+        Ok(size)
+    })
+    .await
+    .context("BBF removal task failed")?
+}
+
+/// Publish a staged container under the same mutation lock used by appenders.
+pub async fn publish(staged: PathBuf, destination: PathBuf) -> Result<()> {
+    tokio::task::spawn_blocking(move || {
+        let parent = destination
+            .parent()
+            .context("BBF destination has no parent")?;
+        std::fs::create_dir_all(parent)?;
+        let _lock = lock(&destination, true)?;
+        match std::fs::rename(&staged, &destination) {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::CrossesDevices => {}
+            Err(error) => return Err(error.into()),
+        }
+        // A temp file on the destination filesystem also handles staging on a
+        // different filesystem. Existing mapped inodes are never overwritten.
+        let temporary = tempfile::NamedTempFile::new_in(parent)?;
+        std::fs::copy(&staged, temporary.path())?;
+        temporary.as_file().sync_all()?;
+        temporary
+            .persist(&destination)
+            .map_err(|error| error.error)?;
+        std::fs::remove_file(staged)?;
+        Ok(())
+    })
+    .await
+    .context("BBF publication task failed")?
+}
+
 pub async fn inspect(path: PathBuf) -> Result<ChapterInfo> {
     tokio::task::spawn_blocking(move || {
         let mapped = map(&path)?;
@@ -243,79 +379,108 @@ pub async fn read_page(
         let entry = index
             .page(range.start + page as u64)?
             .context("missing BBF page")?;
-        let asset = index
-            .asset(entry.asset_index)?
-            .context("missing BBF page asset")?;
-        ensure!(
-            index.verify_asset_hash(entry.asset_index)? == Some(true),
-            "BBF asset checksum mismatch"
-        );
-        let data = index
-            .asset_data(&asset)
-            .context("BBF asset outside file bounds")?;
-        let content_type = content_type(asset.media_type)?;
-        let start = usize::try_from(asset.file_offset)?;
-        let end = start
-            .checked_add(data.len())
-            .context("BBF asset range overflow")?;
-        let content_hash = format!("{:016x}{:016x}", asset.hash_high, asset.hash_low);
-        let mut mapped = mapped;
-        mapped.range = start..end;
-        Ok(StoredPage {
-            bytes: Bytes::from_owner(mapped),
-            content_type,
-            variant,
-            content_hash,
-        })
+        stored_asset(mapped, entry.asset_index, variant)
     })
     .await
     .context("BBF page read task failed")?
 }
 
-pub async fn read_comicinfo(path: PathBuf) -> Result<Option<String>> {
+fn stored_asset(
+    mapped: LockedMapping,
+    asset_index: u64,
+    variant: PageVariant,
+) -> Result<StoredPage> {
+    let reader = mapped.mapped.reader();
+    let index = reader.indexed()?;
+    let asset = index
+        .asset(asset_index)?
+        .context("missing BBF page asset")?;
+    ensure!(
+        index.verify_asset_hash(asset_index)? == Some(true),
+        "BBF asset checksum mismatch"
+    );
+    let data = index
+        .asset_data(&asset)
+        .context("BBF asset outside file bounds")?;
+    let content_type = content_type(asset.media_type)?;
+    let start = usize::try_from(asset.file_offset)?;
+    let end = start
+        .checked_add(data.len())
+        .context("BBF asset range overflow")?;
+    let content_hash = format!("{:016x}{:016x}", asset.hash_high, asset.hash_low);
+    let mut mapped = mapped;
+    mapped.range = start..end;
+    Ok(StoredPage {
+        bytes: Bytes::from_owner(mapped),
+        content_type,
+        variant,
+        content_hash,
+    })
+}
+
+pub async fn read_cover(path: PathBuf) -> Result<StoredPage> {
     tokio::task::spawn_blocking(move || {
         let mapped = map(&path)?;
         let reader = mapped.mapped.reader();
         let index = reader.indexed()?;
         validate_index(&index)?;
+        let mut cover = None;
         for entry in 0..index.footer().metadata_count {
             let metadata = index.metadata(entry)?.context("missing BBF metadata")?;
-            if index.string(metadata.key_offset)? == Some("ComicInfo.xml") {
-                // BBF permits arbitrary string-pool entries. The library's convenience
-                // string() accessor caps scans at 2048 bytes, shorter than a synopsis.
-                let footer = index.footer();
-                ensure!(
-                    metadata.value_offset < footer.string_pool_size,
-                    "invalid ComicInfo string offset"
+            if metadata.parent_offset == libbbf::NO_PARENT_OFFSET
+                && index.string(metadata.key_offset)? == Some("cover.asset_index")
+            {
+                cover = Some(
+                    index
+                        .string(metadata.value_offset)?
+                        .context("missing cover asset reference")?
+                        .parse::<u64>()?,
                 );
-                let start = usize::try_from(
-                    footer
-                        .string_pool_offset
-                        .checked_add(metadata.value_offset)
-                        .context("metadata offset overflow")?,
-                )?;
-                let end = usize::try_from(
-                    footer
-                        .string_pool_offset
-                        .checked_add(footer.string_pool_size)
-                        .context("string pool overflow")?,
-                )?;
-                let value = mapped
-                    .mapped
-                    .as_bytes()
-                    .get(start..end)
-                    .context("metadata outside file")?;
-                let length = value
-                    .iter()
-                    .position(|byte| *byte == 0)
-                    .context("unterminated ComicInfo metadata")?;
-                return Ok(Some(std::str::from_utf8(&value[..length])?.to_owned()));
             }
         }
-        Ok(None)
+        let asset = match cover {
+            Some(asset) => asset,
+            None => {
+                let (_, range) = selected_range(&index, Some(PageVariant::Original))?;
+                index
+                    .page(range.start)?
+                    .context("chapter has no cover or first page")?
+                    .asset_index
+            }
+        };
+        stored_asset(mapped, asset, PageVariant::Original)
+    })
+    .await
+    .context("BBF cover read task failed")?
+}
+
+pub async fn metadata(path: PathBuf) -> Result<std::collections::BTreeMap<String, String>> {
+    tokio::task::spawn_blocking(move || {
+        let mapped = map(&path)?;
+        let reader = mapped.mapped.reader();
+        let index = reader.indexed()?;
+        validate_index(&index)?;
+        let mut values = std::collections::BTreeMap::new();
+        for entry in 0..index.footer().metadata_count {
+            let metadata = index.metadata(entry)?.context("missing BBF metadata")?;
+            if metadata.parent_offset == libbbf::NO_PARENT_OFFSET {
+                let key = index
+                    .string(metadata.key_offset)?
+                    .context("invalid metadata key")?;
+                let value = index
+                    .string(metadata.value_offset)?
+                    .context("invalid metadata value")?;
+                values.insert(key.to_owned(), value.to_owned());
+            }
+        }
+        Ok(values)
     })
     .await
     .context("BBF metadata read task failed")?
+}
+
+pub async fn read_comicinfo(path: PathBuf) -> Result<Option<String>> {
+    Ok(metadata(path).await?.remove("ComicInfo.xml"))
 }
 
 fn file_media_type(path: &Path) -> Result<MediaType> {
@@ -356,6 +521,167 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         image.write_to(&mut bytes, format).unwrap();
         bytes.into_inner()
+    }
+
+    #[tokio::test]
+    async fn sealed_append_and_rerun_preserve_original_payloads_and_two_sections() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("chapter.bbf");
+        let original = encoded(image::ImageFormat::Png, 1600);
+        let first = directory.path().join("first.png");
+        let second = directory.path().join("second.png");
+        std::fs::write(&first, &original).unwrap();
+        std::fs::write(&second, encoded(image::ImageFormat::Png, 1200)).unwrap();
+        write_originals(
+            path.clone(),
+            OriginalChapter {
+                pages: vec![first.clone(), second],
+                comicinfo_xml: "original metadata".into(),
+                cover: Some(first),
+            },
+            || false,
+        )
+        .await
+        .unwrap();
+        let original_file = std::fs::read(&path).unwrap();
+        let first_footer = inspect(path.clone()).await.unwrap().footer_hash;
+        let upscaled = directory.path().join("upscaled.avif");
+        let pixels = image::RgbImage::from_pixel(3200, 24, image::Rgb([190, 40, 220]));
+        std::fs::write(
+            &upscaled,
+            backend_image::encode_lossless_avif_rgb(&pixels).unwrap(),
+        )
+        .unwrap();
+        append_upscaled(
+            path.clone(),
+            UpscaledChapter {
+                pages: vec![upscaled.clone(), upscaled.clone()],
+                model: "first-model".into(),
+                scale: 2,
+                tile_size: 256,
+                expected_footer_hash: first_footer,
+            },
+            || false,
+        )
+        .await
+        .unwrap();
+        let first_append = std::fs::read(&path).unwrap();
+        assert_eq!(
+            &first_append[libbbf::HEADER_SIZE..original_file.len()],
+            &original_file[libbbf::HEADER_SIZE..]
+        );
+        assert_eq!(inspect(path.clone()).await.unwrap().page_count, 2);
+        let best = read_page(path.clone(), 0, None).await.unwrap();
+        assert_eq!(best.content_type, "image/avif");
+        assert_eq!(
+            backend_image::decode_avif(&best.bytes).unwrap().to_rgb8(),
+            pixels
+        );
+        drop(best);
+        assert_eq!(
+            &read_page(path.clone(), 0, Some(PageVariant::Original))
+                .await
+                .unwrap()
+                .bytes[..],
+            &original
+        );
+        assert_eq!(
+            &read_cover(path.clone()).await.unwrap().bytes[..],
+            &original
+        );
+
+        let footer = inspect(path.clone()).await.unwrap().footer_hash;
+        append_upscaled(
+            path.clone(),
+            UpscaledChapter {
+                pages: vec![upscaled.clone(), upscaled],
+                model: "replacement-model".into(),
+                scale: 2,
+                tile_size: 128,
+                expected_footer_hash: footer,
+            },
+            || false,
+        )
+        .await
+        .unwrap();
+        let second_append = std::fs::read(&path).unwrap();
+        assert_eq!(
+            &second_append[libbbf::HEADER_SIZE..first_append.len()],
+            &first_append[libbbf::HEADER_SIZE..]
+        );
+        let reader = libbbf::Reader::from_bytes(second_append);
+        let footer = reader.footer().unwrap();
+        assert_eq!(footer.page_count, 4);
+        assert_eq!(footer.section_count, 2);
+        assert_eq!(footer.metadata_count, 5);
+        assert!(reader.verify_footer_hash().unwrap());
+        assert_eq!(
+            metadata(path.clone()).await.unwrap()["upscale.model"],
+            "replacement-model"
+        );
+        update_comicinfo(path.clone(), "updated synopsis".repeat(300))
+            .await
+            .unwrap();
+        assert_eq!(
+            read_comicinfo(path).await.unwrap(),
+            Some("updated synopsis".repeat(300))
+        );
+    }
+
+    #[tokio::test]
+    async fn canceled_append_leaves_previous_view_and_stale_inference_is_rejected() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("chapter.bbf");
+        let original = directory.path().join("original.png");
+        std::fs::write(&original, encoded(image::ImageFormat::Png, 16)).unwrap();
+        write_originals(
+            path.clone(),
+            OriginalChapter {
+                pages: vec![original.clone(), original],
+                comicinfo_xml: String::new(),
+                cover: None,
+            },
+            || false,
+        )
+        .await
+        .unwrap();
+        let before = inspect(path.clone()).await.unwrap();
+        let upscale = directory.path().join("upscale.avif");
+        std::fs::write(
+            &upscale,
+            backend_image::encode_lossless_avif_rgb(&image::RgbImage::new(32, 24)).unwrap(),
+        )
+        .unwrap();
+        let calls = AtomicUsize::new(0);
+        let chapter = || UpscaledChapter {
+            pages: vec![upscale.clone(), upscale.clone()],
+            model: "test".into(),
+            scale: 2,
+            tile_size: 256,
+            expected_footer_hash: before.footer_hash,
+        };
+        assert!(
+            append_upscaled(path.clone(), chapter(), move || calls
+                .fetch_add(1, Ordering::Relaxed)
+                >= 2)
+            .await
+            .is_err()
+        );
+        let after = inspect(path.clone()).await.unwrap();
+        assert_eq!(after.footer_hash, before.footer_hash);
+        assert_eq!(after.page_count, 2);
+        assert!(!after.has_upscaled);
+        update_comicinfo(path.clone(), "new metadata".into())
+            .await
+            .unwrap();
+        assert!(
+            append_upscaled(path, chapter(), || false)
+                .await
+                .unwrap_err()
+                .downcast_ref::<ChapterChanged>()
+                .is_some()
+        );
     }
     #[tokio::test]
     async fn preserves_native_bytes_dimensions_order_and_long_metadata() {

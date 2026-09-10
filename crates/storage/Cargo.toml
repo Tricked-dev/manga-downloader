@@ -15,4 +15,4 @@ tokio.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-uuid.workspace = true
+backend-image = { path = "../image" }
