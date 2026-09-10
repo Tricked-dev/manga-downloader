@@ -25,7 +25,8 @@ Two sibling repos get folded in at the same time:
   because tar has no index.
 - **`../mangajenai-rs`** — MangaJaNai ESRGAN upscaling via ONNX Runtime. `manga-core` is a plain
   synchronous library (`UpscaleModel`, `upscale_tiled`, model-per-page-height selection from a
-  manifest). This becomes an optional post-download upscale pass.
+  manifest). This becomes a post-download upscale pass that is always compiled in and on by
+  default, which makes ONNX Runtime a hard dependency of the binary.
 
 Plus a new **rawkuma** source for Japanese raws, alongside the existing comix source.
 
@@ -38,13 +39,15 @@ Plus a new **rawkuma** source for Japanese raws, alongside the existing comix so
 | Sources | Native in-process `Source` trait compiled into the binary. wasmtime/WIT/plugin-registry deleted. Port comix, add rawkuma. |
 | Storage | `.bbf` is the on-disk chapter format. Native (as-downloaded) pages are the archival copy; upscaled pages live in the same container as a second section. Re-encode only on demand. |
 | Resolution | Full resolution everywhere by default. No download-time re-encode, no implicit resize; the existing 800px cap is deleted. `&width=` is opt-in at serve time only. |
+| Upscale | **Always enabled** — no cargo feature gate, no opt-out build. ONNX Runtime is a hard dependency and `auto_upscale` defaults to on. |
 | Upscale output | Lossless WebP, stored and served as such. WebP is also the default on-demand re-encode target. |
 | Dropped | Discord bot; all of `infra/`; codesync / http_proxy / dev-start / `libs/bazel`; k6 + observability TS; kanidm-manager. |
 | Kept | OTel telemetry, foyer cache, Cloudflare clearance, OIDC auth, AVIF-on-demand. |
 | Auth | OIDC only, verified **in Rust**. Better Auth + `data/auth.db` deleted. |
 | Web UI | SvelteKit → `adapter-static`, built with **bun**, embedded in the binary via rust-embed, with an optional load-from-disk override. |
 | Clients | **Aidoku + Tachiyomi extensions must keep working** — highest-priority constraint. |
-| Rawkuma | Just another source. Separate library entries, no EN/JP linking. |
+| Rawkuma | Just another source — separate library entries, no EN/JP linking. Browser-driven like comix. |
+| Legacy data | None. No `.tar.zst` reader, no migration command; existing downloads are disposable. |
 
 ## Target shape
 
@@ -61,21 +64,26 @@ manga-downloader/
 │   ├── fs/  image/  persistence/  runtime/  telemetry/  tls/
 │   ├── sources/               # NEW: Source trait, HTTP layer, comix, rawkuma
 │   ├── storage/               # NEW: BBF read/write + chapter archive lifecycle
-│   └── upscale/               # NEW: feature-gated mangajanai wrapper
+│   └── upscale/               # NEW: mangajanai wrapper (always built)
 ├── web/                       # bun workspace: SvelteKit SPA + api-client + ui
 └── clients/aidoku/  clients/tachiyomi/
 ```
 
-`cargo build --release` → `target/release/manga-server`, self-contained: sources, web UI, and
-migrations all compiled in. Optional runtime inputs only: `--web-root` (dev UI override),
-`--features upscale` + a models dir, and a CDP endpoint for challenged sources.
+`cargo build --release` → `target/release/manga-server`, self-contained: sources, web UI,
+migrations, and the upscaler all compiled in. It links ONNX Runtime, so that library must be
+present to build and to run. Optional runtime inputs: `--web-root` (dev UI override), a models
+directory for upscaling, and a CDP endpoint for challenged sources.
 
-## Phase 0 — Import
+## Phase 0 — Import (done)
 
-`origin` is `github.com/Tricked-dev/manga-downloader` and the local clone has **zero commits**.
-Prefer `git fetch origin && git checkout -b simplify origin/main`; if the remote doesn't match the
-zip, commit the extracted zip tree as the initial commit instead. Either way the simplification
-lands as reviewable diffs rather than a from-scratch tree.
+`github.com/Tricked-dev/manga-downloader` turned out to be **completely empty** — `git ls-remote`
+returns nothing, no branches, no commits. So there is no upstream history to branch from and the zip
+is the only copy of the code. `main` now exists with this plan as its initial commit (`c293e11`).
+
+Next: commit the extracted zip tree as-is, unmodified, as a second commit. That costs one throwaway
+commit but makes every later phase a reviewable diff against a known-good baseline instead of an
+unreadable from-scratch drop — which matters most for Phase 3, where ~4k LOC of comix logic moves
+between crates and needs to be verifiably unchanged.
 
 ## Phase 1 — Cargo workspace
 
@@ -160,16 +168,27 @@ and `browser_capture.rs` change — the `wit_bindgen` imports become `SourceHttp
 `ClearanceSolver` calls. Its inline tests (extensive in `parse.rs` and `source.rs`) come along and
 are the acceptance criterion for the port.
 
-**Add rawkuma** (`crates/sources/src/rawkuma/`), base `https://rawkuma.net`. It's an HTML site, not
-a JSON API like comix, so this needs an HTML parser — **there is none in the current dep set**. Add
-`scraper` (html5ever + selectors) to `[workspace.dependencies]`. Implement: search (`/?s=` and
-`/manga/?order=popular` for the popular sort), details (title/cover/author/genres/status/alt-titles
-from the info table), chapter list (`#chapterlist` entries → number + published date), and page list
-(the `ts_reader.run({...})` JSON blob embedded in the chapter page — parse with `serde_json` rather
-than scraping `<img>` tags, it's more stable). Declare `SourceCapability::{Search, MangaDetails,
-ChapterList, PageList}` and set a `Referer` request profile — rawkuma hotlink-blocks its CDN.
-Unit-test each parser against checked-in HTML fixtures, mirroring how `plugins/comix/src/parse.rs`
-tests today.
+**Add rawkuma** (`crates/sources/src/rawkuma/`), base `https://rawkuma.net`. **It goes through the
+browser, like comix** — document fetches use the `ClearanceSolver` / browser-capture path rather
+than plain `reqwest`, so it inherits challenge solving and real-browser headers. Two consequences:
+the browser is now load-bearing for *every* compiled-in source rather than an edge case (see Risks),
+and the capture request shape from the old WIT world (`init-script`, `done-expression`,
+`payloads-expression`, timeouts) is still the right interface — keep it as the native
+`BrowserJsonCaptureRequest` in `crates/sources`, don't design a new one.
+
+It's an HTML site rather than a JSON API, so this needs an HTML parser — **there is none in the
+current dep set**. Add `scraper` (html5ever + selectors) to `[workspace.dependencies]`. Implement:
+search (`/?s=` and `/manga/?order=popular` for the popular sort), details
+(title/cover/author/genres/status/alt-titles from the info table), chapter list (`#chapterlist`
+entries → number + published date), and page list (the `ts_reader.run({...})` JSON blob embedded in
+the chapter page — grab it with a `payloads-expression` capture and parse with `serde_json` rather
+than scraping `<img>` tags, which is both more stable and avoids re-parsing the DOM in Rust).
+Declare `SourceCapability::{Search, MangaDetails, ChapterList, PageList}` and set a `Referer`
+request profile — rawkuma hotlink-blocks its CDN, and image fetches stay on the plain HTTP client
+with that profile rather than going through the browser.
+
+Keep the parsers pure functions over `&str` so they unit-test against checked-in HTML fixtures with
+no browser involved, mirroring how `plugins/comix/src/parse.rs` tests today.
 
 **CLI/API:** `plugins list` → `sources list`; `/v1/sources` reports the compiled-in set. Keep the
 per-source settings and enable/disable endpoints in `api/routes/sources.rs` — the UI and the DB
@@ -219,7 +238,10 @@ path once nothing calls them.
   end up full-resolution, and `convert_to_avif`'s implicit-resize signature should be deleted in
   favour of the explicit `_with_max_width` variant so no future call silently downscales.
 - Page reads serve full-resolution stored bytes with the media type from the BBF asset record.
-  Extensions get original JPEG/WebP → works on every Android/iOS version.
+  **The default variant is upscaled when that section exists, falling back to original when it
+  doesn't** — so a client that passes no `variant` always gets the best copy on hand, and the
+  content type follows it (`image/webp` for upscaled, the source's own type for original).
+  Extensions get WebP or the original JPEG/WebP → works on every Android/iOS version either way.
 - Re-encoding and resizing are serve-time, on demand, opt-in only: `?format=avif|webp|jpeg` +
   `&width=N`, memoized in the existing foyer hybrid cache (`crates/cache`). No `width` parameter
   means no resize. `app/media.rs:466`'s `media_proxy_format_from_query` already implements exactly
@@ -227,13 +249,17 @@ path once nothing calls them.
 - Where a re-encode *is* needed, WebP is the default target rather than AVIF: lossless WebP is
   small enough on manga line art, decodes everywhere (Android 4.3+/iOS 14+ vs AVIF's Android
   12+/iOS 16+), and matches what the upscale pass writes. AVIF stays available via `?format=avif`.
-- Migration command `manga-server archive migrate` converts existing `.tar.zst` archives to `.bbf`
-  in place, since the on-disk format changes.
+- **No legacy migration.** `.bbf` is simply the format; there is no `.tar.zst` reader and no
+  conversion command. This is a fresh project — any existing downloads are disposable and can be
+  re-fetched. Concretely that means the tar+zstd code in `libs/rust/image` is deleted outright
+  rather than kept alive behind a read path, which is what makes the Phase 4 deletions clean.
 
 ## Phase 5 — Upscaling
 
-`crates/upscale`, behind `--features upscale` so the default build has no ONNX Runtime dependency.
-Wraps `mangajanai-rs`'s `manga-core` (git dep, pinned rev): `ModelManifest::select(height, scale)`
+`crates/upscale`, unconditionally part of the workspace and linked into the binary — there is no
+feature gate, so `ort`/ONNX Runtime is a normal dependency and `pkg-config` must find
+`onnxruntime` at build time (`ORT_SKIP_DOWNLOAD=1`, so a missing library is a hard error rather
+than a silent download). Wraps `mangajanai-rs`'s `manga-core` (git dep, pinned rev): `ModelManifest::select(height, scale)`
 → `UpscaleModel` → `upscale_tiled` with a `TileConfig`. Inference is blocking and `&mut`, so run it
 on a dedicated worker thread with a `ModelCache` keyed by model path — port
 `mangajenai-rs/crates/manga-cli/src/convert.rs`'s `ModelCache` rather than reinventing it.
@@ -247,13 +273,20 @@ on a dedicated worker thread with a `ModelCache` keyed by model path — port
   `upscale.tile_size`.
 - **Reads:** `?variant=original|upscaled`, defaulting to upscaled when that section exists.
 - **Jobs:** reuse the `apalis` SQLite backend freed up in Phase 4 for an `upscale_chapter` job.
-  Triggerable per chapter from the API, or automatically via a new `auto_upscale` setting (global,
-  overridable per source using the existing `source_setting_key` pattern in `app/settings.rs:220`).
+  A new `auto_upscale` setting (global, overridable per source using the existing
+  `source_setting_key` pattern in `app/settings.rs:220`) **defaults to on**, so every completed
+  download enqueues one; the job is also triggerable per chapter from the API for re-runs and for
+  backfilling chapters downloaded before a model was available.
 - **State:** migration `0011` adds `upscaled_at`, `upscale_model`, `upscale_scale` to the
   downloaded-chapter rows so the UI and API can show what has been upscaled and what hasn't.
 - Model files are **not** vendored — `--models-dir` (default `./data/models`), documented as a
-  separate download. The flake's `upscale` variant adds `onnxruntime` via pkg-config with
-  `ORT_SKIP_DOWNLOAD=1`, exactly as `mangajenai-rs/flake.nix` already does.
+  separate download; `../_mj_downloads/models_v1` holds the `.pth` weights, which still need the
+  Python `export_onnx.py` step from `mangajenai-rs/tools/` to become `.onnx`.
+- **Degrade, don't fail, when models are absent.** Since upscaling is always on, a server with no
+  models directory is a normal state (fresh install, models not yet exported). The `upscale_chapter`
+  job must log once and mark the chapter un-upscaled rather than erroring in a retry loop, and
+  startup should warn — never refuse to boot. The `"original"` section is always present, so
+  reads keep working untouched.
 
 ## Phase 6 — OIDC in Rust, embedded UI
 
@@ -302,11 +335,13 @@ Highest-priority constraint, and the part most at risk.
 Model `flake.nix` on `libbbf-rs/flake.nix` (crane + rust-overlay + flake-utils, which you already
 use in both sibling repos):
 
-- `packages.default` = `manga-server` (web UI embedded; bun build as a fixed-output derivation).
-- `packages.manga-server-upscale` = the `upscale` feature variant, with `onnxruntime`.
+- `packages.default` = `manga-server` (web UI embedded; bun build as a fixed-output derivation),
+  with `onnxruntime` in `buildInputs` and the `ORT_*` env vars set the way
+  `mangajenai-rs/flake.nix` already does. There is only one package — no upscale variant.
 - `checks` = build, `cargoTest`, `cargoClippy --all-targets -- --deny warnings`, `cargoFmt`.
-- `devShell` = toolchain + rust-analyzer + bun + chromium (for clearance) + `bbfmux` (for
-  inspecting produced archives).
+- `devShell` = toolchain + rust-analyzer + bun + chromium (for clearance) + `onnxruntime` +
+  `bbfmux` (for inspecting produced archives). Reuse `mangajenai-rs`'s `python-env.nix` for the
+  one-time `.pth` → `.onnx` export.
 - Inputs: `libbbf-rs`, `mangajenai-rs`.
 - Neither sibling repo has CI today; a single GitHub Actions job running `nix flake check` is worth
   adding here.
@@ -317,8 +352,10 @@ Build and unit level:
 
 1. `cargo build --workspace && cargo test --workspace` — comix's ported `parse.rs`/`source.rs`
    tests and rawkuma's new fixture tests are the source-port acceptance gate.
-2. `nix flake check`, and `nix build .#manga-server-upscale`.
-3. `ldd target/release/manga-server` — confirm no ONNX Runtime in the default build.
+2. `nix flake check` and `nix build`.
+3. `ldd target/release/manga-server` — confirm ONNX Runtime **is** linked, and that a bare
+   `cargo build` outside the dev shell fails with a clear pkg-config error rather than trying to
+   download a runtime.
 
 Functional, end to end:
 
@@ -330,15 +367,18 @@ Functional, end to end:
    `bbfmux <chapter>.bbf --info --counts --sections --hashes` and `bbfmux <chapter>.bbf --verify`
    on the produced file. This is a strong independent check that the writer is correct, since
    `bbfmux` is byte-parity-tested against the C++ implementation.
-7. `curl -i .../page/0` → original `image/jpeg`/`image/webp`, and its pixel dimensions match the
-   source image exactly (assert this — it's the regression guard against the 800px cap coming back);
-   `?format=webp` → `image/webp`, still full resolution, `X-Image-Cache: MISS` then `HIT`;
-   `?format=avif` → `image/avif`; `&width=1200` → resized only when asked.
-8. Upscale build: trigger the `upscale_chapter` job, then `bbfmux --info --sections` shows both
+7. `curl -i .../page/0` with no `variant` → the upscaled WebP when that section exists, otherwise
+   the original `image/jpeg`/`image/webp`. In the not-yet-upscaled case its pixel dimensions match
+   the source image exactly (assert this — it's the regression guard against the 800px cap coming
+   back); in the upscaled case they match source × model scale. Then `?format=webp` → `image/webp`,
+   still full resolution, `X-Image-Cache: MISS` then `HIT`; `?format=avif` → `image/avif`;
+   `&width=1200` → resized only when asked.
+8. Trigger the `upscale_chapter` job (or just download a chapter, since `auto_upscale` is on),
+   then `bbfmux --info --sections` shows both
    `original` and `upscaled`; `?variant=original` and `?variant=upscaled` return different bytes
    with `image/jpeg` and `image/webp` respectively; the chapter row reports `upscale_model`.
-9. `manga-server archive migrate` against a directory of old `.tar.zst` archives; page reads still
-   work afterwards.
+9. Start with an **empty models directory** and download a chapter: the job degrades with one log
+   line, the chapter is readable, and nothing retry-loops. Then add models and re-run the job.
 10. `curl localhost:4000/` returns the embedded SPA; `--web-root ./web/build` serves from disk;
     OIDC login completes against a real issuer and the session cookie authorizes `/v1` calls.
 11. **On-device:** build and sideload both extension packages from `/v1/clients/*/package`, then
@@ -347,14 +387,25 @@ Functional, end to end:
 
 ## Risks and open items
 
-- **comix depends on headless-browser JSON capture.** The native port must keep the clearance path
-  (`crates/clearance`, chromiumoxide/Browser Use) wired. Test comix specifically against a
-  challenged page, not just the JSON API.
+- **Both sources depend on headless-browser capture**, so `crates/clearance` (chromiumoxide /
+  Browser Use / any CDP endpoint) is a hard runtime requirement for normal operation, not an
+  optional extra for challenged sites. A build with no reachable browser can serve the library but
+  cannot search or fetch new chapters at all. That makes the clearance path worth its own health
+  check in `app/health.rs` and a startup warning, and it means chromium belongs in the dev shell.
+  Test both sources against a challenged page, not just their happy paths.
 - **rawkuma parsers are scraping-fragile.** Fixture-based tests localize breakage but won't prevent
   it; site changes will need parser updates.
 - **New dep: `scraper`** (html5ever). First HTML parser in the tree.
 - **Nightly + `tokio_unstable`** are load-bearing (`Duration::from_mins` in ~10 places, tokio
   poll-time histogram). Documented in `rust-toolchain.toml`; unpinning is a follow-up, not part of this.
+- **ONNX Runtime is now a build-time requirement**, so `cargo build` no longer works on a bare
+  checkout — it needs the dev shell or a system `onnxruntime`. That is the cost of dropping the
+  feature gate; re-adding it later is a small change if it becomes annoying for contributors.
+- **Upscaling every download is expensive.** ESRGAN inference on CPU is minutes per page, so with
+  `auto_upscale` on by default the job queue becomes the bottleneck for large libraries and
+  storage roughly doubles (both sections retained). Bound the job concurrency to 1 and measure a
+  full chapter before turning it loose on a backfill; GPU execution providers are a follow-up
+  (`mangajenai-rs` PROGRESS.md has them scheduled).
 - **BBF stores payloads uncompressed**, so the `.tar.zst` wrapper goes away. Near-neutral for size
   (already-encoded images barely compress) but worth measuring on a real library before committing
   to the migration.
