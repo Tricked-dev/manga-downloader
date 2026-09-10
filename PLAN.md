@@ -44,9 +44,9 @@ Plus a new **rawkuma** source for Japanese raws, alongside the existing comix so
 | Storage | `.bbf` is the on-disk chapter format. Native (as-downloaded) pages are the archival copy; upscaled pages live in the same container as a second section. Re-encode only on demand. |
 | Resolution | Full resolution everywhere by default. No download-time re-encode, no implicit resize; the existing 800px cap is deleted. `&width=` is opt-in at serve time only. |
 | Upscale | **Always enabled** — no cargo feature gate, no opt-out build. ONNX Runtime is a hard dependency and `auto_upscale` defaults to on. |
-| Upscale output | Lossless WebP, stored and served as such. WebP is also the default on-demand re-encode target. |
+| Upscale output | Lossless AVIF (AV1), stored and served as such. AVIF is also the default on-demand re-encode target. |
 | Dropped | Discord bot; all of `infra/`; codesync / http_proxy / dev-start / `libs/bazel`; k6 + observability TS; kanidm-manager. |
-| Kept | OTel telemetry, foyer cache, Cloudflare clearance, OIDC auth, AVIF-on-demand. |
+| Kept | OTel telemetry, foyer cache, Cloudflare clearance, OIDC auth, explicit JPEG/WebP serving options. |
 | Auth | OIDC only, verified **in Rust**. Better Auth + `data/auth.db` deleted. |
 | Web UI | SvelteKit → `adapter-static`, built with **bun**, embedded in the binary via rust-embed, with an optional load-from-disk override. |
 | Clients | **Aidoku + Tachiyomi extensions must keep working** — highest-priority constraint. |
@@ -247,15 +247,17 @@ path once nothing calls them.
 - Page reads serve full-resolution stored bytes with the media type from the BBF asset record.
   **The default variant is upscaled when that section exists, falling back to original when it
   doesn't** — so a client that passes no `variant` always gets the best copy on hand, and the
-  content type follows it (`image/webp` for upscaled, the source's own type for original).
-  Extensions get WebP or the original JPEG/WebP → works on every Android/iOS version either way.
+  content type follows it (`image/avif` for upscaled, the source's own type for original).
+  Verify AVIF decoding on the actual supported Aidoku and Mihon devices.
 - Re-encoding and resizing are serve-time, on demand, opt-in only: `?format=avif|webp|jpeg` +
   `&width=N`, memoized in the existing foyer hybrid cache (`crates/cache`). No `width` parameter
   means no resize. `app/media.rs:466`'s `media_proxy_format_from_query` already implements exactly
   this for the proxy path — extend it to the downloaded-page path instead of writing something new.
-- Where a re-encode *is* needed, WebP is the default target rather than AVIF: lossless WebP is
-  small enough on manga line art, decodes everywhere (Android 4.3+/iOS 14+ vs AVIF's Android
-  12+/iOS 16+), and matches what the upscale pass writes. AVIF stays available via `?format=avif`.
+- Where a re-encode *is* needed, **lossless AVIF (AV1)** is the canonical target, matching
+  upscale output. JPEG and WebP remain explicit `format` options. Lossless means exact decoded
+  pixels: use a lossless AV1 encoder with full range, no chroma subsampling, and an identity
+  color matrix. Quality 100 alone is not the acceptance criterion. Keep full resolution unless
+  an explicit width was requested.
 - **No legacy migration.** `.bbf` is simply the format; there is no `.tar.zst` reader and no
   conversion command. This is a fresh project — any existing downloads are disposable and can be
   re-fetched. Concretely that means the tar+zstd code in `libs/rust/image` is deleted outright
@@ -334,14 +336,20 @@ than a silent download). Wraps `mangajanai-rs`'s `manga-core` (git dep, pinned r
 on a dedicated worker thread with a `ModelCache` keyed by model path — port
 `mangajenai-rs/crates/manga-cli/src/convert.rs`'s `ModelCache` rather than reinventing it.
 
-- **Output encoding: lossless WebP.** `image` 0.25's `WebPEncoder` is lossless-only, so the
-  existing `image` dep covers it — no libwebp, no new native dep. `manga-core` hands back an
-  `image::RgbImage`, so it's a direct encode.
+- **Output encoding: lossless AVIF (AV1).** `manga-core` returns an `image::RgbImage`.
+  Encode it with libavif/libaom in genuine lossless mode, full range, 4:4:4, and an identity
+  RGB matrix. Add the required native build dependency and verify a byte-for-byte pixel
+  round trip after decoding. The existing ravif quality setting is not a lossless guarantee.
+- **GPU inference is mandatory.** Use an explicit GPU execution provider and disable ONNX
+  Runtime CPU fallback, including unsupported individual operators. No CPU inference is
+  allowed on the development PC. Missing GPU support makes an upscale job unavailable;
+  it must never select CPU automatically. Keep one dedicated worker and bound its queue.
+  The user-authorized Mac mini may be used for builds and GPU-backed model preparation.
 - **Both variants in one container — one `.bbf` per chapter, never two files.** Verified against the
   format: `Page { asset_index, flags }` makes a page a pointer to an asset, so two pages can hold two
   encodings of the same logical page; `Section { title_offset, start_index, parent_offset }` is a
   named marker into one flat page list, so pages `[0..N)` are `"original"` and `[N..2N)` are
-  `"upscaled"`; and `media_type` is per-asset, so `Jpg` originals and `Webp` upscales coexist.
+  `"upscaled"`; and `media_type` is per-asset, so `Jpg` originals and `Avif` upscales coexist.
   Asset dedup is XXH3-128 over content, so it only collapses byte-identical assets and will not
   merge the two variants. Metadata records `upscale.model`, `upscale.scale`, `upscale.tile_size`.
 
@@ -407,9 +415,9 @@ Highest-priority constraint, and the part most at risk.
   + debug keystore. Untouched by the Rust changes; the script needs to stop assuming Bazel paths.
   Keep `/v1/clients/tachiyomi/package`.
 - Both extensions consume the same HTTP API, so the contract to protect is: `/v1/media/image`,
-  the page-read endpoints, and their content types. Phase 4's "serve native bytes" policy is
-  *more* compatible than today's opt-in AVIF, so this should be a strict improvement — but it must
-  be verified on-device, not just by curl.
+  the page-read endpoints, and their content types. Original pages retain their native format;
+  upscaled pages use lossless AVIF. Verify both variants and explicit JPEG/WebP conversions
+  on-device, not just by curl.
 
 ## Phase 8 — Flake and CI
 
@@ -417,7 +425,7 @@ Model `flake.nix` on `libbbf-rs/flake.nix` (crane + rust-overlay + flake-utils, 
 use in both sibling repos):
 
 - `packages.default` = `manga-server` (web UI embedded; bun build as a fixed-output derivation),
-  with `onnxruntime` in `buildInputs` and the `ORT_*` env vars set the way
+  with `onnxruntime` and `libavif` (libaom enabled) in `buildInputs` and the `ORT_*` env vars set the way
   `mangajenai-rs/flake.nix` already does. There is only one package — no upscale variant.
 - `checks` = build, `cargoTest` (SQLite backend — hermetic), `cargoClippy --all-targets -- --deny
   warnings`, `cargoFmt`. The Postgres test pass runs under `devenv` in CI, outside the sandbox.
@@ -451,15 +459,15 @@ Functional, end to end:
    `bbfmux <chapter>.bbf --info --counts --sections --hashes` and `bbfmux <chapter>.bbf --verify`
    on the produced file. This is a strong independent check that the writer is correct, since
    `bbfmux` is byte-parity-tested against the C++ implementation.
-7. `curl -i .../page/0` with no `variant` → the upscaled WebP when that section exists, otherwise
+7. `curl -i .../page/0` with no `variant` → the upscaled AVIF when that section exists, otherwise
    the original `image/jpeg`/`image/webp`. In the not-yet-upscaled case its pixel dimensions match
    the source image exactly (assert this — it's the regression guard against the 800px cap coming
-   back); in the upscaled case they match source × model scale. Then `?format=webp` → `image/webp`,
-   still full resolution, `X-Image-Cache: MISS` then `HIT`; `?format=avif` → `image/avif`;
+   back); in the upscaled case they match source × model scale. Then `?format=avif` → `image/avif`,
+   still full resolution, `X-Image-Cache: MISS` then `HIT`; `?format=webp` → `image/webp`;
    `&width=1200` → resized only when asked.
 8. Trigger the `upscale_chapter` job (or just download a chapter, since `auto_upscale` is on), then
    `bbfmux --info --sections` shows both `original` and `upscaled`; `?variant=original` and
-   `?variant=upscaled` return different bytes with `image/jpeg` and `image/webp` respectively; the
+   `?variant=upscaled` return different bytes with `image/jpeg` and `image/avif` respectively; the
    chapter row reports `upscale_model`. Re-run `bbfmux --verify` after the append and confirm the
    page count reads back as exactly 2N.
 9. Start with an **empty models directory** and download a chapter: the job degrades with one log
