@@ -1,0 +1,23 @@
+[package]
+name = "backend-telemetry"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_telemetry"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+autometrics.workspace = true
+metrics.workspace = true
+metrics-exporter-otel.workspace = true
+opentelemetry.workspace = true
+opentelemetry-appender-tracing.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry_sdk.workspace = true
+tokio-metrics.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+tracing-subscriber.workspace = true

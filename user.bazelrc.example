@@ -1,8 +1,0 @@
-# Local-only Bazel credentials template.
-#
-# Keep remote cache, RBE, platform, and toolchain defaults in .bazelrc. Copy only
-# credentials into user.bazelrc when BuildBuddy needs to pull a private GHCR
-# execution image for repo-owned RBE canaries or coverage.
-#
-# build --remote_exec_header=x-buildbuddy-platform.container-registry-username=<github-user>
-# build --remote_exec_header=x-buildbuddy-platform.container-registry-password=<ghcr-token>

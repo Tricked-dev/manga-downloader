@@ -1,0 +1,15 @@
+[package]
+name = "backend-config"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_config"
+path = "src/lib.rs"
+
+[dependencies]
+backend-fs = { path = "../fs" }
+anyhow.workspace = true
+schematic.workspace = true
+serde.workspace = true

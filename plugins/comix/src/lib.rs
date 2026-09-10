@@ -1,7 +1,7 @@
 #![allow(clippy::same_length_and_capacity)]
 
 wit_bindgen::generate!({
-    path: "../../libs/rust/plugin-host/wit/manga-source.wit",
+    path: "../../crates/plugin-host/wit/manga-source.wit",
     world: "manga-source",
 });
 

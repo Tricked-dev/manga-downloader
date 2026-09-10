@@ -1,0 +1,20 @@
+[package]
+name = "backend-page-extraction"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_page_extraction"
+path = "src/lib.rs"
+
+[dependencies]
+backend-fs = { path = "../fs" }
+backend-image = { path = "../image" }
+backend-telemetry = { path = "../telemetry" }
+anyhow.workspace = true
+rayon.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+uuid.workspace = true

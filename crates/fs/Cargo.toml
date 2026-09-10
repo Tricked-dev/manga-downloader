@@ -1,0 +1,23 @@
+[package]
+name = "backend-fs"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_fs"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+fusio.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true
+
+[[bench]]
+name = "filesystem_scans"
+harness = false

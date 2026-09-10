@@ -1,0 +1,10 @@
+[build]
+rustflags = ["--cfg=tokio_unstable"]
+
+# Cargo gives target flags precedence over build.rustflags. Keep Tokio's
+# metrics available when a developer configures a target-specific linker.
+[target.'cfg(all())']
+rustflags = ["--cfg=tokio_unstable"]
+
+[env]
+ORT_SKIP_DOWNLOAD = "1"

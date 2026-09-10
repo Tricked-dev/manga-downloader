@@ -1,0 +1,23 @@
+[package]
+name = "backend-persistence"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_persistence"
+path = "src/lib.rs"
+
+[dependencies]
+backend-core = { path = "../core" }
+backend-fs = { path = "../fs" }
+anyhow.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toasty.workspace = true
+toasty-core.workspace = true
+toasty-driver-sqlite.workspace = true
+tokio.workspace = true
+utoipa.workspace = true
+uuid.workspace = true

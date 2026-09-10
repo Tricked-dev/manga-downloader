@@ -1,6 +1,0 @@
-########################
-# Generated Bazel flag presets.
-#
-# Regenerate the main preset with:
-#   bazel run //libs/bazel/bazelrc:preset.update
-try-import %workspace%/libs/bazel/bazelrc/preset.bazelrc

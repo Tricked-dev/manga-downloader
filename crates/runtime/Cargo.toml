@@ -1,0 +1,12 @@
+[package]
+name = "backend-runtime"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+tracing-subscriber.workspace = true

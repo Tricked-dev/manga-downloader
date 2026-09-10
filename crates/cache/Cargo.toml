@@ -1,0 +1,23 @@
+[package]
+name = "backend-cache"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_cache"
+path = "src/lib.rs"
+
+[dependencies]
+backend-core = { path = "../core" }
+backend-fs = { path = "../fs" }
+backend-runtime = { path = "../runtime" }
+anyhow.workspace = true
+bytes.workspace = true
+foyer.workspace = true
+metrics.workspace = true
+mixtrics.workspace = true
+rkyv.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

@@ -1,7 +1,0 @@
-package(default_visibility = ["//visibility:public"])
-
-filegroup(
-    name = "starlark_files",
-    srcs = ["BUILD.bazel"],
-    tags = ["starlark"],
-)

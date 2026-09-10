@@ -1,0 +1,12 @@
+[package]
+name = "dev-start"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "start"
+path = "start.rs"
+
+[dependencies]
+rusqlite.workspace = true

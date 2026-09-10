@@ -1,0 +1,17 @@
+[package]
+name = "backend-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_core"
+path = "src/lib.rs"
+
+[dependencies]
+backend-fs = { path = "../fs" }
+anyhow.workspace = true
+byte-unit.workspace = true
+jiff.workspace = true
+quick-xml.workspace = true
+sanitize-filename.workspace = true

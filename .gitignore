@@ -60,3 +60,7 @@ apps/svelte/*/.dev.vars
 
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+
+# Historical inputs are kept locally, not nested repositories in this project.
+/inspo/
+/.devenv/

@@ -1,0 +1,12 @@
+[package]
+name = "backend-tls"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "backend_tls"
+path = "src/lib.rs"
+
+[dependencies]
+rustls-graviola.workspace = true

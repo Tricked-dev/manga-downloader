@@ -1,0 +1,74 @@
+[package]
+name = "manga-server"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "manga_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "manga-server"
+path = "src/main.rs"
+
+[dependencies]
+backend-api-types = { path = "../api-types" }
+backend-cache = { path = "../cache" }
+backend-config = { path = "../config" }
+backend-core = { path = "../core" }
+backend-discord = { path = "../discord" }
+backend-fs = { path = "../fs" }
+backend-image = { path = "../image" }
+backend-page-extraction = { path = "../page-extraction" }
+backend-persistence = { path = "../persistence" }
+backend-plugin-host = { path = "../plugin-host" }
+backend-runtime = { path = "../runtime" }
+backend-telemetry = { path = "../telemetry" }
+backend-tls = { path = "../tls" }
+anyhow.workspace = true
+apalis.workspace = true
+autometrics.workspace = true
+axum.workspace = true
+axum-client-ip.workspace = true
+axum-otel-metrics.workspace = true
+backon.workspace = true
+byte-unit.workspace = true
+bytecheck.workspace = true
+clap.workspace = true
+dashmap.workspace = true
+futures-util.workspace = true
+garde.workspace = true
+http.workspace = true
+jiff.workspace = true
+metrics.workspace = true
+mime_guess.workspace = true
+postcard.workspace = true
+rayon.workspace = true
+reqwest.workspace = true
+rkyv.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+shadow-rs.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-graceful.workspace = true
+tokio-util.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tower-resilience-ratelimiter.workspace = true
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+zip.workspace = true
+mimalloc.workspace = true
+
+[dev-dependencies]
+axum-test.workspace = true
+tempfile.workspace = true
+
+[build-dependencies]
+shadow-rs = { workspace = true, features = ["build", "metadata"] }
