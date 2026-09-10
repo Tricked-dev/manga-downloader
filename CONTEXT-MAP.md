@@ -8,4 +8,4 @@
 - [Authentication](crates/server/src/api/auth/CONTEXT.md): OIDC, durable sessions, bearer credentials and public sharing.
 - [Web application](web/CONTEXT.md): static assets, browser state and API integration.
 
-Client extensions use the shared product language. Their context entry is added as that boundary is migrated.
+- [Reader clients](clients/CONTEXT.md): Aidoku and Mihon packages, builds, authentication and API contracts.

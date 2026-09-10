@@ -32,6 +32,8 @@ enum Command {
     Sources(SourcesCommand),
     /// Database maintenance commands.
     Db(DbCommand),
+    /// Build reader extension packages without starting the server.
+    Clients(ClientsCommand),
 }
 
 #[derive(Args, Debug, Default, Clone)]
@@ -137,6 +139,23 @@ struct DbMigrateOptions {
     server: ServerOptions,
 }
 
+#[derive(Args, Debug)]
+struct ClientsCommand {
+    #[command(subcommand)]
+    command: ClientsSubcommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum ClientsSubcommand {
+    /// Write an Aidoku or Tachiyomi/Mihon install package.
+    Package {
+        #[arg(value_parser = ["aidoku", "tachiyomi"])]
+        client: String,
+        #[arg(long)]
+        output: PathBuf,
+    },
+}
+
 #[derive(Serialize)]
 struct ConfigReport {
     web_root: Option<PathBuf>,
@@ -171,6 +190,13 @@ pub(crate) async fn run() -> anyhow::Result<()> {
         Command::Config(command) => run_config_command(command, cli.server),
         Command::Sources(command) => run_sources_command(command, cli.server).await,
         Command::Db(command) => run_db_command(command, cli.server).await,
+        Command::Clients(command) => {
+            let ClientsSubcommand::Package { client, output } = command.command;
+            let package = crate::app::clients::build_package(&client).await?;
+            tokio::fs::write(&output, package.bytes).await?;
+            println!("{} package written to {}", client, output.display());
+            Ok(())
+        }
     }
 }
 

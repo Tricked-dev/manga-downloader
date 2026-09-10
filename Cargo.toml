@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["inspo", "apps/clients/aidoku", "vendor/mangajenai-rs", "vendor/sqlx-0.8.6", "vendor/sqlx-macros-core-0.8.6"]
+exclude = ["inspo", "clients/aidoku", "vendor/mangajenai-rs", "vendor/sqlx-0.8.6", "vendor/sqlx-macros-core-0.8.6"]
 
 [workspace.package]
 version = "0.1.0"

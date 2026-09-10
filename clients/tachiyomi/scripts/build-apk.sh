@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-out="${1:-build/package.apk}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+out="${1:-$root/build/package.apk}"
 build_dir="$root/build"
 stubs_classes="$build_dir/stubs-classes"
 source_classes="$build_dir/source-classes"
@@ -53,7 +53,7 @@ if ((${#kotlin_sources[@]} > 0)); then
 		-d "$source_classes" \
 		"${kotlin_sources[@]}"
 
-	kotlin_root="$(cd "$(dirname "$kotlinc_bin")/.." && pwd)"
+	kotlin_root="${KOTLIN_HOME:-$(cd "$(dirname "$(readlink -f "$kotlinc_bin")")/.." && pwd)}"
 	for jar_name in kotlin-stdlib.jar kotlin-stdlib-jdk7.jar kotlin-stdlib-jdk8.jar; do
 		jar_path="$(find -L "$kotlin_root" -type f -name "$jar_name" | head -n 1)"
 		if [[ -n "$jar_path" ]]; then

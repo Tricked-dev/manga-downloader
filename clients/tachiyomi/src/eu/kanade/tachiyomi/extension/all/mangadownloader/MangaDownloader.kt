@@ -154,7 +154,7 @@ class MangaDownloader : HttpSource(), ConfigurableSource, UnmeteredSource {
             screen,
             PREF_SOURCE_NAMES,
             "Source Names",
-            "Comma-separated source plugin names. Leave blank to auto-discover.",
+            "Comma-separated source names. Leave blank to auto-discover.",
             InputType.TYPE_CLASS_TEXT,
         )
         addTextPreference(
@@ -582,7 +582,7 @@ class MangaDownloader : HttpSource(), ConfigurableSource, UnmeteredSource {
                 try {
                     val format = SimpleDateFormat(pattern, Locale.US)
                     format.timeZone = TimeZone.getTimeZone("UTC")
-                    return format.parse(value).time
+                    return format.parse(value)?.time ?: 0L
                 } catch (_: Exception) {
                 }
             }

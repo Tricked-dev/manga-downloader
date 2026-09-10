@@ -1,6 +1,6 @@
 # Manga Downloader Aidoku Source
 
-This is an Aidoku source that browses Manga Downloader library categories and searches both downloaded manga and configured remote source plugins.
+This is an Aidoku source that browses Manga Downloader library categories and searches both downloaded manga and enabled remote sources.
 
 ## Settings
 
@@ -28,4 +28,13 @@ Search filters are source-aware. The header shows sort, type, demographic, and d
 
 ## Build
 
-Cargo builds are disabled for this repository. Add a hermetic Bazel wasm package target before shipping an Aidoku artifact from this tree.
+The source is an isolated Cargo package pinned to the official Aidoku Rust SDK. In the development environment:
+
+```sh
+cargo build --manifest-path clients/aidoku/Cargo.toml --locked --target wasm32-unknown-unknown --release
+cargo run -p manga-server -- clients package aidoku --output /tmp/manga-downloader.aix
+```
+
+The server packages the WASM, icon and JSON descriptors into an `.aix`. `GET /v1/clients/aidoku/package` serves the same package. Set `AIDOKU_PACKAGE_PATH` to override it with a prebuilt file; release binaries can embed it with `MANGA_EMBED_AIDOKU_PACKAGE` at build time. Otherwise, the endpoint builds from this checkout and requires Cargo with the WASM target.
+
+Run `aidoku verify /tmp/manga-downloader.aix` using the official Aidoku CLI to validate the package. Install it in Aidoku, set the reachable server URL and bearer API key, then check browse, search, and original/upscaled downloaded pages. Package verification does not replace that device check.

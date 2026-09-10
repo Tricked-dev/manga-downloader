@@ -2,6 +2,7 @@ use std::{
     io::{Cursor, Write},
     path::{Path, PathBuf},
     process::Command,
+    sync::Arc,
 };
 
 use anyhow::{Context, anyhow};
@@ -20,6 +21,10 @@ const AIDOKU_PACKAGE_PATH_ENV: &str = "AIDOKU_PACKAGE_PATH";
 const TACHIYOMI_PACKAGE_PATH_ENV: &str = "TACHIYOMI_PACKAGE_PATH";
 const AIDOKU_RUSTFLAGS: &str = "-C link-arg=--allow-undefined";
 const CLIENT_PACKAGE_CONTENT_TYPE: &str = "application/octet-stream";
+
+mod embedded {
+    include!(concat!(env!("OUT_DIR"), "/client_packages.rs"));
+}
 
 pub struct ClientPackage {
     pub bytes: Vec<u8>,
@@ -49,9 +54,19 @@ async fn build_aidoku_client_package() -> Result<ClientPackage, AppError> {
         .await;
     }
 
-    tokio::task::spawn_blocking(build_aidoku_package)
-        .await
-        .map_err(|error| AppError::internal(anyhow!("client package build task failed: {error}")))?
+    if let Some(bytes) = embedded::AIDOKU {
+        return Ok(embedded_package(bytes, AIDOKU_PACKAGE_FILE_NAME));
+    }
+
+    static BUILD_LOCK: std::sync::LazyLock<Arc<tokio::sync::Mutex<()>>> =
+        std::sync::LazyLock::new(|| Arc::new(tokio::sync::Mutex::new(())));
+    let guard = Arc::clone(&BUILD_LOCK).lock_owned().await;
+    tokio::task::spawn_blocking(move || {
+        let _guard = guard;
+        build_aidoku_package()
+    })
+    .await
+    .map_err(|error| AppError::internal(anyhow!("client package build task failed: {error}")))?
 }
 
 #[autometrics]
@@ -90,9 +105,27 @@ async fn build_tachiyomi_client_package() -> Result<ClientPackage, AppError> {
         .await;
     }
 
-    tokio::task::spawn_blocking(build_tachiyomi_package)
-        .await
-        .map_err(|error| AppError::internal(anyhow!("client package build task failed: {error}")))?
+    if let Some(bytes) = embedded::TACHIYOMI {
+        return Ok(embedded_package(bytes, TACHIYOMI_PACKAGE_FILE_NAME));
+    }
+
+    static BUILD_LOCK: std::sync::LazyLock<Arc<tokio::sync::Mutex<()>>> =
+        std::sync::LazyLock::new(|| Arc::new(tokio::sync::Mutex::new(())));
+    let guard = Arc::clone(&BUILD_LOCK).lock_owned().await;
+    tokio::task::spawn_blocking(move || {
+        let _guard = guard;
+        build_tachiyomi_package()
+    })
+    .await
+    .map_err(|error| AppError::internal(anyhow!("client package build task failed: {error}")))?
+}
+
+fn embedded_package(bytes: &[u8], filename: &'static str) -> ClientPackage {
+    ClientPackage {
+        bytes: bytes.to_vec(),
+        content_type: CLIENT_PACKAGE_CONTENT_TYPE,
+        filename,
+    }
 }
 
 #[autometrics(track_concurrency)]
@@ -132,20 +165,27 @@ fn build_aidoku_package() -> Result<ClientPackage, AppError> {
 }
 
 fn aidoku_source_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../apps/clients/aidoku")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../clients/aidoku")
 }
 
 fn tachiyomi_source_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../apps/clients/tachiyomi")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../clients/tachiyomi")
 }
 
 #[autometrics]
 fn ensure_aidoku_release_build(source_dir: &Path) -> Result<(), AppError> {
     let output = Command::new("cargo")
-        .args(["build", "--target", AIDOKU_WASM_TARGET, "--release"])
+        .args([
+            "build",
+            "--locked",
+            "--target",
+            AIDOKU_WASM_TARGET,
+            "--release",
+        ])
         .current_dir(source_dir)
         .env("CARGO_TARGET_DIR", source_dir.join("target"))
         .env("RUSTFLAGS", AIDOKU_RUSTFLAGS)
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
         .env_remove("RUSTUP_TOOLCHAIN")
         .output()
         .with_context(|| format!("failed to run Aidoku build in {}", source_dir.display()))

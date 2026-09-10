@@ -26,7 +26,8 @@ rustc-ice-*.txt
 # Generated client/plugin artifacts
 libs/svelte/api-client/openapi.json
 libs/svelte/api-client/src/generated/
-apps/clients/*/package.aix
+clients/*/package.aix
+clients/*/build/
 plugins/*.wasm
 plugins/*.wasm.metadata.json
 .build/

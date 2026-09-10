@@ -1,0 +1,26 @@
+[package]
+name = "manga-downloader"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "manga_downloader"
+crate-type = ["cdylib"]
+
+[dependencies]
+aidoku = { git = "https://github.com/Aidoku/aidoku-rs", rev = "e1320b0a2e11afb59e4dee374883a2212d325699", features = ["json"] }
+serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+strip = true
+lto = true
+codegen-units = 1
+
+# The extension targets the Aidoku WebAssembly runtime, not the server workspace.
+[workspace]
