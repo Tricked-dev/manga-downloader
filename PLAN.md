@@ -48,6 +48,7 @@ Plus a new **rawkuma** source for Japanese raws, alongside the existing comix so
 | Clients | **Aidoku + Tachiyomi extensions must keep working** — highest-priority constraint. |
 | Rawkuma | Just another source — separate library entries, no EN/JP linking. Browser-driven like comix. |
 | Legacy data | None. No `.tar.zst` reader, no migration command; existing downloads are disposable. |
+| Container extension | libbbf-rs's append API. Originals seal immediately; the upscaled section is appended later. One file per chapter, fast downloads. |
 
 ## Target shape
 
@@ -267,16 +268,27 @@ on a dedicated worker thread with a `ModelCache` keyed by model path — port
 - **Output encoding: lossless WebP.** `image` 0.25's `WebPEncoder` is lossless-only, so the
   existing `image` dep covers it — no libwebp, no new native dep. `manga-core` hands back an
   `image::RgbImage`, so it's a direct encode.
-- **Both variants in one container.** Upscaled pages become a second BBF section, `"upscaled"`,
-  with its own page list pointing at the WebP assets; `"original"` is untouched. Asset dedup is by
-  content hash, so nothing is stored twice. Metadata records `upscale.model`, `upscale.scale`,
-  `upscale.tile_size`.
+- **Both variants in one container — one `.bbf` per chapter, never two files.** Verified against the
+  format: `Page { asset_index, flags }` makes a page a pointer to an asset, so two pages can hold two
+  encodings of the same logical page; `Section { title_offset, start_index, parent_offset }` is a
+  named marker into one flat page list, so pages `[0..N)` are `"original"` and `[N..2N)` are
+  `"upscaled"`; and `media_type` is per-asset, so `Jpg` originals and `Webp` upscales coexist.
+  Asset dedup is XXH3-128 over content, so it only collapses byte-identical assets and will not
+  merge the two variants. Metadata records `upscale.model`, `upscale.scale`, `upscale.tile_size`.
+
+- **The upscaled section is appended to the sealed container** via libbbf-rs's append API.
+  Downloads seal originals immediately and stay fast, inference never sits on the download critical
+  path, and there is one `.bbf` per chapter. Appending costs the new payload plus a rewritten index
+  tail, not a copy of the file: the footer hash covers only `asset_offset .. string_pool_end`, and
+  `Reader::asset_data` is a plain bounds check, so new assets can live past the old tail.
 - **Reads:** `?variant=original|upscaled`, defaulting to upscaled when that section exists.
-- **Jobs:** reuse the `apalis` SQLite backend freed up in Phase 4 for an `upscale_chapter` job.
-  A new `auto_upscale` setting (global, overridable per source using the existing
-  `source_setting_key` pattern in `app/settings.rs:220`) **defaults to on**, so every completed
-  download enqueues one; the job is also triggerable per chapter from the API for re-runs and for
-  backfilling chapters downloaded before a model was available.
+- **Jobs:** the `apalis` SQLite backend freed up in Phase 4 carries an `upscale_chapter` job, which
+  appends the `"upscaled"` section to an already-sealed container. A new `auto_upscale` setting
+  (global, overridable per source using the existing `source_setting_key` pattern in
+  `app/settings.rs:220`) **defaults to on** and enqueues one per completed download; the same job
+  serves API-triggered re-runs, model changes, and backfills. Bound its concurrency to 1. Because
+  append is the mechanism, a download completes as soon as originals are sealed — upscaling is
+  strictly background work.
 - **State:** migration `0011` adds `upscaled_at`, `upscale_model`, `upscale_scale` to the
   downloaded-chapter rows so the UI and API can show what has been upscaled and what hasn't.
 - Model files are **not** vendored — `--models-dir` (default `./data/models`), documented as a
@@ -373,10 +385,11 @@ Functional, end to end:
    back); in the upscaled case they match source × model scale. Then `?format=webp` → `image/webp`,
    still full resolution, `X-Image-Cache: MISS` then `HIT`; `?format=avif` → `image/avif`;
    `&width=1200` → resized only when asked.
-8. Trigger the `upscale_chapter` job (or just download a chapter, since `auto_upscale` is on),
-   then `bbfmux --info --sections` shows both
-   `original` and `upscaled`; `?variant=original` and `?variant=upscaled` return different bytes
-   with `image/jpeg` and `image/webp` respectively; the chapter row reports `upscale_model`.
+8. Trigger the `upscale_chapter` job (or just download a chapter, since `auto_upscale` is on), then
+   `bbfmux --info --sections` shows both `original` and `upscaled`; `?variant=original` and
+   `?variant=upscaled` return different bytes with `image/jpeg` and `image/webp` respectively; the
+   chapter row reports `upscale_model`. Re-run `bbfmux --verify` after the append and confirm the
+   page count reads back as exactly 2N.
 9. Start with an **empty models directory** and download a chapter: the job degrades with one log
    line, the chapter is readable, and nothing retry-loops. Then add models and re-run the job.
 10. `curl localhost:4000/` returns the embedded SPA; `--web-root ./web/build` serves from disk;
@@ -402,10 +415,11 @@ Functional, end to end:
   checkout — it needs the dev shell or a system `onnxruntime`. That is the cost of dropping the
   feature gate; re-adding it later is a small change if it becomes annoying for contributors.
 - **Upscaling every download is expensive.** ESRGAN inference on CPU is minutes per page, so with
-  `auto_upscale` on by default the job queue becomes the bottleneck for large libraries and
-  storage roughly doubles (both sections retained). Bound the job concurrency to 1 and measure a
-  full chapter before turning it loose on a backfill; GPU execution providers are a follow-up
-  (`mangajenai-rs` PROGRESS.md has them scheduled).
+  `auto_upscale` on by default the job queue runs continuously behind a large library and storage
+  roughly doubles (both sections retained). Append keeps this off the download path, so the
+  user-visible effect is "upscaled copies appear over time" rather than slow downloads — worth
+  reflecting in the UI. Measure one real chapter before turning it loose on a backfill; GPU
+  execution providers are a follow-up (`mangajenai-rs` PROGRESS.md has them scheduled).
 - **BBF stores payloads uncompressed**, so the `.tar.zst` wrapper goes away. Near-neutral for size
   (already-encoded images barely compress) but worth measuring on a real library before committing
   to the migration.
