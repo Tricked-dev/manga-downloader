@@ -3,6 +3,18 @@
 #![allow(clippy::missing_errors_doc)]
 
 mod archive;
+mod avif;
+
+pub use avif::{decode_avif, encode_lossless_avif_rgb, encode_lossless_avif_rgba};
+
+/// Decode supported source formats, including AVIF through the native decoder.
+pub fn decode_image(input: &[u8]) -> anyhow::Result<image::DynamicImage> {
+    if image::guess_format(input)? == image::ImageFormat::Avif {
+        decode_avif(input)
+    } else {
+        Ok(image::load_from_memory(input)?)
+    }
+}
 
 use anyhow::{Context, Result};
 use fs4::{FileExt, TryLockError};
@@ -627,81 +639,6 @@ struct TileBox {
     height: u32,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn comix_descrambler_restores_5x5_tile_order() {
-        let original = synthetic_tile_image();
-        let scrambled = scramble_like_comix(&original);
-        let encoded = encode_png(&scrambled);
-
-        let decoded = descramble_comix_5x5_to_png(&encoded).unwrap();
-        let restored = image::load_from_memory(&decoded).unwrap().to_rgba8();
-
-        assert_eq!(restored.as_raw(), original.as_raw());
-    }
-
-    fn synthetic_tile_image() -> image::RgbaImage {
-        let tile = 4;
-        let mut image =
-            image::RgbaImage::new(COMIX_SCRAMBLE_GRID * tile, COMIX_SCRAMBLE_GRID * tile);
-        for index in 0..25usize {
-            let bounds = tile_box(index, image.width(), image.height());
-            let color = image::Rgba([
-                u8::try_from(index * 7).unwrap(),
-                u8::try_from(index * 5).unwrap(),
-                u8::try_from(index * 3).unwrap(),
-                255,
-            ]);
-            for y in bounds.y..bounds.y + bounds.height {
-                for x in bounds.x..bounds.x + bounds.width {
-                    image.put_pixel(x, y, color);
-                }
-            }
-        }
-        image
-    }
-
-    fn scramble_like_comix(original: &image::RgbaImage) -> image::RgbaImage {
-        let mut scrambled = image::RgbaImage::new(original.width(), original.height());
-        for (destination_index, source_index) in COMIX_DESCRAMBLE_MAP.iter().copied().enumerate() {
-            let destination = tile_box(destination_index, original.width(), original.height());
-            let source = tile_box(source_index, original.width(), original.height());
-            let tile = image::imageops::crop_imm(
-                original,
-                destination.x,
-                destination.y,
-                destination.width,
-                destination.height,
-            )
-            .to_image();
-            image::imageops::replace(
-                &mut scrambled,
-                &tile,
-                i64::from(source.x),
-                i64::from(source.y),
-            );
-        }
-        scrambled
-    }
-
-    fn encode_png(image: &image::RgbaImage) -> Vec<u8> {
-        let mut encoded = Vec::new();
-        let cursor = Cursor::new(&mut encoded);
-        let encoder = image::codecs::png::PngEncoder::new(cursor);
-        encoder
-            .write_image(
-                image.as_raw(),
-                image.width(),
-                image.height(),
-                ExtendedColorType::Rgba8,
-            )
-            .unwrap();
-        encoded
-    }
-}
 
 const ARCHIVE_LOCK_WAIT: Duration = Duration::from_secs(30);
 const ARCHIVE_LOCK_POLL: Duration = Duration::from_millis(50);
@@ -798,3 +735,80 @@ fn replace_with_avif_extension(name: &str) -> String {
         format!("{name}.avif")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn comix_descrambler_restores_5x5_tile_order() {
+        let original = synthetic_tile_image();
+        let scrambled = scramble_like_comix(&original);
+        let encoded = encode_png(&scrambled);
+
+        let decoded = descramble_comix_5x5_to_png(&encoded).unwrap();
+        let restored = image::load_from_memory(&decoded).unwrap().to_rgba8();
+
+        assert_eq!(restored.as_raw(), original.as_raw());
+    }
+
+    fn synthetic_tile_image() -> image::RgbaImage {
+        let tile = 4;
+        let mut image =
+            image::RgbaImage::new(COMIX_SCRAMBLE_GRID * tile, COMIX_SCRAMBLE_GRID * tile);
+        for index in 0..25usize {
+            let bounds = tile_box(index, image.width(), image.height());
+            let color = image::Rgba([
+                u8::try_from(index * 7).unwrap(),
+                u8::try_from(index * 5).unwrap(),
+                u8::try_from(index * 3).unwrap(),
+                255,
+            ]);
+            for y in bounds.y..bounds.y + bounds.height {
+                for x in bounds.x..bounds.x + bounds.width {
+                    image.put_pixel(x, y, color);
+                }
+            }
+        }
+        image
+    }
+
+    fn scramble_like_comix(original: &image::RgbaImage) -> image::RgbaImage {
+        let mut scrambled = image::RgbaImage::new(original.width(), original.height());
+        for (destination_index, source_index) in COMIX_DESCRAMBLE_MAP.iter().copied().enumerate() {
+            let destination = tile_box(destination_index, original.width(), original.height());
+            let source = tile_box(source_index, original.width(), original.height());
+            let tile = image::imageops::crop_imm(
+                original,
+                destination.x,
+                destination.y,
+                destination.width,
+                destination.height,
+            )
+            .to_image();
+            image::imageops::replace(
+                &mut scrambled,
+                &tile,
+                i64::from(source.x),
+                i64::from(source.y),
+            );
+        }
+        scrambled
+    }
+
+    fn encode_png(image: &image::RgbaImage) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        let cursor = Cursor::new(&mut encoded);
+        let encoder = image::codecs::png::PngEncoder::new(cursor);
+        encoder
+            .write_image(
+                image.as_raw(),
+                image.width(),
+                image.height(),
+                ExtendedColorType::Rgba8,
+            )
+            .unwrap();
+        encoded
+    }
+}
+

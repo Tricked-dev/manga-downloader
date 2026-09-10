@@ -1,0 +1,26 @@
+[package]
+name = "backend-upscale"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+backend-image = { path = "../image" }
+anyhow.workspace = true
+image.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+manga-core = { path = "../../vendor/mangajenai-rs/crates/manga-core", features = ["migraphx", "cuda", "openvino"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+manga-core = { path = "../../vendor/mangajenai-rs/crates/manga-core", features = ["coreml"] }
+
+[target.'cfg(not(any(target_os = "linux", target_os = "macos")))'.dependencies]
+manga-core = { path = "../../vendor/mangajenai-rs/crates/manga-core" }
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = ["crates/manga-core", "crates/manga-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+repository = "https://github.com/Tricked-dev/mangajenai-rs"
+authors = ["Tricked <tricked@tricked.dev>"]
+
+[workspace.dependencies]
+manga-core = { path = "crates/manga-core" }
+
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+image = "0.25"
+ndarray = "0.17"
+# Defaults are disabled deliberately: ort enables `download-binaries` by
+# default, which fetches a prebuilt ONNX Runtime at build time. We link the
+# nixpkgs one through `pkg-config` instead. `api-27` matches nixpkgs'
+# onnxruntime 1.27.1 exactly, so ort neither requests an API the library lacks
+# nor silently falls back to an older one.
+ort = { version = "2.0.0-rc.13", default-features = false, features = [
+    "std",
+    "ndarray",
+    "tracing",
+    "pkg-config",
+    "api-27",
+] }
+rayon = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+zip = "8.6"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

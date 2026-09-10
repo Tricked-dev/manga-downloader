@@ -45,6 +45,7 @@ pub(super) async fn run_until_shutdown(
     background_result?;
     await_task("http server", server).await?;
     wait_for_plugin_runtime_idle(state).await;
+    state.upscaler.shutdown().await?;
     state.cache.close().await?;
 
     tracing::info!("Server Shutdown Finalized");
@@ -153,7 +154,7 @@ fn spawn_server_tasks(
         background: BackgroundTasks {
             downloads,
             scheduler,
-        search_cache,
+            search_cache,
             database_cleanup,
             archive_index_rebuild,
             tokio_runtime_metrics,
@@ -193,7 +194,12 @@ impl BackgroundTasks {
 fn search_cache_warm_enabled() -> bool {
     std::env::var(SEARCH_CACHE_WARM_ENABLED_ENV)
         .ok()
-        .is_some_and(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .is_some_and(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
 }
 
 async fn wait_for_shutdown_signal() {

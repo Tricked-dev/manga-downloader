@@ -9,20 +9,24 @@ pub struct ServerConfig {
     #[setting(default = PathBuf::from("./data/manga.db"), env = "DB_PATH", parse_env = schematic::env::ignore_empty)]
     pub db_path: PathBuf,
 
+    #[setting(default = PathBuf::from("./data/models"), env = "MODELS_DIR", parse_env = schematic::env::ignore_empty)]
+    pub models_dir: PathBuf,
+
+    #[setting(default = default_upscale_device(), env = "UPSCALE_DEVICE", parse_env = schematic::env::ignore_empty)]
+    pub upscale_device: String,
+
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
-
-
     #[setting(env = "BACKEND_API_KEY", parse_env = schematic::env::ignore_empty)]
     pub backend_api_key: Option<String>,
-
-
 }
 
 #[derive(Debug, Default)]
 pub struct ServerConfigOverrides {
     pub db_path: Option<PathBuf>,
+    pub models_dir: Option<PathBuf>,
+    pub upscale_device: Option<String>,
     pub server_addr: Option<String>,
     pub backend_api_key: Option<String>,
 }
@@ -41,6 +45,12 @@ impl ServerConfig {
     }
 
     fn apply_overrides(&mut self, overrides: ServerConfigOverrides) {
+        if let Some(models_dir) = overrides.models_dir {
+            self.models_dir = models_dir;
+        }
+        if let Some(upscale_device) = overrides.upscale_device {
+            self.upscale_device = upscale_device;
+        }
         if let Some(db_path) = overrides.db_path {
             self.db_path = db_path;
         }
@@ -51,4 +61,13 @@ impl ServerConfig {
             self.backend_api_key = Some(backend_api_key);
         }
     }
+}
+
+fn default_upscale_device() -> String {
+    if cfg!(target_os = "macos") {
+        "coreml"
+    } else {
+        "migraphx"
+    }
+    .into()
 }

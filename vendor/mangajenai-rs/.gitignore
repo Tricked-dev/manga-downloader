@@ -1,0 +1,22 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Nix
+result
+result-*
+.direnv/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Model weights and exported graphs are large binaries fetched/produced by
+# tools/, never committed. See models/models.json for the manifest.
+models/*.pth
+models/*.onnx
+models/*.onnx.data
+
+# Parity reports, benchmark output and rendered diff images.
+/artifacts/

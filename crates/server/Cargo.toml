@@ -19,6 +19,7 @@ backend-config = { path = "../config" }
 backend-core = { path = "../core" }
 backend-fs = { path = "../fs" }
 backend-image = { path = "../image" }
+backend-upscale = { path = "../upscale" }
 backend-page-extraction = { path = "../page-extraction" }
 backend-persistence = { path = "../persistence" }
 backend-sources = { path = "../sources" }

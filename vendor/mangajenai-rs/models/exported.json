@@ -1,0 +1,464 @@
+[
+  {
+    "name": "2x_MangaJaNai_1200p_V1_ESRGAN_70k",
+    "path": "models/2x_MangaJaNai_1200p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1200,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1200p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "43b784f674bdbf89886a62a64cd5f8d8df92caf4d861bdf4d47dad249ede0267",
+    "onnx_sha256": "5c79d24f23219f3e5e46e850fdf6a65fea513afa9f507d5353ebdf9610a88382",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_1300p_V1_ESRGAN_75k",
+    "path": "models/2x_MangaJaNai_1300p_V1_ESRGAN_75k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1300,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1300p_V1_ESRGAN_75k.pth",
+    "source_pth_sha256": "15ca3c0f75f97f7bf52065bf7c9b8d602de94ce9e3b078ac58793855eed18589",
+    "onnx_sha256": "6861c4dcd899468df34b363050fda918c121a7b0d77f5b9759adc1b95e8a2860",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_1400p_V1_ESRGAN_70k",
+    "path": "models/2x_MangaJaNai_1400p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1400,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1400p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "a940ad8ebcf6bea5580f2f59df67deb009f054c9b87dbbc58c2e452722f34858",
+    "onnx_sha256": "7fc7c8107615b9bbebfab54f43626faff6cf6e744ef5ac4e63b2ab86bf856ade",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_1500p_V1_ESRGAN_90k",
+    "path": "models/2x_MangaJaNai_1500p_V1_ESRGAN_90k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1500,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1500p_V1_ESRGAN_90k.pth",
+    "source_pth_sha256": "d91f2d247fa61144c1634a2ba46926acd3956ae90d281a5bed6655f8364a5b2c",
+    "onnx_sha256": "5f7555bec7c7cf3af40d9849a8e51c7665728ceff7a31f855efca9191852f046",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_1600p_V1_ESRGAN_90k",
+    "path": "models/2x_MangaJaNai_1600p_V1_ESRGAN_90k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1600,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1600p_V1_ESRGAN_90k.pth",
+    "source_pth_sha256": "6f5923f812dbc5d6aeed727635a21e74cacddce595afe6135cbd95078f6eee44",
+    "onnx_sha256": "dcb807bf05148a648093210aab89717d8aa3bb8db9ba3d71496aad452b1f9462",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_1920p_V1_ESRGAN_70k",
+    "path": "models/2x_MangaJaNai_1920p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1920,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_1920p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "1ad4aa6f64684baa430da1bb472489bff2a02473b14859015884a3852339c005",
+    "onnx_sha256": "04d07cf63a0e9312e7d23a7856c54a7aab76ad590ab5cbf9ecf83e3836e4bae9",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "2x_MangaJaNai_2048p_V1_ESRGAN_95k",
+    "path": "models/2x_MangaJaNai_2048p_V1_ESRGAN_95k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 2,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 2048,
+    "size_requirements": {
+      "minimum": 4,
+      "multiple_of": 4,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "Min(2*height, 4*((height//2)))",
+      "Min(2*width, 4*((width//2)))"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/2x_MangaJaNai_2048p_V1_ESRGAN_95k.pth",
+    "source_pth_sha256": "146cd009b9589203a8444fe0aa7195709bb5b9fdeaca3808b7fbbd5538f94c41",
+    "onnx_sha256": "8da0143cd430695675575851c7546ccf35cbbba726aa4c84bb831f0a29df151d",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1200p_V1_ESRGAN_70k",
+    "path": "models/4x_MangaJaNai_1200p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1200,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1200p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "6e3a8d21533b731eb3d8eaac1a09cf56290fa08faf8473cbe3debded9ab1ebe1",
+    "onnx_sha256": "27ba780aa163d0d9e3fe1e14fcf302b3b2b1a7c02a56e73e11c047f57357df89",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1300p_V1_ESRGAN_75k",
+    "path": "models/4x_MangaJaNai_1300p_V1_ESRGAN_75k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1300,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1300p_V1_ESRGAN_75k.pth",
+    "source_pth_sha256": "eacf8210543446f3573d4ea1625f6fc11a3b2a5e18b38978873944be146417a8",
+    "onnx_sha256": "23b3d8d3c7378e920100002fb692f09f8b8d4454716eb16a0dc9ef8c18968e61",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1400p_V1_ESRGAN_105k",
+    "path": "models/4x_MangaJaNai_1400p_V1_ESRGAN_105k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1400,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1400p_V1_ESRGAN_105k.pth",
+    "source_pth_sha256": "d77f977a6c6c4bf855dae55f0e9fad6ac2823fa8b2ef883b50e525369fde6a74",
+    "onnx_sha256": "413629c568c614cf1b2387b435c5d65647e69d1ce6c61f5af7bb48e717c5fab6",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1500p_V1_ESRGAN_105k",
+    "path": "models/4x_MangaJaNai_1500p_V1_ESRGAN_105k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1500,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1500p_V1_ESRGAN_105k.pth",
+    "source_pth_sha256": "5e5174b60316e9abb7875e6d2db208fec4ffc34f3d09fa7f0e0f6476f9d31687",
+    "onnx_sha256": "62fa3bb7a841cdff1a8c00fe2f72867ff3f3b40f45e41908aa29130e30b2a9d8",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1600p_V1_ESRGAN_70k",
+    "path": "models/4x_MangaJaNai_1600p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1600,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1600p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "c126ec8d4b7434d8f6a43d24bec1f56d343104ab8a86b5e01d5d25be6b5244c0",
+    "onnx_sha256": "82833feafecd0ff649f478a43b125581c8c7b1d03bd51376b49c10486b7ef725",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_1920p_V1_ESRGAN_105k",
+    "path": "models/4x_MangaJaNai_1920p_V1_ESRGAN_105k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 1920,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_1920p_V1_ESRGAN_105k.pth",
+    "source_pth_sha256": "d469e96e590a25a86037760b26d51405c77759a55b0966b15dc76b609f72f20b",
+    "onnx_sha256": "5ecdd72c855557b9025a389add46747f5cda5a57d20dc3c3c2a18f960ee4726a",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  },
+  {
+    "name": "4x_MangaJaNai_2048p_V1_ESRGAN_70k",
+    "path": "models/4x_MangaJaNai_2048p_V1_ESRGAN_70k.onnx",
+    "architecture": "ESRGAN",
+    "scale": 4,
+    "input_channels": 3,
+    "output_channels": 3,
+    "target_height": 2048,
+    "size_requirements": {
+      "minimum": 2,
+      "multiple_of": 1,
+      "square": false
+    },
+    "opset": 18,
+    "exporter": "dynamo",
+    "dynamic_axes": [
+      "height",
+      "width",
+      "4*height",
+      "4*width"
+    ],
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "source_pth": "models/4x_MangaJaNai_2048p_V1_ESRGAN_70k.pth",
+    "source_pth_sha256": "f70e08c60da372b7207e7348486ea6b498ea8dea6246bb717530a4d45c955b9b",
+    "onnx_sha256": "d8efd2d0d6be071b7542cfe06b1603e3ae7273142b24598f575199c2dd7688dd",
+    "torch_version": "2.13.0",
+    "spandrel_version": "0.4.2"
+  }
+]

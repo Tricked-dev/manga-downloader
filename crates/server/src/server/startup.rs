@@ -9,8 +9,8 @@ use anyhow::Context as _;
 use autometrics::autometrics;
 use backend_cache::MangaCache;
 use backend_config::ServerConfig;
-use backend_sources::SourceRegistry;
 use backend_runtime::color_logs_enabled;
+use backend_sources::SourceRegistry;
 use backend_telemetry::Telemetry;
 use secrecy::SecretString;
 use std::env;
@@ -134,6 +134,8 @@ async fn bootstrap_server(
 ) -> anyhow::Result<ServerContext> {
     let ServerConfig {
         db_path,
+        models_dir,
+        upscale_device,
         server_addr,
         backend_api_key,
     } = config;
@@ -183,6 +185,11 @@ async fn bootstrap_server(
         "Server Boot",
     );
 
+    let upscaler = backend_upscale::Upscaler::start(backend_upscale::UpscaleConfig {
+        models_dir,
+        device: upscale_device.parse()?,
+        ..Default::default()
+    })?;
     let state = build_app_state(AppStateParts {
         config: AppConfig {
             db_path,
@@ -192,6 +199,7 @@ async fn bootstrap_server(
         db,
         cache,
         source_registry,
+        upscaler,
         telemetry,
     });
     crate::archive_index::spawn_startup_warm(Arc::clone(&state));

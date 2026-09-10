@@ -1,7 +1,7 @@
 use crate::server;
 use backend_config::{ServerConfig, ServerConfigOverrides};
-use backend_sources::SourceRegistry;
 use backend_runtime::{color_logs_enabled, init_tracing};
+use backend_sources::SourceRegistry;
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -39,6 +39,14 @@ struct ServerOptions {
     /// `SQLite` database path.
     #[arg(long)]
     db_path: Option<PathBuf>,
+
+    /// Directory containing models.json and exported ONNX graphs.
+    #[arg(long)]
+    models_dir: Option<PathBuf>,
+
+    /// Explicit GPU provider. CPU and automatic fallback are disabled.
+    #[arg(long, value_parser = ["migraphx", "cuda", "openvino", "coreml"])]
+    upscale_device: Option<String>,
 
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
@@ -126,6 +134,8 @@ struct DbMigrateOptions {
 #[derive(Serialize)]
 struct ConfigReport {
     db_path: PathBuf,
+    models_dir: PathBuf,
+    upscale_device: String,
     server_addr: String,
     backend_api_key: SecretStatus,
 }
@@ -244,6 +254,11 @@ fn load_config(options: ServerOptions) -> anyhow::Result<ServerConfig> {
 fn print_config_report(report: &ConfigReport) {
     println!("db_path: {}", report.db_path.display());
     println!("server_addr: {}", report.server_addr);
+    println!("models_dir: {}", report.models_dir.display());
+    println!(
+        "upscale_device: {} (CPU fallback disabled)",
+        report.upscale_device
+    );
     println!(
         "backend_api_key: {}",
         match report.backend_api_key {
@@ -251,7 +266,6 @@ fn print_config_report(report: &ConfigReport) {
             SecretStatus::NotSet => "not set",
         }
     );
-
 }
 
 fn init_command_tracing() {
@@ -262,6 +276,8 @@ impl ServerOptions {
     fn merge(self, overrides: Self) -> Self {
         Self {
             db_path: overrides.db_path.or(self.db_path),
+            models_dir: overrides.models_dir.or(self.models_dir),
+            upscale_device: overrides.upscale_device.or(self.upscale_device),
             addr: overrides.addr.or(self.addr),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
@@ -272,6 +288,8 @@ impl From<ServerOptions> for ServerConfigOverrides {
     fn from(options: ServerOptions) -> Self {
         Self {
             db_path: options.db_path,
+            models_dir: options.models_dir,
+            upscale_device: options.upscale_device,
             server_addr: options.addr,
             backend_api_key: options.backend_api_key,
         }
@@ -282,6 +300,8 @@ impl ConfigReport {
     fn from_config(config: &ServerConfig) -> Self {
         Self {
             db_path: config.db_path.clone(),
+            models_dir: config.models_dir.clone(),
+            upscale_device: config.upscale_device.clone(),
             server_addr: config.server_addr.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set

@@ -1,0 +1,31 @@
+[package]
+name = "manga-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Core image, tiling and ONNX Runtime inference pipeline for MangaJaNai models"
+
+[dependencies]
+anyhow.workspace = true
+image.workspace = true
+ndarray.workspace = true
+ort.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+zip.workspace = true
+
+[features]
+default = []
+# Execution provider bindings. `ort` gates each behind its own cargo feature,
+# and enabling one also affects how ort-sys links, so they are opt-in. The
+# `Device` enum lists all of them regardless; asking for one that was not
+# compiled in is a clear error rather than a silent fall back to CPU.
+migraphx = ["ort/migraphx"]
+cuda = ["ort/cuda"]
+directml = ["ort/directml"]
+coreml = ["ort/coreml"]
+openvino = ["ort/openvino"]

@@ -1,0 +1,18 @@
+# Reference versions for the one-time .pth -> .onnx conversion toolchain.
+#
+# The supported way to get these is the nix flake, which pins the exact same
+# set through nixpkgs:
+#
+#     nix develop
+#
+# This file exists for non-nix users and to document what the scripts in
+# tools/ were verified against.
+torch==2.13.0
+torchvision==0.28.0
+spandrel==0.4.2
+onnx==1.21.0
+onnxscript==0.7.1
+onnxruntime==1.27.1
+numpy==2.5.1
+pillow==12.3.0
+rich==15.0.0

@@ -1,6 +1,5 @@
 use crate::{
-    app::chapter_pages::DownloadedPageTransformCache,
-    archive_index::ArchiveIndexService,
+    app::chapter_pages::DownloadedPageTransformCache, archive_index::ArchiveIndexService,
     downloader,
 };
 use backend_cache::MangaCache;
@@ -37,6 +36,7 @@ pub(crate) struct AppState {
     pub(crate) db: backend_persistence::Database,
     pub(crate) source_registry: RwLock<SourceRegistry>,
     pub(crate) cache: MangaCache,
+    pub(crate) upscaler: backend_upscale::Upscaler,
     pub(crate) archive_index: Arc<ArchiveIndexService>,
     pub(crate) extraction_scheduler: Arc<DownloadedPageExtractionScheduler>,
     pub(crate) downloaded_page_transform_cache: DownloadedPageTransformCache,
@@ -53,6 +53,7 @@ pub(crate) struct AppStateParts {
     pub(crate) db: backend_persistence::Database,
     pub(crate) source_registry: SourceRegistry,
     pub(crate) cache: MangaCache,
+    pub(crate) upscaler: backend_upscale::Upscaler,
     pub(crate) telemetry: Telemetry,
 }
 
@@ -62,6 +63,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         db,
         source_registry,
         cache,
+        upscaler,
         telemetry,
     } = parts;
 
@@ -70,6 +72,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         db,
         source_registry: RwLock::new(source_registry),
         cache,
+        upscaler,
         archive_index: Arc::new(ArchiveIndexService::new()),
         extraction_scheduler: Arc::new(DownloadedPageExtractionScheduler::default()),
         downloaded_page_transform_cache: DownloadedPageTransformCache::default(),
@@ -101,8 +104,7 @@ pub(crate) async fn build_test_app_state(
         .await
         .expect("download path setting should be stored");
 
-    let source_registry = SourceRegistry::new()
-        .expect("plugin manager should initialize");
+    let source_registry = SourceRegistry::new().expect("plugin manager should initialize");
     let cache = MangaCache::new(&cache_path.to_string_lossy(), 1024 * 1024)
         .await
         .expect("cache should initialize");
@@ -116,6 +118,11 @@ pub(crate) async fn build_test_app_state(
         db,
         source_registry,
         cache,
+        upscaler: backend_upscale::Upscaler::start(backend_upscale::UpscaleConfig {
+            models_dir: root.join("models"),
+            ..Default::default()
+        })
+        .expect("test GPU worker should start without loading a model"),
         telemetry: Telemetry::for_test(telemetry_name),
     })
 }
@@ -134,4 +141,3 @@ impl ShutdownDrain {
         self.draining.load(Ordering::Acquire)
     }
 }
-

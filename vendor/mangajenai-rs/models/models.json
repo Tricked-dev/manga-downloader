@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "comment": "Source-height bands are transcribed from MangaJaNaiConverterGui's default workflow; see docs/REFERENCE-SEMANTICS.md. 0 means unbounded, null means the model does not participate in automatic selection.",
+  "scale_boundary": 2,
+  "models": [
+    {
+      "name": "2x_MangaJaNai_1200p_V1_ESRGAN_70k",
+      "path": "2x_MangaJaNai_1200p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1200,
+      "source_height_min": 0,
+      "source_height_max": 1250
+    },
+    {
+      "name": "2x_MangaJaNai_1300p_V1_ESRGAN_75k",
+      "path": "2x_MangaJaNai_1300p_V1_ESRGAN_75k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1300,
+      "source_height_min": 1251,
+      "source_height_max": 1350
+    },
+    {
+      "name": "2x_MangaJaNai_1400p_V1_ESRGAN_70k",
+      "path": "2x_MangaJaNai_1400p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1400,
+      "source_height_min": 1351,
+      "source_height_max": 1450
+    },
+    {
+      "name": "2x_MangaJaNai_1500p_V1_ESRGAN_90k",
+      "path": "2x_MangaJaNai_1500p_V1_ESRGAN_90k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1500,
+      "source_height_min": 1451,
+      "source_height_max": 1550
+    },
+    {
+      "name": "2x_MangaJaNai_1600p_V1_ESRGAN_90k",
+      "path": "2x_MangaJaNai_1600p_V1_ESRGAN_90k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1600,
+      "source_height_min": 1551,
+      "source_height_max": 1760
+    },
+    {
+      "name": "2x_MangaJaNai_1920p_V1_ESRGAN_70k",
+      "path": "2x_MangaJaNai_1920p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 1920,
+      "source_height_min": 1761,
+      "source_height_max": 1984
+    },
+    {
+      "name": "2x_MangaJaNai_2048p_V1_ESRGAN_95k",
+      "path": "2x_MangaJaNai_2048p_V1_ESRGAN_95k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 2,
+      "input_channels": 3,
+      "target_height": 2048,
+      "source_height_min": 1985,
+      "source_height_max": 0
+    },
+    {
+      "name": "4x_MangaJaNai_1200p_V1_ESRGAN_70k",
+      "path": "4x_MangaJaNai_1200p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1200,
+      "source_height_min": 0,
+      "source_height_max": 1250
+    },
+    {
+      "name": "4x_MangaJaNai_1300p_V1_ESRGAN_75k",
+      "path": "4x_MangaJaNai_1300p_V1_ESRGAN_75k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1300,
+      "source_height_min": 1251,
+      "source_height_max": 1350
+    },
+    {
+      "name": "4x_MangaJaNai_1400p_V1_ESRGAN_105k",
+      "path": "4x_MangaJaNai_1400p_V1_ESRGAN_105k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1400,
+      "source_height_min": 1351,
+      "source_height_max": 1450
+    },
+    {
+      "name": "4x_MangaJaNai_1500p_V1_ESRGAN_105k",
+      "path": "4x_MangaJaNai_1500p_V1_ESRGAN_105k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1500,
+      "source_height_min": 1451,
+      "source_height_max": 1550
+    },
+    {
+      "name": "4x_MangaJaNai_1600p_V1_ESRGAN_70k",
+      "path": "4x_MangaJaNai_1600p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1600,
+      "source_height_min": 1551,
+      "source_height_max": 1760
+    },
+    {
+      "name": "4x_MangaJaNai_1920p_V1_ESRGAN_105k",
+      "path": "4x_MangaJaNai_1920p_V1_ESRGAN_105k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 1920,
+      "source_height_min": 1761,
+      "source_height_max": 1984
+    },
+    {
+      "name": "4x_MangaJaNai_2048p_V1_ESRGAN_70k",
+      "path": "4x_MangaJaNai_2048p_V1_ESRGAN_70k.onnx",
+      "architecture": "ESRGAN",
+      "scale": 4,
+      "input_channels": 3,
+      "target_height": 2048,
+      "source_height_min": 1985,
+      "source_height_max": 0
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+[package]
+name = "manga-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Command line interface for the MangaJaNai ONNX upscaling pipeline"
+
+[[bin]]
+name = "mangajanai-rs"
+path = "src/main.rs"
+
+[dependencies]
+manga-core.workspace = true
+
+anyhow.workspace = true
+clap.workspace = true
+image.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[features]
+default = []
+# Passed through to manga-core; see crates/manga-core/src/device.rs.
+cuda = ["manga-core/cuda"]
+directml = ["manga-core/directml"]
+coreml = ["manga-core/coreml"]
+openvino = ["manga-core/openvino"]
