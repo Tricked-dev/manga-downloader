@@ -66,6 +66,10 @@ pub(super) fn build_router(state: &Arc<AppState>) -> Router {
             ),
     );
     backend_api
+        .layer(axum::middleware::map_response(
+            api::auth::private_api_response,
+        ))
+        .merge(api::auth::router().with_state(Arc::clone(state)))
         .merge(api::openapi::docs_router(openapi))
         .route_layer(HttpMetricsLayerBuilder::new().build())
         .layer(ClientIpSource::CfConnectingIp.into_extension())
@@ -273,7 +277,11 @@ fn http_trace_span<B>(request: &Request<B>) -> tracing::Span {
         .get::<MatchedPath>()
         .map_or("", MatchedPath::as_str);
     let user_agent = truncated_header(headers, &USER_AGENT);
-    let referer = truncated_header(headers, &REFERER);
+    let referer = header_value(headers, &REFERER)
+        .split('?')
+        .next()
+        .unwrap_or("");
+    let referer = truncate_for_log(referer, HTTP_LOG_VALUE_MAX_CHARS);
     let client_ip = cloudflare_client_ip(headers).map_or_else(String::new, |ip| ip.to_string());
 
     tracing::info_span!(
@@ -282,7 +290,7 @@ fn http_trace_span<B>(request: &Request<B>) -> tracing::Span {
         method = %request.method(),
         path = %uri.path(),
         matched_path = %matched_path,
-        query = %uri.query().unwrap_or(""),
+        query = %if uri.path().starts_with("/auth/") { "[redacted]" } else { uri.query().unwrap_or("") },
         version = ?request.version(),
         host = %header_value(headers, &HOST),
         user_agent = %user_agent,

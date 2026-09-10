@@ -161,6 +161,7 @@ pub async fn open_postgres_database(
     migrations: &[DatabaseMigration],
 ) -> Result<Db> {
     apply_postgres_migrations(url, migrations).await?;
+    backend_tls::ensure_graviola_rustls_provider()?;
     let driver = toasty_driver_postgresql::PostgreSQL::new(url)?;
     let mut builder = Db::builder();
     builder.models(models);
@@ -168,6 +169,7 @@ pub async fn open_postgres_database(
 }
 
 pub async fn apply_postgres_migrations(url: &str, migrations: &[DatabaseMigration]) -> Result<()> {
+    backend_tls::ensure_graviola_rustls_provider()?;
     let driver = toasty_driver_postgresql::PostgreSQL::new(url)?;
     let mut connection = driver.connect().await?;
     let applied = connection.applied_migrations().await?;

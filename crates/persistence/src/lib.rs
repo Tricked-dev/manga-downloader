@@ -1,5 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
+mod auth;
 mod background_jobs;
 mod chapters;
 mod download_work_state;
@@ -24,6 +25,7 @@ use tokio::sync::{Mutex, MutexGuard};
 
 use backend_core::settings::SETTING_DEFINITIONS;
 
+pub use auth::{AuthSessionRecord, AuthUser, PublicShareRecord};
 pub use backend_core::settings::setting_default;
 pub use background_jobs::{BackgroundJobFailureOutcome, BackgroundJobLease, BackgroundJobStatus};
 pub use download_work_state::{DownloadWorkStatus, DownloadWorkTransition};

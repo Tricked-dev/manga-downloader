@@ -18,12 +18,16 @@ pub struct ServerConfig {
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
+    #[setting(env = "PUBLIC_URL", parse_env = schematic::env::ignore_empty)]
+    pub public_url: Option<String>,
+
     #[setting(env = "BACKEND_API_KEY", parse_env = schematic::env::ignore_empty)]
     pub backend_api_key: Option<String>,
 }
 
 #[derive(Debug, Default)]
 pub struct ServerConfigOverrides {
+    pub public_url: Option<String>,
     pub database_url: Option<String>,
     pub models_dir: Option<PathBuf>,
     pub upscale_device: Option<String>,
@@ -45,6 +49,9 @@ impl ServerConfig {
     }
 
     fn apply_overrides(&mut self, overrides: ServerConfigOverrides) {
+        if let Some(public_url) = overrides.public_url {
+            self.public_url = Some(public_url);
+        }
         if let Some(models_dir) = overrides.models_dir {
             self.models_dir = models_dir;
         }

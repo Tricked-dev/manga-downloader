@@ -12,8 +12,10 @@ use autometrics::autometrics;
 use backend_cache::{MangaCache, parse_max_memory_bytes};
 use backend_core::{parse_positive_byte_size, settings::SettingKey};
 use backend_persistence::Database;
-use secrecy::SecretString;
 use tokio::time::Duration;
+
+const SECRET_PLACEHOLDER: &str = "********";
+const SECRET_KEYS: [&str; 2] = ["auth_oidc_client_secret", "backend_api_key"];
 
 const DEFAULT_UPDATE_INTERVAL: Duration = Duration::from_hours(1);
 const SECONDS_PER_HOUR: f64 = 3600.0;
@@ -124,17 +126,6 @@ impl SettingsInterface<'_> {
             .unwrap_or_else(|| key.default_value().to_string()))
     }
 
-    async fn non_empty(&self, key: SettingKey) -> Result<Option<String>> {
-        Ok(self
-            .raw(key)
-            .await?
-            .filter(|value| !value.trim().is_empty()))
-    }
-
-    async fn non_empty_secret(&self, key: SettingKey) -> Result<Option<SecretString>> {
-        Ok(self.non_empty(key).await?.map(SecretString::from))
-    }
-
     pub(crate) async fn download_path(&self) -> Result<String> {
         self.string_or_default(SettingKey::DownloadPath).await
     }
@@ -147,16 +138,6 @@ impl SettingsInterface<'_> {
         Ok(parse_max_memory_bytes(
             self.raw(SettingKey::CacheMaxMemoryBytes).await?.as_deref(),
         ))
-    }
-
-    pub(crate) async fn backend_api_key(
-        &self,
-        fallback_api_key: Option<SecretString>,
-    ) -> Result<Option<SecretString>> {
-        Ok(self
-            .non_empty_secret(SettingKey::BackendApiKey)
-            .await?
-            .or(fallback_api_key))
     }
 
     pub(crate) async fn library_update_interval(&self) -> Duration {
@@ -234,9 +215,15 @@ impl SettingsInterface<'_> {
 
 #[autometrics]
 pub async fn get(state: &Arc<AppState>) -> Result<SettingsResponse, AppError> {
-    Ok(SettingsResponse {
-        settings: state.db.get_all_settings().await?,
-    })
+    let mut settings = state.db.get_all_settings().await?;
+    for key in SECRET_KEYS {
+        if let Some(value) = settings.get_mut(key)
+            && !value.is_empty()
+        {
+            *value = SECRET_PLACEHOLDER.into();
+        }
+    }
+    Ok(SettingsResponse { settings })
 }
 
 #[autometrics]
@@ -244,8 +231,15 @@ pub async fn update(
     state: &Arc<AppState>,
     settings: &HashMap<String, String>,
 ) -> Result<SettingsUpdateResult, AppError> {
-    let changes = SettingsChangeSet::from_settings(settings);
-    interface(&state.db).set_many(settings).await?;
+    let settings = settings
+        .iter()
+        .filter(|(key, value)| {
+            !(SECRET_KEYS.contains(&key.as_str()) && value.as_str() == SECRET_PLACEHOLDER)
+        })
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+    let changes = SettingsChangeSet::from_settings(&settings);
+    interface(&state.db).set_many(&settings).await?;
 
     crate::app::route_snapshot_invalidation::settings_changed(state);
 

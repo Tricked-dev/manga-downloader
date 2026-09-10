@@ -45,6 +45,7 @@ async fn sqlite_contract() {
 #[tokio::test]
 #[ignore = "requires TEST_POSTGRES_URL with permission to create a temporary database"]
 async fn postgres_contract() {
+    backend_tls::ensure_graviola_rustls_provider().unwrap();
     let url = std::env::var("TEST_POSTGRES_URL").expect("TEST_POSTGRES_URL is required");
     let pool = sqlx::PgPool::connect(&url).await.unwrap();
     let name = format!("manga_test_{}", uuid::Uuid::now_v7().simple());

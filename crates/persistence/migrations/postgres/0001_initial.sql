@@ -5,6 +5,16 @@ CREATE TABLE "app_settings" (
     PRIMARY KEY ("key")
 );
 -- #[toasty::breakpoint]
+CREATE TABLE "auth_sessions" (
+    "token_hash" TEXT NOT NULL,
+    "config_hash" TEXT NOT NULL,
+    "subject" TEXT NOT NULL,
+    "name" TEXT,
+    "email" TEXT,
+    "expires_at" TEXT NOT NULL,
+    PRIMARY KEY ("token_hash")
+);
+-- #[toasty::breakpoint]
 CREATE TABLE "background_jobs" (
     "id" TEXT NOT NULL,
     "queue" TEXT NOT NULL,
@@ -89,6 +99,13 @@ CREATE TABLE "library_series" (
     PRIMARY KEY ("id")
 );
 -- #[toasty::breakpoint]
+CREATE TABLE "public_shares" (
+    "id" TEXT NOT NULL,
+    "series_id" TEXT NOT NULL,
+    "created_at" TEXT NOT NULL,
+    PRIMARY KEY ("id")
+);
+-- #[toasty::breakpoint]
 CREATE TABLE "sources" (
     "key" TEXT NOT NULL,
     "display_name" TEXT NOT NULL,
@@ -113,6 +130,8 @@ CREATE TABLE "stats_events" (
     "created_at" TEXT NOT NULL,
     PRIMARY KEY ("id")
 );
+-- #[toasty::breakpoint]
+CREATE INDEX "index_auth_sessions_by_expires_at" ON "auth_sessions" ("expires_at");
 -- #[toasty::breakpoint]
 CREATE INDEX "index_background_jobs_by_queue" ON "background_jobs" ("queue");
 -- #[toasty::breakpoint]
@@ -165,6 +184,8 @@ CREATE INDEX "index_stats_events_by_kind" ON "stats_events" ("kind");
 CREATE INDEX "index_stats_events_by_series_id" ON "stats_events" ("series_id");
 -- #[toasty::breakpoint]
 CREATE INDEX "index_stats_events_by_source" ON "stats_events" ("source");
+-- #[toasty::breakpoint]
+CREATE UNIQUE INDEX "index_public_shares_by_series_id" ON "public_shares" ("series_id");
 -- #[toasty::breakpoint]
 -- Toasty 0.7 does not generate composite uniqueness or partial indexes.
 -- Both database engines enforce these domain invariants independently of locks.

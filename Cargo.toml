@@ -9,6 +9,8 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
+openidconnect = { version = "=4.0.1", default-features = false, features = ["timing-resistant-secret-traits"] }
+subtle = "2.6"
 ulid = "1"
 toasty-driver-postgresql = "=0.7.0"
 apalis-postgres = "=1.0.0-rc.8"

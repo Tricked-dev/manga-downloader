@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, Notify, RwLock};
 
 #[derive(Clone)]
 pub(crate) struct AppConfig {
+    pub(crate) public_url: Option<String>,
     pub(crate) cache_disk_path: PathBuf,
     pub(crate) backend_api_key: Option<SecretString>,
 }
@@ -27,6 +28,7 @@ pub(crate) struct DownloadStorageUsage {
 }
 
 pub(crate) struct AppState {
+    pub(crate) oidc: tokio::sync::OnceCell<crate::api::auth::oidc::OidcRuntime>,
     pub(crate) config: AppConfig,
     pub(crate) db: backend_persistence::Database,
     pub(crate) source_registry: RwLock<SourceRegistry>,
@@ -63,6 +65,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
     } = parts;
 
     Arc::new(AppState {
+        oidc: tokio::sync::OnceCell::new(),
         config,
         db,
         source_registry: RwLock::new(source_registry),
@@ -82,6 +85,7 @@ pub(crate) async fn build_test_app_state(
     label: &str,
     telemetry_name: &'static str,
 ) -> Arc<AppState> {
+    backend_tls::ensure_graviola_rustls_provider().expect("initialize TLS before database clients");
     let root = crate::test_support::temp_path(label);
     let db_path = root.join("test.sqlite3");
     let cache_path = root.join("cache");
@@ -120,6 +124,7 @@ pub(crate) async fn build_test_app_state(
 
     build_app_state(AppStateParts {
         config: AppConfig {
+            public_url: Some("http://localhost".into()),
             cache_disk_path: cache_path,
             backend_api_key: None,
         },

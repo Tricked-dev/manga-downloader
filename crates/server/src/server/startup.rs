@@ -133,6 +133,7 @@ async fn bootstrap_server(
     telemetry: Telemetry,
 ) -> anyhow::Result<ServerContext> {
     let ServerConfig {
+        public_url,
         database_url,
         models_dir,
         upscale_device,
@@ -164,9 +165,7 @@ async fn bootstrap_server(
         );
     }
 
-    let backend_api_key = settings
-        .backend_api_key(backend_api_key.map(SecretString::from))
-        .await?;
+    let backend_api_key = backend_api_key.map(SecretString::from);
     let cache = MangaCache::new(&cache_disk_path, cache_max_memory_bytes).await?;
     let build_info = build_info::server_build_info();
     tracing::info!(
@@ -192,6 +191,9 @@ async fn bootstrap_server(
     let upscale_queue = crate::jobs::UpscaleQueue::open(&db).await?;
     let state = build_app_state(AppStateParts {
         config: AppConfig {
+            public_url: public_url
+                .map(|url| crate::api::auth::normalize_public_url(&url))
+                .transpose()?,
             cache_disk_path: PathBuf::from(cache_disk_path),
             backend_api_key,
         },

@@ -9,6 +9,7 @@ name = "backend_persistence"
 path = "src/lib.rs"
 
 [dependencies]
+backend-tls = { path = "../tls" }
 toasty-driver-postgresql.workspace = true
 url.workspace = true
 backend-core = { path = "../core" }

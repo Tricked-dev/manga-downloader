@@ -178,3 +178,28 @@ pub(crate) struct BackgroundJob {
     #[update(crate::now_timestamp())]
     pub(crate) updated_at: String,
 }
+
+#[derive(Clone, Debug, toasty::Model)]
+#[table = "auth_sessions"]
+pub(crate) struct AuthSession {
+    #[key]
+    pub(crate) token_hash: String,
+    pub(crate) config_hash: String,
+    pub(crate) subject: String,
+    pub(crate) name: Option<String>,
+    pub(crate) email: Option<String>,
+    #[index]
+    pub(crate) expires_at: String,
+}
+
+#[derive(Clone, Debug, toasty::Model)]
+#[table = "public_shares"]
+pub(crate) struct PublicShare {
+    #[key]
+    #[default(crate::new_id())]
+    pub(crate) id: String,
+    #[unique]
+    pub(crate) series_id: String,
+    #[default(crate::now_timestamp())]
+    pub(crate) created_at: String,
+}
