@@ -10,10 +10,14 @@ BuildBuddy remote cache/RBE plus a source-built LLVM toolchain. There is **no Ca
 one `third_party/rust/Cargo.toml` of ~85 all-`optional` deps feeds `crates_universe`, and three
 separate policy gates actively *forbid* any other `Cargo.toml` from existing.
 
-The product inside all that is good: an Axum API server with SQLite persistence, a download queue,
-library/update tracking, a media proxy, and pluggable manga sources. The goal is to keep that
-product and throw away the delivery machinery — `cargo build --release` should produce one binary,
-and nothing else should be required to run it.
+The product inside all that is good: an Axum API server, a download queue, library/update tracking,
+a media proxy, and pluggable manga sources. The goal is to keep that product and throw away the
+delivery machinery — `cargo build --release` should produce one binary.
+
+Persistence supports **both SQLite and PostgreSQL**, selected by connection string. SQLite stays the
+default, so the single-binary zero-dependency deployment survives and tests stay hermetic; Postgres
+is opt-in for real concurrent writes and `LISTEN/NOTIFY` job pickup, with `devenv` running the dev
+server.
 
 Two sibling repos get folded in at the same time:
 
@@ -48,6 +52,7 @@ Plus a new **rawkuma** source for Japanese raws, alongside the existing comix so
 | Clients | **Aidoku + Tachiyomi extensions must keep working** — highest-priority constraint. |
 | Rawkuma | Just another source — separate library entries, no EN/JP linking. Browser-driven like comix. |
 | Legacy data | None. No `.tar.zst` reader, no migration command; existing downloads are disposable. |
+| Database | **Both** SQLite and PostgreSQL, chosen by connection string; SQLite is the default. `toasty-driver-postgresql` 0.7.0 matches the pinned toasty 0.7.0, so no ORM bump. `devenv` runs the dev PG server. |
 | Container extension | libbbf-rs's append API. Originals seal immediately; the upscaled section is appended later. One file per chapter, fast downloads. |
 
 ## Target shape
@@ -59,6 +64,7 @@ manga-downloader/
 ├── rust-toolchain.toml        # nightly-2026-06-01
 ├── .cargo/config.toml         # rustflags = ["--cfg=tokio_unstable"]
 ├── flake.nix                  # crane; packages.default = manga-server
+├── devenv.nix / devenv.yaml   # dev shell + postgres service
 ├── crates/
 │   ├── server/                # bin `manga-server` (+ lib manga_server)
 │   ├── api-types/  cache/  clearance/  config/  core/
@@ -255,6 +261,69 @@ path once nothing calls them.
   re-fetched. Concretely that means the tar+zstd code in `libs/rust/image` is deleted outright
   rather than kept alive behind a read path, which is what makes the Phase 4 deletions clean.
 
+## Phase 4b — PostgreSQL alongside SQLite
+
+Cheap at the ORM layer, because `toasty::Db` is **non-generic — the driver is type-erased**. The
+project's own code proves it: `persistence/src/lib.rs:61` stores a plain `db: Db`, and
+`open_sqlite_database` returns `Result<Db>` after `builder.build(Sqlite::open(path))`. So both
+drivers produce the same `Db` type and selection can be a runtime branch on the connection string.
+
+Two more facts keep the port small, both checked against the source. Only `archive_index.rs` and
+`readonly.rs` contain raw SQL — Phase 4 already deleted the first — so every remaining query goes
+through toasty's model API. And the DDL in `libs/rust/persistence/migrations/` is nearly
+dialect-neutral: quoted identifiers, `TEXT`/`BIGINT`/`BOOLEAN` (90/21/15 uses), one `INTEGER`, one
+`BLOB`, no `AUTOINCREMENT`/`PRAGMA`/`INSERT OR REPLACE`/`strftime`. The `-- #[toasty::breakpoint]`
+markers show it is generated from the `#[derive(toasty::Model)]` structs.
+
+1. **Add the driver, keep the old one.** `toasty-driver-postgresql` **0.7.0** published the same day
+   as the pinned toasty 0.7.0, so the ORM stays put and none of toasty's later breaking changes
+   (`Query<T>` consolidation in 0.8, capability API in 0.10) are in scope. `rusqlite` and
+   `libsqlite3-sys` stay.
+2. **Dispatch on the connection string.** `Database::new(path)` becomes `Database::open(url)`:
+   `postgres://` / `postgresql://` → the PG driver, anything else → SQLite (bare paths keep working,
+   so existing invocations are unaffected). `setup.rs` grows `open_postgres_database` next to
+   `open_sqlite_database`; `SqliteDatabaseOptions` (WAL, foreign-key pragmas) stays SQLite-only.
+3. **The write lock must fork — this is the one real trap.** `persistence/src/lib.rs:63` holds a
+   process-wide `write_lock: Arc<Mutex<()>>` serializing every write, which is correct for SQLite's
+   single-writer model and actively counterproductive under PG: it would serialize all writes and
+   throw away exactly the concurrency PG is being adopted for. Make it
+   `write_lock: Option<Arc<Mutex<()>>>` — `Some` for SQLite, `None` for PG. Three touch points
+   (lines 63, 80, 105) and no callers outside the crate. This is what toasty means by not abstracting
+   the database; assume more of these surface and treat each explicitly rather than papering over it.
+4. **Two generated schemas**, `migrations/sqlite/0001_initial.sql` and
+   `migrations/postgres/0001_initial.sql`, regenerated from the models rather than porting the
+   9-migration chain — the history is not worth carrying, since `0003` is literally
+   `plugin_api_v5_clean_break`, `0004` is `removed_compat_api`, Phase 3 drops the plugin tables and
+   Phase 4 drops the archive-index tables. The only dialect delta is `BLOB` → `bytea` plus a review
+   of the lone `INTEGER`. Timestamps are stored as `TEXT`; keep that so model types are untouched and
+   note `timestamptz` as a follow-up.
+5. **Delete `readonly.rs` (177 LOC) regardless — it is dead code.** `ReadOnlyDatabase` is exported
+   from `persistence/src/lib.rs:42` and referenced nowhere outside the crate.
+   `sqlite_read_only_immutable_uri` goes with it, along with its 5 raw SQL statements.
+6. **Job queue is the ongoing cost.** The custom SQLite `apalis` `Backend` in
+   `crates/server/src/jobs.rs` **survives** instead of being deleted, and `apalis-postgres`
+   (1.0.0-rc.8, tracking apalis-core/apalis-sql 1.0.0-rc.9 = the pinned apalis) sits beside it behind
+   a small enum. The PG path uses `PostgresStorageWithListener` so `LISTEN/NOTIFY` replaces polling.
+   Two queue backends is the main price of supporting both.
+7. **Config.** `DB_PATH` / `--db-path` → `DATABASE_URL` / `--database-url` (accepting a bare path for
+   SQLite), touching exactly five files: `config/src/lib.rs`, `server/src/cli.rs`,
+   `server/src/server/state.rs`, `server/src/server/startup.rs`, `server/src/app/health.rs`. Add a
+   per-backend connectivity check to `health.rs`, and report the active backend in
+   `config print`. `db migrate` picks the schema matching the URL.
+
+**devenv** owns the dev environment and the PG server: `services.postgres.enable = true` with
+`initialDatabases`, `listen_addresses = "127.0.0.1"`, state in `.devenv/state/postgres` (gitignore
+`.devenv/`), started with `devenv up`. It does **not** export `DATABASE_URL` globally — that would
+silently make Postgres the default and let the SQLite path rot. Provide it as an opt-in
+(`devenv up` plus an explicit `--database-url`, or a `devenv` script like `run-pg`), so the plain
+`cargo run` path stays SQLite.
+
+**Testing both is the discipline that makes this worth it.** SQLite keeps `cargo test` hermetic and
+runnable anywhere, so it stays the default and `cargoTest` stays in `nix flake check`. Parameterize
+the DB-touching tests over both backends and run the PG pass under `devenv` in CI, with a per-test
+transaction rollback or a temp database per run. The failure mode to avoid is a backend that only
+ever runs on one developer's machine.
+
 ## Phase 5 — Upscaling
 
 `crates/upscale`, unconditionally part of the workspace and linked into the binary — there is no
@@ -350,10 +419,11 @@ use in both sibling repos):
 - `packages.default` = `manga-server` (web UI embedded; bun build as a fixed-output derivation),
   with `onnxruntime` in `buildInputs` and the `ORT_*` env vars set the way
   `mangajenai-rs/flake.nix` already does. There is only one package — no upscale variant.
-- `checks` = build, `cargoTest`, `cargoClippy --all-targets -- --deny warnings`, `cargoFmt`.
-- `devShell` = toolchain + rust-analyzer + bun + chromium (for clearance) + `onnxruntime` +
-  `bbfmux` (for inspecting produced archives). Reuse `mangajenai-rs`'s `python-env.nix` for the
-  one-time `.pth` → `.onnx` export.
+- `checks` = build, `cargoTest` (SQLite backend — hermetic), `cargoClippy --all-targets -- --deny
+  warnings`, `cargoFmt`. The Postgres test pass runs under `devenv` in CI, outside the sandbox.
+- No `devShell` here — `devenv.nix` owns it (see Phase 4b), including postgres, bun, chromium,
+  `onnxruntime`, and `bbfmux` for inspecting archives. Reuse `mangajenai-rs`'s `python-env.nix` for
+  the one-time `.pth` → `.onnx` export.
 - Inputs: `libbbf-rs`, `mangajenai-rs`.
 - Neither sibling repo has CI today; a single GitHub Actions job running `nix flake check` is worth
   adding here.
@@ -371,7 +441,9 @@ Build and unit level:
 
 Functional, end to end:
 
-4. `manga-server db migrate` on a fresh dir; `manga-server config print --json`;
+4. **Both backends:** `manga-server db migrate` with no URL (SQLite file appears), then `devenv up`
+   and `db migrate --database-url postgres://…` (`psql` shows the same tables).
+   `config print --json` reports the active backend in each case;
    `manga-server sources list` shows comix **and** rawkuma.
 5. `manga-server serve`, then via `/v1`: search on both sources, add one of each to the library,
    queue a download.
@@ -409,6 +481,13 @@ Functional, end to end:
 - **rawkuma parsers are scraping-fragile.** Fixture-based tests localize breakage but won't prevent
   it; site changes will need parser updates.
 - **New dep: `scraper`** (html5ever). First HTML parser in the tree.
+- **Dual backends mean two code paths that can silently diverge**, most acutely the two apalis queue
+  backends and the SQLite-only write lock. Toasty deliberately does not abstract the database, so
+  expect further per-backend forks; the mitigation is running the full test suite against both, not
+  hoping the ORM hides the difference.
+- **Postgres deployment is undocumented** — `infra/` is deleted in Phase 2 and `devenv` covers
+  development only. Fine while SQLite is the default, but it needs an answer before anyone runs the
+  PG path in production.
 - **Nightly + `tokio_unstable`** are load-bearing (`Duration::from_mins` in ~10 places, tokio
   poll-time histogram). Documented in `rust-toolchain.toml`; unpinning is a follow-up, not part of this.
 - **ONNX Runtime is now a build-time requirement**, so `cargo build` no longer works on a bare
