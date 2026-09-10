@@ -1,0 +1,209 @@
+load("//libs/bazel/cargo:defs.bzl", "cargo_shear_test")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "starlark_files",
+    srcs = [
+        "BUILD.bazel",
+        "defs.bzl",
+    ],
+    tags = ["starlark"],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = ["runner.rs"],
+    tags = ["rust"],
+)
+
+genrule(
+    name = "cargo_deny",
+    srcs = [
+        "//:cargo_workspace_files",
+        "//third_party/rust:Cargo.lock",
+        "//third_party/rust:Cargo.toml",
+    ],
+    outs = ["cargo_deny.ok"],
+    cmd = """
+set -eu
+$(location @cargo_tools_crates//:cargo-deny__cargo-deny) --version
+printf 'ok\\n' > "$@"
+""",
+    exec_compatible_with = ["//infra/images/rbe:executor_ghcr"],
+    tags = [
+        "cargo-deny",
+        "manual",
+    ],
+    tools = ["@cargo_tools_crates//:cargo-deny__cargo-deny"],
+)
+
+genrule(
+    name = "cargo_manifest_policy",
+    srcs = [
+        "//:starlark_files",
+        "//third_party/rust:cargo_files",
+    ],
+    outs = ["cargo_manifest_policy.ok"],
+    cmd = """
+set -eu
+combined="$@.combined"
+cat $(SRCS) > "$$combined"
+require() {
+  name="$$1"
+  snippet="$$2"
+  if ! grep -F -- "$$snippet" "$$combined" >/dev/null; then
+    echo "missing required Cargo manifest policy: $$name" >&2
+    exit 1
+  fi
+}
+forbid() {
+  name="$$1"
+  snippet="$$2"
+  if grep -F -- "$$snippet" "$$combined" >/dev/null; then
+    echo "forbidden Cargo manifest policy found: $$name" >&2
+    grep -n -F -- "$$snippet" "$$combined" >&2
+    exit 1
+  fi
+}
+require "central Cargo lock label" '//third_party/rust:Cargo.lock'
+require "central Cargo manifest label" '//third_party/rust:Cargo.toml'
+require "rules_rs central lock" 'cargo_lock = "//third_party/rust:Cargo.lock"'
+require "rules_rs central manifest" 'cargo_toml = "//third_party/rust:Cargo.toml"'
+forbid "root Cargo lock export" '"Cargo.lock"'
+forbid "root Cargo manifest export" '"Cargo.toml"'
+printf 'ok\\n' > "$@"
+""",
+    exec_compatible_with = ["//infra/images/rbe:executor_ghcr"],
+    tags = [
+        "cargo-manifest-policy",
+    ],
+)
+
+genrule(
+    name = "cargo_tool_policy",
+    srcs = [
+        ":starlark_files",
+        "//:starlark_files",
+    ],
+    outs = ["cargo_tool_policy.ok"],
+    cmd = """
+set -eu
+combined="$@.combined"
+cat $(SRCS) > "$$combined"
+require() {
+  name="$$1"
+  snippet="$$2"
+  if ! grep -F -- "$$snippet" "$$combined" | grep -v 'require "' >/dev/null; then
+    echo "missing required Cargo tool policy: $$name" >&2
+    exit 1
+  fi
+}
+forbid() {
+  name="$$1"
+  snippet="$$2"
+  if grep -F -- "$$snippet" "$$combined" | grep -v 'forbid "' >/dev/null; then
+    echo "forbidden Cargo tool policy found: $$name" >&2
+    grep -n -F -- "$$snippet" "$$combined" | grep -v 'forbid "' >&2
+    exit 1
+  fi
+}
+require "Bazel-built cargo-deny binary execution" '@cargo_tools_crates//:cargo-deny__cargo-deny) --version'
+require "Bazel-built cargo-shear binary execution" '@cargo_tools_crates//:cargo-shear__cargo-shear) --version'
+require "cargo-deny remote GHCR executor constraint" 'exec_compatible_with = ["//infra/images/rbe:executor_ghcr"]'
+require "cargo tool build task" '["build"] + CARGO_TOOL_TARGETS'
+rust_test_pattern='rust_''test('
+cargo_deny_test_pattern='["test", "//libs/bazel/cargo:cargo_''deny"]'
+cargo_shear_test_pattern='["test", "//libs/bazel/cargo:cargo_''shear"]'
+cargo_metadata_pattern='cargo ''metadata'
+command_cargo_pattern='Command::new("''cargo")'
+forbid "Bash-backed Rust test harness for cargo tools" "$$rust_test_pattern"
+forbid "Aspect cargo-deny test task" "$$cargo_deny_test_pattern"
+forbid "Aspect cargo-shear test task" "$$cargo_shear_test_pattern"
+forbid "non-hermetic cargo metadata shellout in Bazel action" "$$cargo_metadata_pattern"
+forbid "PATH cargo lookup in Bazel action" "$$command_cargo_pattern"
+printf 'ok\\n' > "$@"
+""",
+    exec_compatible_with = ["//infra/images/rbe:executor_ghcr"],
+    tags = [
+        "cargo-tool-policy",
+    ],
+)
+
+genrule(
+    name = "sys_crate_policy",
+    srcs = [
+        "//apps/rust/server:rust_files",
+        "//:bazel_toolchain_policy_files",
+        "//libs/rust/clearance:rust_files",
+        "//libs/rust/plugin-host:rust_files",
+        "//libs/rust/tls:rust_files",
+        "//libs/rust/tls:starlark_files",
+        "//third_party/rust:cargo_files",
+    ],
+    outs = ["sys_crate_policy.ok"],
+    cmd = """
+set -eu
+combined="$@.combined"
+cat $(SRCS) > "$$combined"
+require() {
+  name="$$1"
+  snippet="$$2"
+  if ! grep -F -- "$$snippet" "$$combined" >/dev/null; then
+    echo "missing required Rust sys-crate policy: $$name" >&2
+    exit 1
+  fi
+}
+forbid() {
+  name="$$1"
+  snippet="$$2"
+  if grep -F -- "$$snippet" "$$combined" >/dev/null; then
+    echo "forbidden Rust sys-crate policy found: $$name" >&2
+    grep -n -F -- "$$snippet" "$$combined" >&2
+    exit 1
+  fi
+}
+require "zlib BCR module" 'bazel_dep(name = "zlib"'
+require "lz4 BCR module" 'bazel_dep(name = "lz4"'
+require "zstd BCR module" 'bazel_dep(name = "zstd"'
+require "libgit2 BCR module" 'bazel_dep(name = "libgit2"'
+require "mimalloc BCR module" 'bazel_dep(name = "mimalloc"'
+require "libz-sys annotation" 'crate = "libz-sys"'
+require "libgit2-sys annotation" 'crate = "libgit2-sys"'
+require "lz4-sys annotation" 'crate = "lz4-sys"'
+require "zstd-sys annotation" 'crate = "zstd-sys"'
+require "libz-sys build script disabled" 'deps = ["@zlib"]'
+require "libgit2-sys build script disabled" 'deps = ["@libgit2"]'
+require "lz4-sys build script disabled" 'deps = ["@lz4//:lz4_frame"]'
+require "zstd-sys build script disabled" 'deps = ["@zstd"]'
+require "rules_rs native repo injection" 'inject_repo(crate, "libgit2", "lz4", "mimalloc", "zlib", "zstd")'
+require "sqlite sys exception annotation" 'crate = "libsqlite3-sys"'
+require "sqlite sys build script exception" 'gen_build_script = "on"'
+require "sqlite sys exception reason" 'toasty-driver-sqlite 0.7 hardcodes rusqlite'
+require "reqwest rustls provider externalized" 'features = ["cookies", "json", "rustls-no-provider", "zstd"]'
+require "graviola rustls provider dependency" 'rustls-graviola'
+require "shared graviola provider crate" 'crate_name = "backend_tls"'
+require "graviola provider installed by shared helper" 'rustls_graviola::default_provider()'
+require "graviola install default call" '.install_default()'
+require "plugin-host reqwest provider guard" 'ensure_graviola_rustls_provider()?;'
+require "clearance reqwest provider guard" 'backend_tls::ensure_graviola_rustls_provider().map_err(|err| err.to_string())?;'
+require "server reqwest provider guard" 'backend_tls::ensure_graviola_rustls_provider()?;'
+require "documented sys-crate policy" '`//libs/bazel/cargo:sys_crate_policy`'
+forbid "OpenSSL sys crate in central lock" 'name = "openssl-sys"'
+printf 'ok\\n' > "$@"
+""",
+    exec_compatible_with = ["//infra/images/rbe:executor_ghcr"],
+    tags = [
+        "cargo-sys-crate-policy",
+    ],
+)
+
+cargo_shear_test(
+    name = "cargo_shear",
+    data = [
+        "//:cargo_workspace_files",
+        "//third_party/rust:Cargo.lock",
+        "//third_party/rust:Cargo.toml",
+    ],
+    workspace = ".",
+)

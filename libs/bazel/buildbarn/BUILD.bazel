@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["bb_clientd.buildbuddy.jsonnet"])
+
+filegroup(
+    name = "bb_clientd_config",
+    srcs = ["bb_clientd.buildbuddy.jsonnet"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

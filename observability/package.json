@@ -1,0 +1,23 @@
+{
+  "name": "@manga-downloader/observability",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Grafana and OpenTelemetry observability as code for manga-downloader.",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx src/generate.ts",
+    "check": "npm run generate && tsc --noEmit"
+  },
+  "devDependencies": {
+    "@grafana/grafana-foundation-sdk": "0.0.13",
+    "@types/node": "25.9.1",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3",
+    "yaml": "2.9.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

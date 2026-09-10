@@ -1,0 +1,1422 @@
+{
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "schemaVersion": 42,
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "skipUrlSync": false,
+        "multi": false,
+        "allowCustomValue": true,
+        "includeAll": false,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": false,
+          "text": "Metrics",
+          "value": "prometheus"
+        }
+      },
+      {
+        "type": "query",
+        "name": "job",
+        "skipUrlSync": false,
+        "multi": false,
+        "allowCustomValue": true,
+        "includeAll": false,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Job",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(manga_server_tokio_workers_count_ratio, job)",
+        "query": {
+          "query": "label_values(manga_server_tokio_workers_count_ratio, job)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": false,
+          "text": "manga-server",
+          "value": "manga-server"
+        }
+      }
+    ]
+  },
+  "annotations": {},
+  "title": "Manga Server Tokio Runtime",
+  "uid": "manga-server-tokio-runtime",
+  "tags": [
+    "manga-server",
+    "prometheus",
+    "tokio",
+    "runtime"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "version": 200,
+  "liveNow": false,
+  "weekStart": "",
+  "description": "Tokio runtime health and scheduler pressure for the manga downloader backend.",
+  "panels": [
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 1,
+      "title": "Up",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "min(up{job=\"$job\"})",
+          "refId": "A",
+          "legendFormat": "Up",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 2,
+      "title": "Workers",
+      "gridPos": {
+        "x": 3,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_workers_count_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "Workers",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 3,
+      "title": "Live tasks",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_live_tasks_count_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "Live tasks",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 4,
+      "title": "Busy",
+      "gridPos": {
+        "x": 9,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_busy_ratio_percent{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "Busy",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 5,
+      "title": "Blocking Q",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_blocking_queue_depth_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "Blocking Q",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 6,
+      "title": "Forced yields/s",
+      "gridPos": {
+        "x": 15,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(manga_server_tokio_budget_forced_yield_count_total{job=\"$job\"}[$__rate_interval]))",
+          "refId": "A",
+          "legendFormat": "Forced yields/s",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 7,
+      "title": "Poll p95",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(manga_server_tokio_poll_time_histogram_microseconds_bucket{job=\"$job\"}[$__rate_interval])))",
+          "refId": "A",
+          "legendFormat": "Poll p95",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 8,
+      "title": "Polls/park",
+      "gridPos": {
+        "x": 21,
+        "y": 0,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_mean_polls_per_park_percent{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "Polls/park",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "id": 10,
+      "panels": [],
+      "title": "Scheduler Pressure",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 11,
+      "title": "Queue depths",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_global_queue_depth_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "global",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_total_local_queue_depth_ratio{job=\"$job\"}",
+          "refId": "B",
+          "legendFormat": "local total",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_max_local_queue_depth_ratio{job=\"$job\"}",
+          "refId": "C",
+          "legendFormat": "local max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_min_local_queue_depth_ratio{job=\"$job\"}",
+          "refId": "D",
+          "legendFormat": "local min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_blocking_queue_depth_ratio{job=\"$job\"}",
+          "refId": "E",
+          "legendFormat": "blocking",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 12,
+      "title": "Task and blocking pool counts",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_live_tasks_count_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "live tasks",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_blocking_threads_count_ratio{job=\"$job\"}",
+          "refId": "B",
+          "legendFormat": "blocking threads",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_idle_blocking_threads_count_ratio{job=\"$job\"}",
+          "refId": "C",
+          "legendFormat": "idle blocking threads",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 13,
+      "title": "Scheduling operations",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_num_remote_schedules_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "remote",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_local_schedule_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "local total",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_local_schedule_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "local worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_local_schedule_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "D",
+          "legendFormat": "local worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 14,
+      "title": "Polls, forced yields, and I/O readiness",
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_polls_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "polls",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_budget_forced_yield_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "forced yields",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_io_driver_ready_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "io ready",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "id": 20,
+      "panels": [],
+      "title": "Poll and Busy Time",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 21,
+      "title": "Poll duration summary",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_mean_poll_duration_microseconds{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "mean",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_mean_poll_duration_worker_max_microseconds{job=\"$job\"}",
+          "refId": "B",
+          "legendFormat": "worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_mean_poll_duration_worker_min_microseconds{job=\"$job\"}",
+          "refId": "C",
+          "legendFormat": "worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 22,
+      "title": "Poll time quantiles",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(manga_server_tokio_poll_time_histogram_microseconds_bucket{job=\"$job\"}[$__rate_interval])))",
+          "refId": "A",
+          "legendFormat": "p95",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 23,
+      "title": "Poll counts by worker extrema",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_polls_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "polls",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_polls_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_polls_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 24,
+      "title": "Busy duration rate",
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ns",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_busy_duration_microseconds_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "total busy",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_busy_duration_microseconds_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_busy_duration_microseconds_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "id": 30,
+      "panels": [],
+      "title": "Worker Balance",
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 31,
+      "title": "Parking and no-op wakeups",
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_total_park_count_ratio{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "parks",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_noop_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "no-op",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_mean_polls_per_park_percent{job=\"$job\"}",
+          "refId": "C",
+          "legendFormat": "polls per park",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 32,
+      "title": "Park/no-op worker extrema",
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_max_park_count_ratio{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "park worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_park_count_ratio{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "park worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_noop_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "no-op worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_noop_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "D",
+          "legendFormat": "no-op worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 33,
+      "title": "Task steals",
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_steal_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "steal count",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_steal_operations_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "steal ops",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 34,
+      "title": "Steal worker extrema",
+      "gridPos": {
+        "x": 12,
+        "y": 47,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_max_steal_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "count worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_steal_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "count worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_steal_operations_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "ops worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_steal_operations_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "D",
+          "legendFormat": "ops worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "id": 40,
+      "panels": [],
+      "title": "Overflow and Blocking",
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 41,
+      "title": "Overflow events",
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_overflow_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "total",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_max_overflow_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "worker max",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_min_overflow_count_total{job=\"$job\"}[$__rate_interval])",
+          "refId": "C",
+          "legendFormat": "worker min",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 42,
+      "title": "Blocking pool detail",
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "manga_server_tokio_blocking_threads_count_ratio{job=\"$job\"}",
+          "refId": "A",
+          "legendFormat": "blocking threads",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_idle_blocking_threads_count_ratio{job=\"$job\"}",
+          "refId": "B",
+          "legendFormat": "idle blocking threads",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "manga_server_tokio_blocking_queue_depth_ratio{job=\"$job\"}",
+          "refId": "C",
+          "legendFormat": "queue",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 43,
+      "title": "Poll histogram sample flow",
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(manga_server_tokio_poll_time_histogram_microseconds_count{job=\"$job\"}[$__rate_interval])",
+          "refId": "A",
+          "legendFormat": "samples",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "rate(manga_server_tokio_poll_time_histogram_microseconds_sum{job=\"$job\"}[$__rate_interval])",
+          "refId": "B",
+          "legendFormat": "sample sum",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

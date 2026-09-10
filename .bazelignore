@@ -1,0 +1,17 @@
+.cargo
+.ccc
+.cocoindex_code
+.direnv
+.git
+.svelte-kit
+bazel-bin
+bazel-manga-downloader
+bazel-out
+bazel-testlogs
+apps/clients/aidoku/target
+apps/clients/tachiyomi/build
+data
+node_modules
+observability/node_modules
+plugins/*/target
+result

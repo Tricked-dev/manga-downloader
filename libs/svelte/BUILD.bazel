@@ -1,0 +1,52 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "libs",
+    srcs = [
+        "//libs/svelte/api-client:pkg",
+        "//libs/svelte/ui:pkg",
+    ],
+)
+
+test_suite(
+    name = "tests",
+    tests = [
+        "//libs/svelte/api-client:test",
+        "//libs/svelte/api-client:typecheck",
+        "//libs/svelte/ui:typecheck",
+    ],
+)
+
+test_suite(
+    name = "lint",
+    tests = [
+        "//libs/svelte/api-client:lint",
+        "//libs/svelte/ui:lint",
+    ],
+)
+
+test_suite(
+    name = "format_oxc_js_ts_check",
+    tests = [
+        "//libs/svelte/api-client:format_oxc_js_ts_check",
+        "//libs/svelte/ui:format_oxc_js_ts_check",
+    ],
+)
+
+test_suite(
+    name = "format_oxc_json_check",
+    tests = [
+        "//libs/svelte/api-client:format_oxc_json_check",
+        "//libs/svelte/ui:format_oxc_json_check",
+    ],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = [
+        "BUILD.bazel",
+        "//libs/svelte/api-client:starlark_files",
+        "//libs/svelte/ui:starlark_files",
+    ],
+    tags = ["starlark"],
+)

@@ -1,0 +1,18 @@
+########################
+# Root Bazel rc loader.
+#
+# Bazel auto-loads a workspace file named `.bazelrc`, so this file stays as the
+# stable entry point while the real flags live in `tools/bazelrc/`.
+try-import %workspace%/tools/bazelrc/00-preset.bazelrc
+try-import %workspace%/tools/bazelrc/10-defaults.bazelrc
+try-import %workspace%/tools/bazelrc/20-incompatible.bazelrc
+try-import %workspace%/tools/bazelrc/30-cache.bazelrc
+try-import %workspace%/tools/bazelrc/40-buildbuddy.bazelrc
+try-import %workspace%/tools/bazelrc/50-platforms.bazelrc
+try-import %workspace%/tools/bazelrc/60-run-test.bazelrc
+try-import %workspace%/tools/bazelrc/70-bb-clientd.bazelrc
+try-import %workspace%/tools/bazelrc/80-rust-modes.bazelrc
+
+########################
+# User preferences and local credentials
+try-import %workspace%/user.bazelrc

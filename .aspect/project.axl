@@ -1,0 +1,77 @@
+"""Aspect task definitions for the manga-downloader repository."""
+
+load(
+    ".aspect/tasks/core.axl",
+    "backend",
+    "build",
+    "frontend",
+    "test",
+)
+load(
+    ".aspect/tasks/coverage.axl",
+    "coverage",
+    "coverage_repo_owned",
+)
+load(
+    ".aspect/tasks/diagnostics.axl",
+    "action_graph",
+    "bb_ask",
+    "bb_explain",
+    "bb_print",
+    "bb_view",
+    "build_events",
+    "cache_probe",
+    "canonical_flags",
+    "configured_targets",
+    "exec_log",
+    "grpc_log",
+    "profile",
+)
+load(
+    ".aspect/tasks/doctor.axl",
+    "doctor",
+    "repo_check",
+)
+load(
+    ".aspect/tasks/gazelle.axl",
+    "gazelle",
+    "gazelle_build",
+    "gazelle_check",
+    "mod_deps_check",
+    "mod_deps_update",
+)
+load(
+    ".aspect/tasks/quality.axl",
+    "cargo_deny",
+    "cargo_manifest_policy",
+    "cargo_policy",
+    "cargo_shear",
+    "cargo_tools",
+    "format_check",
+    "lint",
+    "policy",
+    "quality",
+    "sbom",
+)
+load(
+    ".aspect/tasks/rbe.axl",
+    "rbe_default_image_check",
+    "rbe_image",
+    "rbe_owned_image_check",
+    "rbe_push",
+    "rbe_smoke",
+)
+load(
+    ".aspect/tasks/runtime.axl",
+    "asan",
+    "bb_clientd_build",
+    "bb_clientd_prepare",
+    "bench",
+    "flamegraph",
+    "k6",
+    "lsan",
+    "optimized",
+    "release",
+    "sanitizers",
+    "start",
+)

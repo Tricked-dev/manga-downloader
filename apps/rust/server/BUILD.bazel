@@ -1,0 +1,149 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+load("//libs/bazel/upx:defs.bzl", "upx_compress_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+_SERVER_DEPS = [
+    "//libs/rust/api-types",
+    "//libs/rust/cache",
+    "//libs/rust/config",
+    "//libs/rust/core",
+    "//libs/rust/discord",
+    "//libs/rust/fs",
+    "//libs/rust/image",
+    "//libs/rust/page-extraction",
+    "//libs/rust/persistence",
+    "//libs/rust/plugin-host",
+    "//libs/rust/runtime",
+    "//libs/rust/telemetry",
+    "//libs/rust/tls",
+    "@backend_crates//:anyhow",
+    "@backend_crates//:apalis",
+    "@backend_crates//:autometrics",
+    "@backend_crates//:axum",
+    "@backend_crates//:axum-client-ip",
+    "@backend_crates//:axum-otel-metrics",
+    "@backend_crates//:backon",
+    "@backend_crates//:byte-unit",
+    "@backend_crates//:bytecheck",
+    "@backend_crates//:clap",
+    "@backend_crates//:dashmap",
+    "@backend_crates//:futures-util",
+    "@backend_crates//:garde",
+    "@backend_crates//:http",
+    "@backend_crates//:jiff",
+    "@backend_crates//:metrics",
+    "@backend_crates//:mime_guess",
+    "@backend_crates//:postcard",
+    "@backend_crates//:rayon",
+    "@backend_crates//:reqwest",
+    "@backend_crates//:rkyv",
+    "@backend_crates//:secrecy",
+    "@backend_crates//:serde",
+    "@backend_crates//:serde_json",
+    "@backend_crates//:shadow-rs",
+    "@backend_crates//:thiserror",
+    "@backend_crates//:tokio",
+    "@backend_crates//:tokio-graceful",
+    "@backend_crates//:tokio-util",
+    "@backend_crates//:tower",
+    "@backend_crates//:tower-http",
+    "@backend_crates//:tower-resilience-ratelimiter",
+    "@backend_crates//:tracing",
+    "@backend_crates//:url",
+    "@backend_crates//:utoipa",
+    "@backend_crates//:utoipa-axum",
+    "@backend_crates//:uuid",
+    "@backend_crates//:zip",
+    "@mimalloc",
+]
+
+_RUSTC_ENV = {
+    "OUT_DIR": ".",
+}
+
+_RUSTC_FLAGS = select({
+    "@platforms//os:linux": ["-Clink-arg=-Wl,--allow-multiple-definition"],
+    "//conditions:default": [],
+})
+
+rust_library(
+    name = "server_lib",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "manga_server",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    rustc_env = _RUSTC_ENV,
+    rustc_flags = _RUSTC_FLAGS,
+    deps = _SERVER_DEPS,
+)
+
+rust_binary(
+    name = "server",
+    srcs = ["src/main.rs"],
+    crate_name = "manga_server_bin",
+    edition = "2024",
+    rustc_env = _RUSTC_ENV,
+    rustc_flags = _RUSTC_FLAGS,
+    deps = [
+        ":server_lib",
+        "@backend_crates//:tokio",
+    ],
+)
+
+rust_binary(
+    name = "openapi_export",
+    srcs = ["src/bin/openapi_export.rs"],
+    crate_name = "manga_openapi_export",
+    edition = "2024",
+    rustc_env = _RUSTC_ENV,
+    rustc_flags = _RUSTC_FLAGS,
+    deps = [":server_lib"],
+)
+
+rust_test(
+    name = "test_server",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "manga_server_test",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    rustc_env = _RUSTC_ENV,
+    rustc_flags = _RUSTC_FLAGS,
+    deps = _SERVER_DEPS + [
+        "@backend_crates//:axum-test",
+        "@backend_crates//:tempfile",
+    ],
+)
+
+rust_quality_targets(
+    targets = [
+        ":openapi_export",
+        ":server",
+        ":server_lib",
+        ":test_server",
+    ],
+)
+
+upx_compress_binary(
+    name = "server_upx",
+    binary = ":server",
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = glob(
+        [
+            "src/**/*.rs",
+            "tests/**/*.rs",
+        ],
+        allow_empty = True,
+    ),
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

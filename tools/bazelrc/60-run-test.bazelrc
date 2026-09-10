@@ -1,0 +1,10 @@
+########################
+# Command-specific defaults
+#
+# Normal build/test targets stay Linux x86_64 for RBE through common platform
+# defaults. `bazel run` still needs a host binary and host tools so local
+# developer runs work on Darwin.
+run --host_platform=@platforms//host:host
+run --platforms=@platforms//host:host
+
+common --test_output=errors

@@ -1,0 +1,74 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "image",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "backend_image",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    deps = [
+        "//libs/rust/fs",
+        "@backend_crates//:anyhow",
+        "@backend_crates//:fs4",
+        "@backend_crates//:image",
+        "@backend_crates//:mime_guess",
+        "@backend_crates//:natord",
+        "@backend_crates//:quick-xml",
+        "@backend_crates//:rayon",
+        "@backend_crates//:serde",
+        "@backend_crates//:tar",
+        "@backend_crates//:tempfile",
+        "@backend_crates//:zstd",
+    ],
+)
+
+rust_test(
+    name = "test_archive",
+    srcs = ["tests/archive.rs"],
+    crate_root = "tests/archive.rs",
+    edition = "2024",
+    deps = [
+        ":image",
+        "//libs/rust/fs",
+        "@backend_crates//:anyhow",
+        "@backend_crates//:fs4",
+        "@backend_crates//:criterion",
+        "@backend_crates//:image",
+        "@backend_crates//:mime_guess",
+        "@backend_crates//:natord",
+        "@backend_crates//:quick-xml",
+        "@backend_crates//:rayon",
+        "@backend_crates//:serde",
+        "@backend_crates//:tar",
+        "@backend_crates//:tempfile",
+        "@backend_crates//:zstd",
+    ],
+)
+
+rust_quality_targets(
+    targets = [
+        ":image",
+        ":test_archive",
+    ],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = glob(
+        [
+            "src/**/*.rs",
+            "tests/**/*.rs",
+        ],
+        allow_empty = True,
+    ),
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

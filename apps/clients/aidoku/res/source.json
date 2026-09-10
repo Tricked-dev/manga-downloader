@@ -1,0 +1,13 @@
+{
+	"info": {
+		"id": "multi.mangadownloader",
+		"name": "Manga Downloader",
+		"version": 6,
+		"url": "http://localhost:4000",
+		"contentRating": 0,
+		"languages": ["multi"]
+	},
+	"config": {
+		"hidesFiltersWhileSearching": false
+	}
+}

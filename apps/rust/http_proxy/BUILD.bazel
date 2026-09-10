@@ -1,0 +1,47 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+
+package(default_visibility = ["//visibility:public"])
+
+_HTTP_PROXY_DEPS = [
+    "@backend_crates//:anyhow",
+    "@backend_crates//:tokio",
+    "@backend_crates//:url",
+]
+
+rust_binary(
+    name = "http_proxy",
+    srcs = ["src/main.rs"],
+    crate_name = "manga_http_proxy",
+    crate_root = "src/main.rs",
+    edition = "2024",
+    deps = _HTTP_PROXY_DEPS,
+)
+
+rust_test(
+    name = "test_http_proxy",
+    srcs = ["src/main.rs"],
+    crate_name = "manga_http_proxy_test",
+    crate_root = "src/main.rs",
+    edition = "2024",
+    deps = _HTTP_PROXY_DEPS,
+)
+
+rust_quality_targets(
+    targets = [
+        ":http_proxy",
+        ":test_http_proxy",
+    ],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = glob(["src/**/*.rs"]),
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["BUILD.upx.bazel"])
+
+filegroup(
+    name = "starlark_files",
+    srcs = [
+        "BUILD.bazel",
+        "BUILD.upx.bazel",
+    ],
+    tags = ["starlark"],
+)

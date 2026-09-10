@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "go_compiler_flags.patch",
+    "llvm_libgcc_s_linker_script.patch",
+    "rules_apko_range_header.patch",
+    "rules_go_cgo_runtime_link_inputs.patch",
+])
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

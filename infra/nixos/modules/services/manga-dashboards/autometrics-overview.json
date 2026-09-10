@@ -1,0 +1,770 @@
+{
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "schemaVersion": 42,
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "skipUrlSync": false,
+        "multi": false,
+        "allowCustomValue": true,
+        "includeAll": false,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Datasource",
+        "query": "prometheus",
+        "current": {
+          "selected": false,
+          "text": "Metrics",
+          "value": "prometheus"
+        }
+      },
+      {
+        "type": "query",
+        "name": "job",
+        "skipUrlSync": false,
+        "multi": false,
+        "allowCustomValue": true,
+        "includeAll": false,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Job",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(function_calls_total, job)",
+        "query": {
+          "query": "label_values(function_calls_total, job)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": false,
+          "text": "manga-server",
+          "value": "manga-server"
+        }
+      },
+      {
+        "type": "query",
+        "name": "service_name",
+        "skipUrlSync": false,
+        "multi": true,
+        "allowCustomValue": true,
+        "includeAll": true,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(function_calls_total{job=\"$job\"}, service_name)",
+        "query": {
+          "query": "label_values(function_calls_total{job=\"$job\"}, service_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "allValue": ".*"
+      },
+      {
+        "type": "query",
+        "name": "module",
+        "skipUrlSync": false,
+        "multi": true,
+        "allowCustomValue": true,
+        "includeAll": true,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Module",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(function_calls_total{job=\"$job\", service_name=~\"$service_name\"}, module)",
+        "query": {
+          "query": "label_values(function_calls_total{job=\"$job\", service_name=~\"$service_name\"}, module)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "allValue": ".*"
+      },
+      {
+        "type": "textbox",
+        "name": "limit",
+        "skipUrlSync": false,
+        "multi": false,
+        "allowCustomValue": true,
+        "includeAll": false,
+        "auto": false,
+        "auto_min": "10s",
+        "auto_count": 30,
+        "label": "Top N",
+        "query": "10",
+        "current": {
+          "selected": false,
+          "text": "10",
+          "value": "10"
+        }
+      }
+    ]
+  },
+  "annotations": {},
+  "title": "Autometrics Overview",
+  "uid": "autometrics-overview",
+  "tags": [
+    "autometrics",
+    "manga-server",
+    "prometheus"
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "version": 200,
+  "liveNow": false,
+  "weekStart": "",
+  "description": "Function-level request rate, error ratio, latency, and concurrency from Autometrics.",
+  "links": [
+    {
+      "title": "Function Explorer",
+      "type": "link",
+      "icon": "dashboard",
+      "tooltip": "",
+      "tags": [],
+      "asDropdown": false,
+      "placement": "inControlsMenu",
+      "targetBlank": false,
+      "includeVars": true,
+      "keepTime": true,
+      "url": "/d/autometrics-function-explorer/autometrics-function-explorer?var-datasource=$datasource&var-job=$job"
+    }
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 1,
+      "title": "Function call rate",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__rate_interval]))",
+          "refId": "A",
+          "legendFormat": "Function call rate",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 2,
+      "title": "Error ratio",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "clamp_max((sum(rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", result=\"error\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__rate_interval])), 0.001), 1)",
+          "refId": "A",
+          "legendFormat": "Error ratio",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 3,
+      "title": "p95 latency",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(function_calls_duration_seconds{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", quantile=\"0.95\"})",
+          "refId": "A",
+          "legendFormat": "p95 latency",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 4,
+      "title": "Concurrent calls",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(function_calls_concurrent{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"})",
+          "refId": "A",
+          "legendFormat": "Concurrent calls",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 5,
+      "title": "Functions seen",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "count(count by (function, module) (function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}))",
+          "refId": "A",
+          "legendFormat": "Functions seen",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 6,
+      "title": "Modules seen",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "count(count by (module) (function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}))",
+          "refId": "A",
+          "legendFormat": "Modules seen",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 10,
+      "title": "Top function call rate",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "topk($limit, sum by (function, module, service_name) (rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__rate_interval])))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 11,
+      "title": "Top function error ratio",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * topk($limit, clamp_max((sum by (function, module, service_name) (rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", result=\"error\"}[$__rate_interval])) or on(function, module, service_name) (0 * sum by (function, module, service_name) (rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__rate_interval])))) / clamp_min(sum by (function, module, service_name) (rate(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__rate_interval])), 0.001), 1))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 12,
+      "title": "Function latency p95/p99",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "topk($limit, max by (function, module, service_name) (function_calls_duration_seconds{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", quantile=\"0.95\"}))",
+          "refId": "A",
+          "legendFormat": "p95 {{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        },
+        {
+          "expr": "topk($limit, max by (function, module, service_name) (function_calls_duration_seconds{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", quantile=\"0.99\"}))",
+          "refId": "B",
+          "legendFormat": "p99 {{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 13,
+      "title": "Concurrent functions",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "topk($limit, sum by (function, module, service_name) (function_calls_concurrent{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "time_series",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 14,
+      "title": "High volume functions",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "showTypeIcons": false,
+        "footer": {
+          "show": false,
+          "reducer": [],
+          "countRows": false
+        },
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": false,
+              "Value": false,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "value"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "topk($limit, sum by (function, module, service_name) (increase(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__range])))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 15,
+      "title": "Slowest p95 functions",
+      "gridPos": {
+        "x": 8,
+        "y": 20,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "showTypeIcons": false,
+        "footer": {
+          "show": false,
+          "reducer": [],
+          "countRows": false
+        },
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": false,
+              "Value": false,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "value"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "topk($limit, max by (function, module, service_name) (function_calls_duration_seconds{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", quantile=\"0.95\"}))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}}",
+          "editorMode": "code",
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "transparent": false,
+      "repeatDirection": "h",
+      "id": 16,
+      "title": "Recent function errors",
+      "gridPos": {
+        "x": 16,
+        "y": 20,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "showTypeIcons": false,
+        "footer": {
+          "show": false,
+          "reducer": [],
+          "countRows": false
+        },
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": false,
+              "Value": false,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "value"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "expr": "topk($limit, sum by (function, module, service_name, result) (increase(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\", result=\"error\"}[$__range])) or on(function, module, service_name, result) label_replace(0 * sum by (function, module, service_name) (increase(function_calls_total{job=\"$job\", service_name=~\"$service_name\", module=~\"$module\"}[$__range])), \"result\", \"none\", \"function\", \".*\"))",
+          "refId": "A",
+          "legendFormat": "{{module}}::{{function}} {{result}}",
+          "editorMode": "code",
+          "format": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "instant": true,
+          "range": false
+        }
+      ]
+    }
+  ]
+}

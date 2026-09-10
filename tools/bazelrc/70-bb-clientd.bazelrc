@@ -1,0 +1,11 @@
+########################
+# Optional bb_clientd local proxy
+common:bb-clientd --remote_cache=unix://%workspace%/.cache/bb_clientd/grpc
+common:bb-clientd --remote_executor=unix://%workspace%/.cache/bb_clientd/grpc
+common:bb-clientd --remote_instance_name=cyclops.buildbuddy.io/trashcan69420/manga-downloader/bazel
+common:bb-clientd --remote_bytestream_uri_prefix=grpcs://cyclops.buildbuddy.io
+common:bb-clientd --remote_timeout=24h
+common:bb-clientd --remote_download_minimal
+common:bb-clientd --remote_cache_compression
+common:bb-clientd --experimental_remote_output_service=unix://%workspace%/.cache/bb_clientd/grpc
+common:bb-clientd --experimental_remote_output_service_output_path_prefix=%workspace%/.cache/bb_clientd/mount/outputs

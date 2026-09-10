@@ -1,0 +1,19 @@
+########################
+# Remote build platforms and toolchains
+common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+common --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
+common --shell_executable=/bin/sh
+common --host_platform=//infra/images/rbe:execution_platform_linux_x86_64_ghcr
+common --platforms=//infra/images/rbe:platform_linux_x86_64_ghcr
+common --extra_execution_platforms=//infra/images/rbe:execution_platform_linux_x86_64
+common --extra_execution_platforms=//infra/images/rbe:execution_platform_linux_x86_64_ghcr
+common --macos_minimum_os=26.0
+common --host_macos_minimum_os=26.0
+common --@llvm//toolchain:source=bootstrapped
+common --@llvm//config:experimental_stub_libgcc_s=True
+common --@rules_rust//:extra_rustc_flag=--cfg=tokio_unstable
+
+# External C/C++ projects are built as dependencies; keep their warning policy
+# from drowning out diagnostics from this workspace's code.
+common --per_file_copt=external/.*@-w
+common --host_per_file_copt=external/.*@-w

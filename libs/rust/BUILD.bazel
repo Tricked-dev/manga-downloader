@@ -1,0 +1,99 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "libs",
+    srcs = [
+        "//libs/rust/api-types",
+        "//libs/rust/cache",
+        "//libs/rust/clearance",
+        "//libs/rust/config",
+        "//libs/rust/core",
+        "//libs/rust/discord",
+        "//libs/rust/fs",
+        "//libs/rust/image",
+        "//libs/rust/page-extraction",
+        "//libs/rust/persistence",
+        "//libs/rust/plugin-host",
+        "//libs/rust/runtime",
+        "//libs/rust/telemetry",
+        "//libs/rust/tls",
+    ],
+)
+
+test_suite(
+    name = "tests",
+    tests = [
+        "//libs/rust/core:test_comicinfo",
+        "//libs/rust/discord:test_notifications",
+        "//libs/rust/fs:test_filesystem",
+        "//libs/rust/image:test_archive",
+        "//libs/rust/page-extraction:test_page_extraction",
+        "//libs/rust/persistence:test_archive_index",
+        "//libs/rust/persistence:test_chapters",
+        "//libs/rust/plugin-host:test_media_spec",
+        "//libs/rust/runtime:test_logging",
+    ],
+)
+
+test_suite(
+    name = "rustfmt_test",
+    tests = [
+        "//libs/rust/api-types:rustfmt_test",
+        "//libs/rust/cache:rustfmt_test",
+        "//libs/rust/clearance:rustfmt_test",
+        "//libs/rust/config:rustfmt_test",
+        "//libs/rust/core:rustfmt_test",
+        "//libs/rust/discord:rustfmt_test",
+        "//libs/rust/fs:rustfmt_test",
+        "//libs/rust/image:rustfmt_test",
+        "//libs/rust/page-extraction:rustfmt_test",
+        "//libs/rust/persistence:rustfmt_test",
+        "//libs/rust/plugin-host:rustfmt_test",
+        "//libs/rust/runtime:rustfmt_test",
+        "//libs/rust/telemetry:rustfmt_test",
+        "//libs/rust/tls:rustfmt_test",
+    ],
+)
+
+filegroup(
+    name = "clippy_check",
+    testonly = True,
+    srcs = [
+        "//libs/rust/api-types:clippy_check",
+        "//libs/rust/cache:clippy_check",
+        "//libs/rust/clearance:clippy_check",
+        "//libs/rust/config:clippy_check",
+        "//libs/rust/core:clippy_check",
+        "//libs/rust/discord:clippy_check",
+        "//libs/rust/fs:clippy_check",
+        "//libs/rust/image:clippy_check",
+        "//libs/rust/page-extraction:clippy_check",
+        "//libs/rust/persistence:clippy_check",
+        "//libs/rust/plugin-host:clippy_check",
+        "//libs/rust/runtime:clippy_check",
+        "//libs/rust/telemetry:clippy_check",
+        "//libs/rust/tls:clippy_check",
+    ],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = [
+        "BUILD.bazel",
+        "//libs/rust/api-types:starlark_files",
+        "//libs/rust/cache:starlark_files",
+        "//libs/rust/clearance:starlark_files",
+        "//libs/rust/config:starlark_files",
+        "//libs/rust/core:starlark_files",
+        "//libs/rust/discord:starlark_files",
+        "//libs/rust/fs:starlark_files",
+        "//libs/rust/image:starlark_files",
+        "//libs/rust/page-extraction:starlark_files",
+        "//libs/rust/persistence:starlark_files",
+        "//libs/rust/plugin-host:starlark_files",
+        "//libs/rust/runtime:starlark_files",
+        "//libs/rust/telemetry:starlark_files",
+        "//libs/rust/tls:starlark_files",
+    ],
+    tags = ["starlark"],
+)

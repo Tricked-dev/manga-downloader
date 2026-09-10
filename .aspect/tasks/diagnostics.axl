@@ -1,0 +1,329 @@
+"""Diagnostics Aspect tasks."""
+
+load(
+    ".aspect/libs/repo.axl",
+    "ACTION_GRAPH_DEFAULTS",
+    "BACKEND_SERVER_TARGET",
+    "BAZEL_POLICY_TARGETS",
+    "BUILD_EVENTS_PATH",
+    "BUILD_EVENTS_RAW_PATH",
+    "BUILD_EVENTS_SECRET_PREFIXES",
+    "CANONICAL_FLAG_DEFAULTS",
+    "CARGO_POLICY_TARGETS",
+    "CARGO_TOOL_TARGETS",
+    "CONFIGURED_TARGET_DEFAULTS",
+    "DEV_START_TARGET",
+    "DOCTOR_PREFLIGHT_STEPS",
+    "DOCTOR_VALIDATION_STEPS",
+    "EXEC_LOG_PATH",
+    "FILESYSTEM_TEST_TARGET",
+    "FLAMEGRAPH_SERVER_TARGET",
+    "GAZELLE_DIFF_STEP",
+    "K6_TARGETS",
+    "OPTIMIZED_STEPS",
+    "PROFILE_PATH",
+    "QUALITY_STEPS",
+    "RBE_DEFAULT_IMAGE_CANARY_TARGET",
+    "RBE_IMAGE_TARGET",
+    "RBE_PUSH_TARGET",
+    "RBE_REPO_OWNED_EXECUTION_PLATFORM",
+    "RBE_REPO_OWNED_IMAGE_CANARY_TARGET",
+    "REMOTE_GRPC_LOG_PATH",
+    "ensure_cache_dir",
+    "run_bazel",
+    "run_bb",
+    "run_steps",
+    "targets_or_default",
+)
+
+def _canonical_flags_impl(ctx: TaskContext) -> int:
+    flags = targets_or_default(ctx.args.flags, CANONICAL_FLAG_DEFAULTS)
+    return run_bazel(ctx, ["canonicalize-flags", "--"] + flags)
+
+canonical_flags = task(
+    group = ["repo"],
+    implementation = _canonical_flags_impl,
+    summary = "Canonicalize Bazel flags for rc and policy debugging.",
+    args = {
+        "flags": args.positional(
+            default = CANONICAL_FLAG_DEFAULTS,
+            description = "Bazel flags to canonicalize after --.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _action_graph_impl(ctx: TaskContext) -> int:
+    args_list = targets_or_default(ctx.args.args, ACTION_GRAPH_DEFAULTS)
+    return run_bazel(ctx, ["aquery"] + args_list)
+
+action_graph = task(
+    group = ["repo"],
+    implementation = _action_graph_impl,
+    summary = "Inspect Bazel action graph details for execution and cache debugging.",
+    args = {
+        "args": args.positional(
+            default = ACTION_GRAPH_DEFAULTS,
+            description = "Arguments forwarded to bazel aquery.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _configured_targets_impl(ctx: TaskContext) -> int:
+    args_list = targets_or_default(ctx.args.args, CONFIGURED_TARGET_DEFAULTS)
+    return run_bazel(ctx, ["cquery"] + args_list)
+
+configured_targets = task(
+    group = ["repo"],
+    implementation = _configured_targets_impl,
+    summary = "Inspect configured targets, transitions, and platform-sensitive graph state.",
+    args = {
+        "args": args.positional(
+            default = CONFIGURED_TARGET_DEFAULTS,
+            description = "Arguments forwarded to bazel cquery.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _cache_probe_impl(ctx: TaskContext) -> int:
+    targets = targets_or_default(ctx.args.targets, ["//libs/bazel/bazelrc:remote_cache_policy"])
+    return run_bazel(ctx, [
+        "build",
+        "--experimental_remote_require_cached",
+        "--noremote_upload_local_results",
+    ] + targets)
+
+cache_probe = task(
+    group = ["repo"],
+    implementation = _cache_probe_impl,
+    summary = "Verify selected targets are already in remote cache without uploading new results.",
+    args = {
+        "targets": args.positional(
+            default = ["//libs/bazel/bazelrc:remote_cache_policy"],
+            description = "Bazel targets to require from remote cache.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _exec_log_impl(ctx: TaskContext) -> int:
+    if not ensure_cache_dir(ctx):
+        return 1
+    targets = targets_or_default(ctx.args.targets, ["//libs/bazel/bazelrc:remote_cache_policy"])
+    return run_bazel(ctx, [
+        "build",
+        "--execution_log_compact_file=" + EXEC_LOG_PATH,
+    ] + targets)
+
+exec_log = task(
+    group = ["repo"],
+    implementation = _exec_log_impl,
+    summary = "Capture a compact Bazel execution log for cache debugging.",
+    args = {
+        "targets": args.positional(
+            default = ["//libs/bazel/bazelrc:remote_cache_policy"],
+            description = "Bazel targets to build while capturing .cache/bazel/execution-log.compact.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _grpc_log_impl(ctx: TaskContext) -> int:
+    if not ensure_cache_dir(ctx):
+        return 1
+    targets = targets_or_default(ctx.args.targets, ["//libs/bazel/bazelrc:remote_cache_policy"])
+    return run_bazel(ctx, [
+        "build",
+        "--remote_grpc_log=" + REMOTE_GRPC_LOG_PATH,
+    ] + targets)
+
+grpc_log = task(
+    group = ["repo"],
+    implementation = _grpc_log_impl,
+    summary = "Capture Bazel remote cache and execution gRPC traffic for debugging.",
+    args = {
+        "targets": args.positional(
+            default = ["//libs/bazel/bazelrc:remote_cache_policy"],
+            description = "Bazel targets to build while capturing .cache/bazel/remote-grpc.log.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _bb_explain_impl(ctx: TaskContext) -> int:
+    return run_bb(ctx, ["explain"] + ctx.args.args)
+
+bb_explain = task(
+    group = ["repo"],
+    implementation = _bb_explain_impl,
+    summary = "Compare compact execution logs or BuildBuddy invocations with bb explain.",
+    args = {
+        "args": args.positional(
+            default = [],
+            description = "Arguments forwarded to bb explain, such as --old and --new.",
+            maximum = 16,
+            minimum = 0,
+        ),
+    },
+)
+
+def _bb_print_impl(ctx: TaskContext) -> int:
+    args_list = targets_or_default(ctx.args.args, [
+        "--compact_execution_log=" + EXEC_LOG_PATH,
+        "--sort=true",
+    ])
+    return run_bb(ctx, ["print"] + args_list)
+
+bb_print = task(
+    group = ["repo"],
+    implementation = _bb_print_impl,
+    summary = "Print Bazel log files through BuildBuddy's log printer.",
+    args = {
+        "args": args.positional(
+            default = [
+                "--compact_execution_log=" + EXEC_LOG_PATH,
+                "--sort=true",
+            ],
+            description = "Arguments forwarded to bb print.",
+            maximum = 32,
+            minimum = 0,
+        ),
+    },
+)
+
+def _bb_view_impl(ctx: TaskContext) -> int:
+    return run_bb(ctx, ["view"] + ctx.args.args)
+
+bb_view = task(
+    group = ["repo"],
+    implementation = _bb_view_impl,
+    summary = "View BuildBuddy invocation logs from the terminal.",
+    args = {
+        "args": args.positional(
+            default = [],
+            description = "Arguments forwarded to bb view, such as an invocation ID and --lines.",
+            maximum = 16,
+            minimum = 0,
+        ),
+    },
+)
+
+def _bb_ask_impl(ctx: TaskContext) -> int:
+    return run_bb(ctx, ["ask"] + ctx.args.args)
+
+bb_ask = task(
+    group = ["repo"],
+    implementation = _bb_ask_impl,
+    summary = "Ask BuildBuddy for suggestions about the previous invocation.",
+    args = {
+        "args": args.positional(
+            default = [],
+            description = "Arguments forwarded to bb ask, such as --openai.",
+            maximum = 8,
+            minimum = 0,
+        ),
+    },
+)
+
+def _profile_impl(ctx: TaskContext) -> int:
+    if not ensure_cache_dir(ctx):
+        return 1
+    targets = targets_or_default(ctx.args.targets, ["//libs/bazel/bazelrc:remote_cache_policy"])
+    return run_bazel(ctx, [
+        "build",
+        "--profile=" + PROFILE_PATH,
+        "--experimental_profile_include_target_label",
+        "--experimental_profile_include_target_configuration",
+    ] + targets)
+
+profile = task(
+    group = ["repo"],
+    implementation = _profile_impl,
+    summary = "Capture a Bazel JSON trace profile for analysis and execution timing.",
+    args = {
+        "targets": args.positional(
+            default = ["//libs/bazel/bazelrc:remote_cache_policy"],
+            description = "Bazel targets to build while capturing .cache/bazel/profile.json.gz.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)
+
+def _build_events_impl(ctx: TaskContext) -> int:
+    if not ensure_cache_dir(ctx):
+        return 1
+    targets = targets_or_default(ctx.args.targets, ["//libs/bazel/bazelrc:remote_cache_policy"])
+    code = run_bazel(ctx, [
+        "build",
+        "--build_event_json_file=" + BUILD_EVENTS_RAW_PATH,
+        "--build_event_publish_all_actions",
+        "--experimental_bep_target_summary",
+        "--experimental_record_metrics_for_all_mnemonics",
+    ] + targets)
+    if code != 0:
+        return code
+
+    _redact_build_events(ctx)
+
+    remove = ctx.std.process.command("rm").arg("-f").arg(BUILD_EVENTS_RAW_PATH)
+    remove_result = remove.spawn().wait()
+    return 0 if remove_result.success else 1
+
+def _redact_build_events(ctx: TaskContext):
+    redacted = ctx.std.fs.read_to_string(BUILD_EVENTS_RAW_PATH)
+    for prefix in BUILD_EVENTS_SECRET_PREFIXES:
+        redacted = _redact_after_prefix(redacted, prefix)
+    ctx.std.fs.write(BUILD_EVENTS_PATH, redacted)
+
+def _redact_after_prefix(text: str, prefix: str) -> str:
+    parts = text.split(prefix)
+    chunks = [parts[0]]
+    for part in parts[1:]:
+        value_end = _secret_value_end(part)
+        chunks.append(prefix)
+        chunks.append("<redacted>")
+        chunks.append(part[value_end:])
+    return "".join(chunks)
+
+def _secret_value_end(text: str) -> int:
+    for cursor in range(len(text)):
+        if _is_secret_terminator(text[cursor]):
+            return cursor
+    return len(text)
+
+def _is_secret_terminator(ch: str) -> bool:
+    return ch in [
+        "\"",
+        "'",
+        "\\",
+        ",",
+        "]",
+        "}",
+        " ",
+        "\n",
+        "\r",
+        "\t",
+    ]
+
+build_events = task(
+    group = ["repo"],
+    implementation = _build_events_impl,
+    summary = "Capture a local Build Event Protocol JSON stream for build diagnostics.",
+    args = {
+        "targets": args.positional(
+            default = ["//libs/bazel/bazelrc:remote_cache_policy"],
+            description = "Bazel targets to build while capturing .cache/bazel/build-events.json.",
+            maximum = 128,
+            minimum = 0,
+        ),
+    },
+)

@@ -1,0 +1,20 @@
+{
+  "name": "manga-server-kanidm-manager",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  // Keep this at the newest date supported by the checked-in Wrangler runtime.
+  "compatibility_date": "2026-05-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".svelte-kit/cloudflare",
+    "run_worker_first": true,
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "vars": {
+    "KANIDM_BASE_URL": "https://auth.trashcan.ing",
+    "MANGA_SERVER_BASE_URL": "https://manga.trashcan.ing",
+  },
+}

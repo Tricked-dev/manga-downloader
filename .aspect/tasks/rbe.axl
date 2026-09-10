@@ -1,0 +1,106 @@
+"""Rbe Aspect tasks."""
+
+load(
+    ".aspect/libs/repo.axl",
+    "ACTION_GRAPH_DEFAULTS",
+    "BACKEND_SERVER_TARGET",
+    "BAZEL_POLICY_TARGETS",
+    "BUILD_EVENTS_PATH",
+    "BUILD_EVENTS_RAW_PATH",
+    "BUILD_EVENTS_SECRET_PREFIXES",
+    "CANONICAL_FLAG_DEFAULTS",
+    "CARGO_POLICY_TARGETS",
+    "CARGO_TOOL_TARGETS",
+    "CONFIGURED_TARGET_DEFAULTS",
+    "DEV_START_TARGET",
+    "DOCTOR_PREFLIGHT_STEPS",
+    "DOCTOR_VALIDATION_STEPS",
+    "EXEC_LOG_PATH",
+    "FILESYSTEM_TEST_TARGET",
+    "FLAMEGRAPH_SERVER_TARGET",
+    "GAZELLE_DIFF_STEP",
+    "K6_TARGETS",
+    "OPTIMIZED_STEPS",
+    "PROFILE_PATH",
+    "QUALITY_STEPS",
+    "RBE_DEFAULT_IMAGE_CANARY_TARGET",
+    "RBE_IMAGE_TARGET",
+    "RBE_PUSH_TARGET",
+    "RBE_REPO_OWNED_EXECUTION_PLATFORM",
+    "RBE_REPO_OWNED_IMAGE_CANARY_TARGET",
+    "REMOTE_GRPC_LOG_PATH",
+    "ensure_cache_dir",
+    "run_bazel",
+    "run_bb",
+    "run_steps",
+    "targets_or_default",
+)
+
+def _rbe_image_impl(ctx: TaskContext) -> int:
+    return run_bazel(ctx, ["build", RBE_IMAGE_TARGET])
+
+rbe_image = task(
+    group = ["repo"],
+    implementation = _rbe_image_impl,
+    summary = "Build the locked apko BuildBuddy RBE image through the bootstrap executor constraint.",
+    args = {},
+)
+
+def _rbe_push_impl(ctx: TaskContext) -> int:
+    return run_bazel(ctx, ["run", RBE_PUSH_TARGET])
+
+rbe_push = task(
+    group = ["repo"],
+    implementation = _rbe_push_impl,
+    summary = "Push the BuildBuddy RBE image to GHCR with host launcher tools.",
+    args = {},
+)
+
+def _rbe_smoke_impl(ctx: TaskContext) -> int:
+    return run_steps(ctx, [
+        ["build", "@llvm//toolchain/args:empty_linux_sysroot"],
+        ["build"] + CARGO_TOOL_TARGETS,
+        ["build"] + BAZEL_POLICY_TARGETS + CARGO_POLICY_TARGETS,
+        ["build", RBE_IMAGE_TARGET],
+    ])
+
+rbe_smoke = task(
+    group = ["repo"],
+    implementation = _rbe_smoke_impl,
+    summary = "Smoke-test the default repo-owned BuildBuddy execution platform.",
+    args = {},
+)
+
+def _rbe_default_image_check_impl(ctx: TaskContext) -> int:
+    return run_default_rbe_image_canary(ctx)
+
+def run_default_rbe_image_canary(ctx: TaskContext) -> int:
+    cmd = ctx.std.process.command("sh")
+    cmd = cmd.arg("-c")
+    cmd = cmd.arg("bazel build --action_env=RBE_CANARY=$(date +%s%N)-$$ --noremote_accept_cached --noremote_upload_local_results " + RBE_DEFAULT_IMAGE_CANARY_TARGET)
+    result = cmd.spawn().wait()
+    return 0 if result.success else 1
+
+rbe_default_image_check = task(
+    group = ["repo"],
+    implementation = _rbe_default_image_check_impl,
+    summary = "Check whether BuildBuddy can execute a no-cache action on the default RBE image.",
+    args = {},
+)
+
+def _rbe_owned_image_check_impl(ctx: TaskContext) -> int:
+    return _run_repo_owned_rbe_image_canary(ctx)
+
+def _run_repo_owned_rbe_image_canary(ctx: TaskContext) -> int:
+    cmd = ctx.std.process.command("sh")
+    cmd = cmd.arg("-c")
+    cmd = cmd.arg("bazel build --action_env=RBE_REPO_OWNED_CANARY=$(date +%s%N)-$$ --extra_execution_platforms=" + RBE_REPO_OWNED_EXECUTION_PLATFORM + " --noremote_accept_cached --noremote_upload_local_results " + RBE_REPO_OWNED_IMAGE_CANARY_TARGET)
+    result = cmd.spawn().wait()
+    return 0 if result.success else 1
+
+rbe_owned_image_check = task(
+    group = ["repo"],
+    implementation = _rbe_owned_image_check_impl,
+    summary = "Check whether BuildBuddy can pull and execute the repo-owned GHCR RBE image.",
+    args = {},
+)

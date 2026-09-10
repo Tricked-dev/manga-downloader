@@ -1,0 +1,21 @@
+########################
+# Project defaults
+common --enable_platform_specific_config
+common --color=yes
+common --lockfile_mode=error
+#common --java_language_version=26
+#common --tool_java_language_version=26
+#common --java_runtime_version=remotejdk_26
+#common --tool_java_runtime_version=remotejdk_26
+
+# Suppress sun.misc.Unsafe deprecation warnings from external tools
+common --javacopt="-Xlint:-deprecation"
+
+common --@rules_img//img/settings:compress=zstd
+common --@rules_img//img/settings:compression_level=4
+common --@rules_img//img/settings:push_strategy=eager
+common --@rules_img//img/settings:remote_cache=grpcs://cyclops.buildbuddy.io
+common --@rules_img//img/settings:credential_helper=tweag-credential-helper
+common --noremote_local_fallback
+common --remote_download_minimal
+common --remote_upload_local_results

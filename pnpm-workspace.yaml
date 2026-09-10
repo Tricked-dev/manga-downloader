@@ -1,0 +1,47 @@
+packages:
+  - "apps/svelte/*"
+  - "libs/svelte/*"
+
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  msgpackr-extract: true
+  msw: true
+  sharp: true
+  workerd: false
+
+catalog:
+  "@lucide/svelte": 1.17.0
+  "@sveltejs/adapter-cloudflare": 7.2.8
+  "@sveltejs/kit": 2.61.1
+  "@sveltejs/vite-plugin-svelte": 7.1.2
+  "@tailwindcss/vite": 4.3.0
+  "@tanstack/svelte-query": 6.1.33
+  "@types/node": 25.9.1
+  clsx: 2.1.1
+  svelte: 5.56.0
+  svelte-check: 4.4.8
+  tailwind-merge: 3.6.0
+  tailwindcss: 4.3.0
+  typescript: 6.0.3
+  vite: npm:@voidzero-dev/vite-plus-core@0.1.23
+  vite-plus: 0.1.23
+  vitest: 4.1.7
+  wrangler: 4.100.0
+minimumReleaseAgeExclude:
+  - '@tanstack/svelte-table@9.0.0-alpha.50'
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
+  - msgpackr-extract
+overrides:
+  kysely: "0.28.17"
+  vite: "catalog:"
+  vitest: "catalog:"
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: "*"
+    vitest: "*"

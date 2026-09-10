@@ -1,0 +1,196 @@
+load("@rules_apko//apko:defs.bzl", "apko_image", "apko_lock")
+load("@rules_img//img:convert.bzl", "image_manifest_from_oci_layout")
+load("@rules_img//img:media_types.bzl", "GZIP_LAYER")
+load("@rules_img//img:push.bzl", "image_push")
+
+package(default_visibility = ["//visibility:public"])
+
+_RBE_EXECUTION_IMAGE = "docker://ghcr.io/cyclopsbot/manga-downloader-rbe@sha256:a282ec63af83721aa65410c032bd7e77ede0e062c6bf9800e655efbf1dfbf08c"
+
+_REPO_OWNED_RBE_EXECUTION_IMAGE = "docker://ghcr.io/cyclopsbot/manga-downloader-rbe@sha256:a282ec63af83721aa65410c032bd7e77ede0e062c6bf9800e655efbf1dfbf08c"
+
+exports_files(["apko.lock.json"])
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)
+
+filegroup(
+    name = "yaml_files",
+    srcs = ["apko.yaml"],
+    tags = ["yaml"],
+)
+
+apko_image(
+    name = "image",
+    config = "apko.yaml",
+    contents = "@rbe_apko_lock//:contents",
+    tag = "ghcr.io/cyclopsbot/manga-downloader-rbe:latest",
+)
+
+apko_lock(
+    name = "lock",
+    config = "apko.yaml",
+    lockfile_name = "apko.lock.json",
+)
+
+image_manifest_from_oci_layout(
+    name = "image_manifest",
+    src = ":image",
+    architecture = "amd64",
+    layers = [GZIP_LAYER],
+    os = "linux",
+)
+
+image_push(
+    name = "push",
+    image = ":image_manifest",
+    registry = "ghcr.io",
+    repository = "cyclopsbot/manga-downloader-rbe",
+    tag = "latest",
+    tags = ["manual"],
+)
+
+constraint_setting(name = "executor_kind")
+
+constraint_value(
+    name = "executor_bootstrap",
+    constraint_setting = ":executor_kind",
+)
+
+constraint_value(
+    name = "executor_ghcr",
+    constraint_setting = ":executor_kind",
+)
+
+constraint_value(
+    name = "executor_repo_owned_ghcr",
+    constraint_setting = ":executor_kind",
+)
+
+platform(
+    name = "platform_linux_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+    exec_properties = {
+        "Arch": "amd64",
+        "OSFamily": "Linux",
+    },
+)
+
+platform(
+    name = "platform_linux_x86_64_ghcr",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+    exec_properties = {
+        "Arch": "amd64",
+        "OSFamily": "Linux",
+        "container-image": _RBE_EXECUTION_IMAGE,
+        "dockerNetwork": "off",
+    },
+)
+
+platform(
+    name = "platform_linux_aarch64_ghcr",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+)
+
+platform(
+    name = "execution_platform_linux_x86_64",
+    constraint_values = [
+        ":executor_bootstrap",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+    exec_properties = {
+        "Arch": "amd64",
+        "OSFamily": "Linux",
+    },
+)
+
+platform(
+    name = "execution_platform_linux_x86_64_ghcr",
+    constraint_values = [
+        ":executor_ghcr",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+    exec_properties = {
+        "Arch": "amd64",
+        "OSFamily": "Linux",
+        "container-image": _RBE_EXECUTION_IMAGE,
+        "dockerNetwork": "off",
+    },
+)
+
+platform(
+    name = "execution_platform_linux_x86_64_repo_owned_ghcr",
+    constraint_values = [
+        ":executor_repo_owned_ghcr",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@llvm//constraints/cxxstdlib:libcxx",
+        "@llvm//constraints/libc:gnu.2.43",
+        "@llvm//constraints/pie:off",
+        "@rules_rs//rs/platforms/constraints:glibc",
+    ],
+    exec_properties = {
+        "Arch": "amd64",
+        "OSFamily": "Linux",
+        "container-image": _REPO_OWNED_RBE_EXECUTION_IMAGE,
+        "dockerNetwork": "off",
+    },
+)
+
+genrule(
+    name = "default_rbe_image_canary",
+    outs = ["default_rbe_image_canary.txt"],
+    cmd = "printf 'default-rbe-image-ok\\n' > $@",
+    exec_compatible_with = [":executor_ghcr"],
+    tags = [
+        "manual",
+        "no-cache",
+        "rbe-default-image-canary",
+    ],
+)
+
+genrule(
+    name = "repo_owned_rbe_image_canary",
+    outs = ["repo_owned_rbe_image_canary.txt"],
+    cmd = "printf 'repo-owned-rbe-image-ok\\n' > $@",
+    exec_compatible_with = [":executor_repo_owned_ghcr"],
+    tags = [
+        "manual",
+        "no-cache",
+        "rbe-repo-owned-image-canary",
+    ],
+)

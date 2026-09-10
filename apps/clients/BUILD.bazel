@@ -1,0 +1,17 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "apps",
+    srcs = ["//apps/clients/tachiyomi:source"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = [
+        "BUILD.bazel",
+        "//apps/clients/aidoku:starlark_files",
+        "//apps/clients/tachiyomi:starlark_files",
+        "//apps/clients/tachiyomi/scripts:starlark_files",
+    ],
+    tags = ["starlark"],
+)

@@ -1,0 +1,51 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "runtime",
+    srcs = glob(["src/**/*.rs"]),
+    crate_name = "backend_runtime",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    deps = [
+        "@backend_crates//:tracing-subscriber",
+    ],
+)
+
+rust_test(
+    name = "test_logging",
+    srcs = ["tests/logging.rs"],
+    crate_root = "tests/logging.rs",
+    edition = "2024",
+    deps = [
+        ":runtime",
+        "@backend_crates//:tracing-subscriber",
+    ],
+)
+
+rust_quality_targets(
+    targets = [
+        ":runtime",
+        ":test_logging",
+    ],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = glob(
+        [
+            "src/**/*.rs",
+            "tests/**/*.rs",
+        ],
+        allow_empty = True,
+    ),
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

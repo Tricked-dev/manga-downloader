@@ -1,0 +1,121 @@
+[
+	{
+		"type": "sort",
+		"id": "sort",
+		"title": "Sort",
+		"canAscend": false,
+		"options": [
+			"Best Match",
+			"Recently Updated",
+			"Recently Added",
+			"Title A-Z",
+			"Rating",
+			"Popular",
+			"Most Views 7d",
+			"Most Views 1mo",
+			"Total Views",
+			"Most Follows"
+		],
+		"default": {
+			"index": 0,
+			"ascending": false
+		}
+	},
+	{
+		"type": "select",
+		"id": "type",
+		"title": "Types",
+		"options": [
+			"Any",
+			"Manga",
+			"Manhwa",
+			"Manhua",
+			"Other"
+		],
+		"ids": [
+			"",
+			"manga",
+			"manhwa",
+			"manhua",
+			"other"
+		],
+		"default": ""
+	},
+	{
+		"type": "select",
+		"id": "demographic",
+		"title": "Demographic",
+		"options": [
+			"Any",
+			"Shounen",
+			"Seinen",
+			"Shoujo",
+			"Josei"
+		],
+		"ids": [
+			"",
+			"shounen",
+			"seinen",
+			"shoujo",
+			"josei"
+		],
+		"default": ""
+	},
+	{
+		"type": "select",
+		"id": "status",
+		"title": "Library Status",
+		"options": [
+			"Any",
+			"Ongoing",
+			"Completed",
+			"Hiatus",
+			"Cancelled"
+		],
+		"ids": [
+			"",
+			"ongoing",
+			"completed",
+			"hiatus",
+			"cancelled"
+		],
+		"default": ""
+	},
+	{
+		"type": "select",
+		"id": "age_rating",
+		"title": "Age Rating",
+		"options": [
+			"Any",
+			"Rating Pending",
+			"Adults Only 18+"
+		],
+		"ids": [
+			"",
+			"Rating Pending",
+			"Adults Only 18+"
+		],
+		"default": ""
+	},
+	{
+		"type": "text",
+		"id": "genre",
+		"title": "Library Genre",
+		"hideFromHeader": true,
+		"placeholder": "Genre from ComicInfo.xml"
+	},
+	{
+		"type": "text",
+		"id": "language",
+		"title": "Language",
+		"hideFromHeader": true,
+		"placeholder": "LanguageISO, like en"
+	},
+	{
+		"type": "text",
+		"id": "sources",
+		"title": "Sources",
+		"hideFromHeader": true,
+		"placeholder": "Blank = all, or enter names like comix"
+	}
+]

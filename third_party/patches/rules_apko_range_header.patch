@@ -1,0 +1,52 @@
+diff --git a/apko/private/apk.bzl b/apko/private/apk.bzl
+index b8cb5cb..0645a6d 100644
+--- a/apko/private/apk.bzl
++++ b/apko/private/apk.bzl
+@@ -73,19 +73,10 @@ def _check_initial_setup(rctx):
+ """.format(bytes[0]))
+-
+ def _download(rctx, url, rng, **kwargs):
+-    if versions.is_at_least("7.1.0", native.bazel_version):
+-        return rctx.download(
+-            url = [url],
+-            headers = {"Range": [rng]},
+-            auth = _auth(rctx, url),
+-            **kwargs
+-        )
+-    else:
+-        return rctx.download(
+-            url = [_range(url, rng)],
+-            auth = _auth(rctx, url),
+-            **kwargs
+-        )
++    return rctx.download(
++        url = [_range(url, rng)],
++        auth = _auth(rctx, url),
++        **kwargs
++    )
+ 
+ def _apk_import_impl(rctx):
+     repo = util.repo_url(rctx.attr.url, rctx.attr.architecture)
+diff --git a/apko/private/apko_config.bzl b/apko/private/apko_config.bzl
+index 705b386..929d1f2 100644
+--- a/apko/private/apko_config.bzl
++++ b/apko/private/apko_config.bzl
+@@ -105,10 +105,15 @@ def copy_to_workdir(ctx, src, dst):
+         inputs = [src]
+        cmds.append(copy_file_cmd(src, dst.path))
+-
+-    ctx.actions.run_shell(
++    script = ctx.actions.declare_file(dst.short_path + ".copy_to_workdir.sh")
++    ctx.actions.write(
++        output = script,
++        content = "#!/bin/sh\n" + "\n".join(cmds) + "\n",
++        is_executable = True,
++    )
++    ctx.actions.run(
+         inputs = inputs,
+         outputs = [dst],
+-        command = "\n".join(cmds),
++        executable = script,
+         mnemonic = "CopyToWorkdir",
+         progress_message = "Staging %s" % dst.short_path,
+     )

@@ -1,0 +1,148 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_test")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//apps/svelte/kanidm-manager:svelte-check/package_json.bzl", svelte_check = "bin")
+load("@npm//apps/svelte/kanidm-manager:vite-plus/package_json.bzl", vite_plus = "bin")
+load("@npm//apps/svelte/kanidm-manager:wrangler/package_json.bzl", wrangler = "bin")
+
+package(default_visibility = ["//visibility:public"])
+
+npm_link_all_packages()
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "src/**",
+        "static/**",
+        "*.js",
+        "*.json",
+        "*.jsonc",
+        "*.ts",
+    ]),
+)
+
+js_library(
+    name = "pkg",
+    srcs = [":sources"],
+    deps = [
+        ":node_modules/@lucide/svelte",
+        ":node_modules/@manga-server/ui",
+    ],
+)
+
+js_test(
+    name = "lint",
+    args = [
+        "oxlint",
+        "oxlint",
+        "apps/svelte/kanidm-manager",
+    ],
+    data = [
+        ":pkg",
+        "//:node_modules",
+        "//:root_oxc_files",
+    ],
+    entry_point = "//:run_npm_bin",
+)
+
+js_test(
+    name = "format_oxc_js_ts_check",
+    args = [
+        "oxfmt",
+        "oxfmt",
+        "--check",
+        "apps/svelte/kanidm-manager",
+    ],
+    data = [
+        ":pkg",
+        "//:node_modules",
+        "//:root_oxc_files",
+    ],
+    entry_point = "//:run_npm_bin",
+)
+
+js_test(
+    name = "format_oxc_json_check",
+    args = [
+        "oxfmt",
+        "oxfmt",
+        "--check",
+        "apps/svelte/kanidm-manager/package.json",
+        "apps/svelte/kanidm-manager/tsconfig.json",
+    ],
+    data = [
+        ":pkg",
+        "//:node_modules",
+        "//:root_oxc_files",
+    ],
+    entry_point = "//:run_npm_bin",
+)
+
+vite_plus.vp(
+    name = "build",
+    srcs = [
+        ":node_modules",
+        ":pkg",
+        "//:node_modules/vite-plus",
+    ],
+    args = ["build"],
+    chdir = package_name(),
+    copy_srcs_to_bin = False,
+    out_dirs = [".svelte-kit"],
+)
+
+svelte_check.svelte_check_test(
+    name = "typecheck",
+    args = [
+        "--tsconfig",
+        "tsconfig.json",
+    ],
+    chdir = package_name(),
+    data = [
+        ":build",
+        ":node_modules",
+        ":sources",
+    ],
+)
+
+wrangler.wrangler_binary(
+    name = "deploy_cloudflare",
+    args = [
+        "deploy",
+        "--config",
+        "wrangler.jsonc",
+    ],
+    chdir = package_name(),
+    data = [
+        ":build",
+        ":node_modules",
+    ],
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)
+
+wrangler.wrangler_binary(
+    name = "deploy_cloudflare_dry_run",
+    args = [
+        "deploy",
+        "--dry-run",
+        "--config",
+        "wrangler.jsonc",
+    ],
+    chdir = package_name(),
+    data = [
+        ":build",
+        ":node_modules",
+    ],
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)

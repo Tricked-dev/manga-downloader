@@ -1,0 +1,63 @@
+diff --git a/rust/private/rustc.bzl b/rust/private/rustc.bzl
+index 91d017c8..e17f8ac9 100644
+--- a/rust/private/rustc.bzl
++++ b/rust/private/rustc.bzl
+@@ -402,7 +402,46 @@ def get_cc_user_link_flags(ctx):
+         depset: The flags passed to Bazel by --linkopt option.
+     """
+     return ctx.fragments.cpp.linkopts
++
++def _collect_library_paths_from_link_args(link_args):
++    paths = []
++    next_arg_is_path = False
++    for arg in link_args:
++        if next_arg_is_path:
++            if arg:
++                paths.append(arg)
++            next_arg_is_path = False
++            continue
++
++        if arg == "-L":
++            next_arg_is_path = True
++            continue
++
++        if not arg.startswith("-L"):
++            continue
++
++        path = arg[2:]
++        if path.startswith("="):
++            path = path[1:]
++        if path.startswith("native="):
++            path = path[len("native="):]
+ 
++        if path:
++            paths.append(path)
++
++    return paths
++
++def _prepend_env_paths(env, name, paths, separator):
++    if not paths:
++        return
++
++    value = separator.join(paths)
++    existing = env.get(name)
++    if existing:
++        value = value + separator + existing
++
++    env[name] = value
++
+ def get_linker_and_args(ctx, crate_type, toolchain, cc_toolchain, feature_configuration, rpaths, add_flags_for_binary = False):
+     """Gathers cc_common linker information
+ 
+@@ -1326,6 +1365,11 @@ def construct_arguments(
+             )
+ 
+             env.update(link_env)
++            if toolchain.target_os == "linux":
++                link_library_paths = _collect_library_paths_from_link_args(link_args)
++                rustc_flags.add_all(link_library_paths, before_each = "-L")
++                _prepend_env_paths(env, "LIBRARY_PATH", link_library_paths, ":")
++
+             macos_sdkroot = _apple_sdkroot(ctx, attr)
+             if macos_sdkroot != None:
+                 env["SDKROOT"] = macos_sdkroot

@@ -1,0 +1,338 @@
+actions:
+  - name: "Bazel doctor"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 4
+      memory: "8GB"
+      disk: "20GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: &ensure_nix |
+          if [ -x "$HOME/.nix-profile/bin/nix" ]; then
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+          elif [ -S /nix/var/nix/daemon-socket/socket ]; then
+            if [ -d /nix ] && [ ! -w /nix ] && command -v sudo >/dev/null 2>&1; then
+              sudo chown -R "$USER" /nix || true
+            fi
+            if command -v curl >/dev/null 2>&1; then
+              curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon
+              . "$HOME/.nix-profile/etc/profile.d/nix.sh" || true
+            else
+              sudo apt-get update
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nix-bin
+              if [ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+                # shellcheck disable=SC1091
+                . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+              fi
+            fi
+          else
+            if ! command -v nix >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nix-bin
+            fi
+            if [ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+              # shellcheck disable=SC1091
+              . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+            elif [ -f /etc/profile.d/nix.sh ]; then
+              # shellcheck disable=SC1091
+              . /etc/profile.d/nix.sh
+            fi
+          fi
+          mkdir -p "$HOME/.config/nix"
+          {
+            printf 'experimental-features = nix-command flakes\n'
+            printf 'accept-flake-config = true\n'
+            printf 'substituters = https://nix.aethor.xyz:8443/fleet https://nix.aethor.xyz:8444 https://cache.nixos.org\n'
+            printf 'trusted-public-keys = fleet:pPo9XWTATgYpXoridRoaEt6rq/e5KJrgHVRhzXAw5E4= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\n'
+          } > "$HOME/.config/nix/nix.conf"
+          NIX_ENV_FILE="$HOME/.buildbuddy-nix-env"
+          : > "$NIX_ENV_FILE"
+
+          if ! nix --extra-experimental-features 'nix-command flakes' eval --expr '1 + 1' >/dev/null 2>&1; then
+            if NIX_REMOTE=local nix --extra-experimental-features 'nix-command flakes' eval --expr '1 + 1' >/dev/null 2>&1; then
+              printf 'export NIX_REMOTE=local\n' > "$NIX_ENV_FILE"
+            else
+              if command -v curl >/dev/null 2>&1; then
+                if [ -d /nix ] && [ ! -w /nix ] && command -v sudo >/dev/null 2>&1; then
+                  sudo chown -R "$USER" /nix || true
+                fi
+                curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon
+                . "$HOME/.nix-profile/etc/profile.d/nix.sh" || true
+                if NIX_REMOTE=local nix --extra-experimental-features 'nix-command flakes' eval --expr '1 + 1' >/dev/null 2>&1; then
+                  printf 'export NIX_REMOTE=local\n' > "$NIX_ENV_FILE"
+                fi
+              else
+                echo "nix socket check failed and curl is unavailable; continuing with local Nix mode."
+                printf 'export NIX_REMOTE=local\n' > "$NIX_ENV_FILE"
+              fi
+            fi
+          fi
+          if [ -f "$NIX_ENV_FILE" ]; then
+            . "$NIX_ENV_FILE"
+          fi
+          if ! command -v nix >/dev/null 2>&1; then
+            echo "nix is not available"
+            exit 1
+          fi
+          nix --version
+      - run: &configure_ghcr_rbe |
+          if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+            {
+              printf 'build --remote_exec_header=x-buildbuddy-platform.container-registry-username=%s\n' "$GHCR_USERNAME"
+              printf 'build --remote_exec_header=x-buildbuddy-platform.container-registry-password=%s\n' "$GHCR_TOKEN"
+            } > user.bazelrc
+          fi
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo doctor"
+  - name: "Bazel build"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "16GB"
+      disk: "40GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo build"
+  - name: "Bazel test"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "16GB"
+      disk: "40GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo test"
+  - name: "Bazel quality"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "8GB"
+      disk: "20GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo quality"
+  - name: "Bazel coverage"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "16GB"
+      disk: "40GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo coverage-repo-owned"
+  - name: "Bazel optimized modes"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "16GB"
+      disk: "40GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+          - "gh-readonly-queue/*"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo optimized"
+  - name: "RBE image"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 8
+      memory: "8GB"
+      disk: "40GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+    steps:
+      - run: *ensure_nix
+      - run: *configure_ghcr_rbe
+      - run: "if [ -f \"$HOME/.buildbuddy-nix-env\" ]; then . \"$HOME/.buildbuddy-nix-env\"; fi; nix develop --accept-flake-config -c aspect repo rbe-image"
+      - run: |
+          if [ -z "${GHCR_USERNAME:-}" ] || [ -z "${GHCR_TOKEN:-}" ]; then
+            echo "Skipping GHCR push; set BuildBuddy secrets GHCR_USERNAME and GHCR_TOKEN."
+            exit 0
+          fi
+
+          mkdir -p "$HOME/.docker"
+          auth="$(printf '%s:%s' "$GHCR_USERNAME" "$GHCR_TOKEN" | base64 | tr -d '\n')"
+          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}\n' "$auth" > "$HOME/.docker/config.json"
+          if [ -f "$HOME/.buildbuddy-nix-env" ]; then . "$HOME/.buildbuddy-nix-env"; fi
+          nix develop --accept-flake-config -c aspect repo rbe-push
+  - name: "NixOS sysupdate deploy"
+    container_image: "ubuntu-24.04"
+    resource_requests:
+      cpu: 24
+      memory: "20GB"
+      disk: "80GB"
+    triggers:
+      push:
+        branches:
+          - "main"
+    steps:
+      - run: *ensure_nix
+      - run: |
+          if [ -z "${TAILSCALE_AUTHKEY:-}" ]; then
+            echo "Skipping Celler/Tailscale cache; set BuildBuddy secret TAILSCALE_AUTHKEY."
+            exit 0
+          fi
+
+          if ! command -v tailscaled >/dev/null 2>&1 || ! command -v tailscale >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates
+            curl -fsSL https://tailscale.com/install.sh | sh
+          fi
+
+          TAILSCALE_SOCKET="${HOME}/.tailscale-buildbuddy/tailscaled.sock"
+          TAILSCALE_HTTP_PROXY="127.0.0.1:1055"
+          install -d -m 0700 "${HOME}/.tailscale-buildbuddy"
+          if [ ! -S "${TAILSCALE_SOCKET}" ]; then
+            nohup tailscaled \
+              --tun=userspace-networking \
+              --socket="${TAILSCALE_SOCKET}" \
+              --state=mem: \
+              --outbound-http-proxy-listen="${TAILSCALE_HTTP_PROXY}" \
+              > "${HOME}/.tailscale-buildbuddy/tailscaled.log" 2>&1 &
+            for _ in $(seq 1 30); do
+              [ -S "${TAILSCALE_SOCKET}" ] && break
+              sleep 1
+            done
+          fi
+
+          tailscale --socket="${TAILSCALE_SOCKET}" up \
+            --auth-key="${TAILSCALE_AUTHKEY}" \
+            --hostname="buildbuddy-manga-downloader-sysupdate" \
+            --accept-dns=false \
+            --accept-routes=false \
+            --ssh=false \
+            --shields-up=true \
+            --timeout=30s
+
+          tailscale --socket="${TAILSCALE_SOCKET}" status --json >/dev/null
+          curl --proxy "http://${TAILSCALE_HTTP_PROXY}" --silent --show-error --fail --max-time 10 \
+            http://100.68.106.29:8080/vps/nix-cache-info >/dev/null
+
+          tmp_nix_conf="${HOME}/.config/nix/nix.conf.tmp"
+          awk '
+            $1 == "substituters" && $2 == "=" { next }
+            $1 == "trusted-public-keys" && $2 == "=" { next }
+            { print }
+          ' "${HOME}/.config/nix/nix.conf" > "${tmp_nix_conf}"
+          {
+            cat "${tmp_nix_conf}"
+            printf 'substituters = http://100.68.106.29:8080/vps https://nix.aethor.xyz:8443/fleet https://nix.aethor.xyz:8444 https://cache.nixos.org\n'
+            printf 'trusted-public-keys = vps:kGtlomXvtREiMQDVIapf7Kj5NRWN17ty3FnUexb6Iuo= fleet:pPo9XWTATgYpXoridRoaEt6rq/e5KJrgHVRhzXAw5E4= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\n'
+          } > "${HOME}/.config/nix/nix.conf"
+
+          NIX_ENV_FILE="${HOME}/.buildbuddy-nix-env"
+          {
+            printf 'export http_proxy=http://%s\n' "${TAILSCALE_HTTP_PROXY}"
+            printf 'export HTTP_PROXY=http://%s\n' "${TAILSCALE_HTTP_PROXY}"
+            printf 'export https_proxy=http://%s\n' "${TAILSCALE_HTTP_PROXY}"
+            printf 'export HTTPS_PROXY=http://%s\n' "${TAILSCALE_HTTP_PROXY}"
+          } >> "${NIX_ENV_FILE}"
+      - run: |
+          if [ "$(uname -m)" != "aarch64" ]; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-user-static binfmt-support
+
+            if [ ! -e /proc/sys/fs/binfmt_misc/register ]; then
+              sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc || true
+            fi
+
+            sudo update-binfmts --import qemu-aarch64 2>/dev/null || true
+            sudo update-binfmts --enable qemu-aarch64 2>/dev/null || true
+            sudo update-binfmts --enable qemu-aarch64-static 2>/dev/null || true
+
+            if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ] && [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64-static ]; then
+              qemu_binfmt_conf=""
+              for candidate in \
+                /usr/lib/binfmt.d/qemu-aarch64.conf \
+                /usr/share/qemu/binfmt.d/qemu-aarch64.conf
+              do
+                if [ -f "$candidate" ]; then
+                  qemu_binfmt_conf="$candidate"
+                  break
+                fi
+              done
+
+              if [ -n "$qemu_binfmt_conf" ] && grep -q '^:' "$qemu_binfmt_conf"; then
+                sudo sh -c "cat '$qemu_binfmt_conf' > /proc/sys/fs/binfmt_misc/register" || true
+              fi
+            fi
+
+            if [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ] && [ ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64-static ]; then
+              echo "qemu-aarch64 binfmt is not registered; BuildBuddy cannot realize native aarch64-linux Nix derivations."
+              if [ -d /proc/sys/fs/binfmt_misc ]; then
+                ls -la /proc/sys/fs/binfmt_misc || true
+              fi
+              if command -v update-binfmts >/dev/null 2>&1; then
+                update-binfmts --display | sed -n '1,120p' || true
+              fi
+              exit 1
+            fi
+          fi
+
+          mkdir -p "$HOME/.config/nix"
+          if ! grep -q '^extra-platforms = .*aarch64-linux' "$HOME/.config/nix/nix.conf"; then
+            printf 'extra-platforms = aarch64-linux\n' >> "$HOME/.config/nix/nix.conf"
+          fi
+      - run: |
+          NIX_SYSUPDATE_BUILD_CORES="${NIXOS_SYSUPDATE_BUILD_CORES:-24}"
+          NIX_SYSUPDATE_MAX_JOBS="${NIXOS_SYSUPDATE_MAX_JOBS:-1}"
+          mkdir -p "$HOME/.config/nix"
+          {
+            printf 'cores = %s\n' "$NIX_SYSUPDATE_BUILD_CORES"
+            printf 'max-jobs = %s\n' "$NIX_SYSUPDATE_MAX_JOBS"
+          } >> "$HOME/.config/nix/nix.conf"
+          NIX_ENV_FILE="$HOME/.buildbuddy-nix-env"
+          {
+            printf 'export NIX_BUILD_CORES=%s\n' "$NIX_SYSUPDATE_BUILD_CORES"
+            printf 'export NIX_MAX_JOBS=%s\n' "$NIX_SYSUPDATE_MAX_JOBS"
+            printf 'export NIX_BUILD_LOG_FLAGS="--print-build-logs --verbose --show-trace"\n'
+            if command -v mold >/dev/null 2>&1; then
+              printf 'export NIX_CFLAGS_LINK="-fuse-ld=mold"\n'
+            fi
+          } >> "$NIX_ENV_FILE"
+      - run: *configure_ghcr_rbe
+      - run: |
+          if [ "${NIXOS_SYSUPDATE_DEPLOY_ENABLED:-}" != "true" ]; then
+            echo "Skipping NixOS sysupdate build; set NIXOS_SYSUPDATE_DEPLOY_ENABLED=true."
+            exit 0
+          fi
+
+          if [ -f "$HOME/.buildbuddy-nix-env" ]; then
+            . "$HOME/.buildbuddy-nix-env"
+          fi
+          unset TARGET_HOST
+          export UPDATE_FLAKE=false
+          infra/nixos/scripts/build-bazel-sysupdate.sh
+      - run: "infra/nixos/scripts/buildbuddy-sysupdate-deploy.sh deploy-bundle"

@@ -1,0 +1,37 @@
+contents:
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  repositories:
+    - https://packages.wolfi.dev/os
+  packages:
+    - wolfi-baselayout
+    - ca-certificates-bundle
+    - bash
+    - busybox
+    - clang
+    - file
+    - findutils
+    - grep
+    - gzip
+    - libatomic
+    - libarchive-tools
+    - lld
+    - make
+    - patch
+    - posix-libc-utils-bin
+    - pkgconf
+    - python-3
+    - sed
+    - unzip
+    - xz
+    - zip
+    - zstd
+environment:
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+annotations:
+  org.opencontainers.image.description: Minimal Wolfi x86_64 remote-execution image for manga-downloader Bazel builds.
+  org.opencontainers.image.source: https://github.com/CyclopsBot/manga-downloader
+  org.opencontainers.image.title: manga-downloader-rbe
+archs:
+  - x86_64

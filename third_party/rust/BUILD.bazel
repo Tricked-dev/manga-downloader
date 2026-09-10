@@ -1,0 +1,30 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "Cargo.lock",
+    "Cargo.toml",
+    "rust-toolchain.toml",
+])
+
+filegroup(
+    name = "cargo_files",
+    srcs = [
+        "Cargo.lock",
+        "Cargo.toml",
+    ],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = [
+        "do_not_build.rs",
+        "src/lib.rs",
+    ],
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

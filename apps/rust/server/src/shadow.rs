@@ -1,0 +1,12 @@
+pub const PROJECT_NAME: &str = "manga-server";
+pub const PKG_VERSION: &str = "0.1.0";
+pub const BRANCH: &str = "unknown";
+pub const COMMIT_HASH: &str = "unknown";
+pub const SHORT_COMMIT: &str = "unknown";
+pub const COMMIT_DATE: &str = "unknown";
+pub const COMMIT_DATE_3339: &str = "unknown";
+pub const BUILD_TIME: &str = "1";
+pub const BUILD_TIME_3339: &str = "1970-01-01T00:00:01Z";
+pub const BUILD_RUST_CHANNEL: &str = "bazel";
+pub const BUILD_TARGET: &str = "unknown";
+pub const GIT_CLEAN: bool = false;

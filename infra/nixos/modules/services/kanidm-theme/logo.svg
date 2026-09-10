@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title>Trashcan Manga Downloader</title>
+  <rect x="16" y="16" width="224" height="224" fill="#2b0b0e" stroke="#f43f5e" stroke-width="8"/>
+  <path d="M82 70h44c17 0 31 14 31 31v85H96c-19 0-34-15-34-34V90c0-11 9-20 20-20Z" fill="none" stroke="#fb7185" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M130 70h44c11 0 20 9 20 20v62c0 19-15 34-34 34h-30V70Z" fill="none" stroke="#fb7185" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M88 104h38M88 132h38M130 104h38M130 132h38" stroke="#ffe4e6" stroke-width="9" stroke-linecap="square"/>
+</svg>

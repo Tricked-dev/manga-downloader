@@ -1,0 +1,99 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "persistence",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = glob([
+        "migrations/*.sql",
+    ]),
+    crate_name = "backend_persistence",
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    deps = [
+        "//libs/rust/core",
+        "//libs/rust/fs",
+        "@backend_crates//:anyhow",
+        "@backend_crates//:rusqlite",
+        "@backend_crates//:serde",
+        "@backend_crates//:serde_json",
+        "@backend_crates//:toasty",
+        "@backend_crates//:toasty-core",
+        "@backend_crates//:toasty-driver-sqlite",
+        "@backend_crates//:tokio",
+        "@backend_crates//:utoipa",
+        "@backend_crates//:uuid",
+    ],
+)
+
+rust_test(
+    name = "test_archive_index",
+    srcs = ["tests/archive_index.rs"],
+    crate_root = "tests/archive_index.rs",
+    edition = "2024",
+    deps = [
+        ":persistence",
+        "//libs/rust/core",
+        "//libs/rust/fs",
+        "@backend_crates//:anyhow",
+        "@backend_crates//:rusqlite",
+        "@backend_crates//:serde",
+        "@backend_crates//:serde_json",
+        "@backend_crates//:toasty",
+        "@backend_crates//:toasty-core",
+        "@backend_crates//:toasty-driver-sqlite",
+        "@backend_crates//:tokio",
+        "@backend_crates//:utoipa",
+        "@backend_crates//:uuid",
+    ],
+)
+
+rust_test(
+    name = "test_chapters",
+    srcs = ["tests/chapters.rs"],
+    crate_root = "tests/chapters.rs",
+    edition = "2024",
+    deps = [
+        ":persistence",
+        "//libs/rust/core",
+        "//libs/rust/fs",
+        "@backend_crates//:anyhow",
+        "@backend_crates//:rusqlite",
+        "@backend_crates//:serde",
+        "@backend_crates//:serde_json",
+        "@backend_crates//:toasty",
+        "@backend_crates//:toasty-core",
+        "@backend_crates//:toasty-driver-sqlite",
+        "@backend_crates//:tokio",
+        "@backend_crates//:utoipa",
+        "@backend_crates//:uuid",
+    ],
+)
+
+rust_quality_targets(
+    targets = [
+        ":persistence",
+        ":test_archive_index",
+        ":test_chapters",
+    ],
+)
+
+filegroup(
+    name = "rust_files",
+    srcs = glob(
+        [
+            "src/**/*.rs",
+            "tests/**/*.rs",
+        ],
+        allow_empty = True,
+    ),
+    tags = ["rust"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

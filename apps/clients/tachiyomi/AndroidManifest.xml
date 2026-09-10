@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="eu.kanade.tachiyomi.extension.all.mangadownloader"
+    android:versionCode="1"
+    android:versionName="1.4.1">
+
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="35" />
+    <uses-feature android:name="tachiyomi.extension" android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="Tachiyomi: Manga Downloader"
+        android:supportsRtl="true">
+        <meta-data
+            android:name="tachiyomi.extension.class"
+            android:value=".MangaDownloaderFactory" />
+        <meta-data
+            android:name="tachiyomi.extension.nsfw"
+            android:value="0" />
+    </application>
+</manifest>

@@ -1,0 +1,22 @@
+load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+
+package(default_visibility = ["//visibility:public"])
+
+java_library(
+    name = "compile_stubs",
+    srcs = glob(["stubs/**/*.java"]),
+    neverlink = True,
+)
+
+kt_jvm_library(
+    name = "source",
+    srcs = glob(["src/**/*.kt"]),
+    deps = [":compile_stubs"],
+)
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)

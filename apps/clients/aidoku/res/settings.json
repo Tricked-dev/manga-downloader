@@ -1,0 +1,30 @@
+[
+	{
+		"type": "group",
+		"title": "Server",
+		"items": [
+			{
+				"type": "text",
+				"key": "serverBaseUrl",
+				"title": "Server Base URL",
+				"placeholder": "http://localhost:4000",
+				"keyboardType": 3,
+				"returnKeyType": 9,
+				"autocorrectionDisabled": true,
+				"autocapitalizationType": 0,
+				"refreshes": ["content"]
+			},
+			{
+				"type": "text",
+				"key": "backendApiKey",
+				"title": "Backend API Key",
+				"placeholder": "Optional",
+				"returnKeyType": 9,
+				"autocorrectionDisabled": true,
+				"autocapitalizationType": 0,
+				"refreshes": ["content"]
+			}
+		],
+		"footer": "Use a URL reachable from the device running Aidoku. Search uses every enabled source that supports search."
+	}
+]

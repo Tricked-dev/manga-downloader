@@ -1,0 +1,136 @@
+"""Shared helpers and constants for manga-downloader Aspect tasks."""
+
+def run_bazel(ctx: TaskContext, args: list[str]) -> int:
+    cmd = ctx.std.process.command("bazel")
+    for arg in args:
+        cmd = cmd.arg(arg)
+    result = cmd.spawn().wait()
+    return 0 if result.success else 1
+
+def run_bb(ctx: TaskContext, args: list[str]) -> int:
+    cmd = ctx.std.process.command("bb")
+    for arg in args:
+        cmd = cmd.arg(arg)
+    result = cmd.spawn().wait()
+    return 0 if result.success else 1
+
+def targets_or_default(targets: list[str], default: list[str]) -> list[str]:
+    return targets if targets else default
+
+def ensure_cache_dir(ctx: TaskContext) -> bool:
+    result = ctx.std.process.command("mkdir").arg("-p").arg(".cache/bazel").spawn().wait()
+    return result.success
+
+def run_steps(ctx: TaskContext, steps: list[list[str]]) -> int:
+    for step in steps:
+        code = run_bazel(ctx, step)
+        if code != 0:
+            return code
+    return 0
+
+K6_TARGETS = [
+    "//stress-testing:api_smoke",
+    "//stress-testing:bursty_uncached_pages",
+    "//stress-testing:media_proxy",
+    "//stress-testing:page_cache",
+    "//stress-testing:reader_journey",
+]
+
+BACKEND_SERVER_TARGET = "//apps/rust/server:server"
+DEV_START_TARGET = "//apps/rust/dev-start:start"
+FILESYSTEM_TEST_TARGET = "//libs/rust/fs:test_filesystem"
+RBE_IMAGE_TARGET = "//infra/images/rbe:image"
+RBE_PUSH_TARGET = "//infra/images/rbe:push"
+RBE_DEFAULT_IMAGE_CANARY_TARGET = "//infra/images/rbe:default_rbe_image_canary"
+RBE_REPO_OWNED_IMAGE_CANARY_TARGET = "//infra/images/rbe:repo_owned_rbe_image_canary"
+RBE_REPO_OWNED_EXECUTION_PLATFORM = "//infra/images/rbe:execution_platform_linux_x86_64_repo_owned_ghcr"
+EXEC_LOG_PATH = ".cache/bazel/execution-log.compact"
+REMOTE_GRPC_LOG_PATH = ".cache/bazel/remote-grpc.log"
+PROFILE_PATH = ".cache/bazel/profile.json.gz"
+BUILD_EVENTS_PATH = ".cache/bazel/build-events.json"
+BUILD_EVENTS_RAW_PATH = ".cache/bazel/build-events.raw.json"
+BUILD_EVENTS_SECRET_PREFIXES = [
+    "x-buildbuddy-api-key=",
+    "x-buildbuddy-api-key\\u003d",
+    "X-BuildBuddy-Api-Key=",
+    "X-BuildBuddy-Api-Key\\u003d",
+    "x-buildbuddy-platform.container-registry-password=",
+    "x-buildbuddy-platform.container-registry-password\\u003d",
+]
+CANONICAL_FLAG_DEFAULTS = [
+    "--experimental_remote_cache_chunking",
+    "--remote_cache_compression",
+    "--experimental_remote_cache_lease_extension",
+    "--remote_verify_downloads",
+    "--noremote_local_fallback",
+    "--guard_against_concurrent_changes=full",
+    "--remote_download_minimal",
+    "--lockfile_mode=error",
+]
+ACTION_GRAPH_DEFAULTS = [
+    "--output=text",
+    'mnemonic("BazelPolicyCheck", //libs/bazel/bazelrc:remote_cache_policy)',
+]
+CONFIGURED_TARGET_DEFAULTS = [
+    "--output=label_kind",
+    "//libs/bazel/bazelrc:remote_cache_policy",
+]
+BAZEL_POLICY_TARGETS = [
+    "//libs/bazel/bazelrc:app_library_build_policy",
+    "//libs/bazel/bazelrc:aspect_task_policy",
+    "//libs/bazel/bazelrc:buildbuddy_workflow_policy",
+    "//libs/bazel/bazelrc:coverage_policy",
+    "//libs/bazel/bazelrc:credential_policy",
+    "//libs/bazel/bazelrc:diagnostic_redaction_policy",
+    "//libs/bazel/bazelrc:format_policy",
+    "//libs/bazel/bazelrc:gazelle_policy",
+    "//libs/bazel/bazelrc:llvm_toolchain_policy",
+    "//libs/bazel/bazelrc:prebuilt_tool_policy",
+    "//libs/bazel/bazelrc:rbe_execution_image_policy",
+    "//libs/bazel/bazelrc:remote_cache_policy",
+    "//libs/bazel/bazelrc:supply_chain_policy",
+]
+GAZELLE_DIFF_STEP = ["run", "//:gazelle", "--", "-mode=diff"]
+CARGO_POLICY_TARGETS = [
+    "//libs/bazel/cargo:cargo_manifest_policy",
+    "//libs/bazel/cargo:sys_crate_policy",
+    "//libs/bazel/cargo:cargo_tool_policy",
+]
+CARGO_TOOL_TARGETS = [
+    "//libs/bazel/cargo:cargo_deny",
+    "//libs/bazel/cargo:cargo_shear",
+]
+FLAMEGRAPH_SERVER_TARGET = "//libs/bazel/flamegraph:server"
+DOCTOR_PREFLIGHT_STEPS = [
+    ["version"],
+    ["mod", "deps", "--lockfile_mode=error"],
+]
+
+DOCTOR_VALIDATION_STEPS = [
+    ["build"] + BAZEL_POLICY_TARGETS,
+    ["build"] + CARGO_POLICY_TARGETS,
+    ["build", "--nobuild", BACKEND_SERVER_TARGET],
+    ["build", "--nobuild", "--platforms=@platforms//host:host", DEV_START_TARGET],
+    ["build", "--nobuild", RBE_IMAGE_TARGET],
+]
+
+QUALITY_STEPS = [
+    GAZELLE_DIFF_STEP,
+    ["build", "//:format_check"],
+    ["test", "//:rustfmt_test"],
+    ["test", "//:format_oxc_check"],
+    ["test", "//:lint"],
+    ["build", "//:clippy_check"],
+    ["build"] + BAZEL_POLICY_TARGETS,
+    ["build"] + CARGO_POLICY_TARGETS,
+    ["build", DEV_START_TARGET],
+    ["build"] + K6_TARGETS,
+    ["build"] + CARGO_TOOL_TARGETS,
+    ["build", "//:backend_sbom_graph"],
+]
+
+OPTIMIZED_STEPS = [
+    ["build", "--config=release", BACKEND_SERVER_TARGET],
+    ["test", "--config=asan", FILESYSTEM_TEST_TARGET],
+    ["test", "--config=lsan", FILESYSTEM_TEST_TARGET],
+]

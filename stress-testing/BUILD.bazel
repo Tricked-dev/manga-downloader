@@ -1,0 +1,160 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("//libs/bazel/rust:defs.bzl", "rust_quality_targets")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "starlark_files",
+    srcs = ["BUILD.bazel"],
+    tags = ["starlark"],
+)
+
+filegroup(
+    name = "nu_files",
+    srcs = ["run-k6.nu"],
+)
+
+filegroup(
+    name = "k6_scripts",
+    srcs = glob(["*.k6.ts"]),
+)
+
+filegroup(
+    name = "k6_support",
+    srcs = glob(["lib/**/*.ts"]),
+)
+
+js_library(
+    name = "oxc_pkg",
+    srcs = glob([
+        "*.k6.ts",
+        "lib/**/*.ts",
+    ]),
+)
+
+js_test(
+    name = "lint",
+    args = [
+        "oxlint",
+        "oxlint",
+        "stress-testing",
+    ],
+    data = [
+        ":oxc_pkg",
+        "//:node_modules",
+        "//:root_oxc_files",
+    ],
+    entry_point = "//:run_npm_bin",
+)
+
+js_test(
+    name = "format_oxc_js_ts_check",
+    args = [
+        "oxfmt",
+        "oxfmt",
+        "--check",
+        "stress-testing",
+    ],
+    data = [
+        ":oxc_pkg",
+        "//:node_modules",
+        "//:root_oxc_files",
+    ],
+    entry_point = "//:run_npm_bin",
+)
+
+rust_binary(
+    name = "api_smoke",
+    srcs = ["k6_runner.rs"],
+    args = ["$(rootpath api-smoke.k6.ts)"],
+    crate_name = "manga_k6_api_smoke",
+    crate_root = "k6_runner.rs",
+    data = [
+        "api-smoke.k6.ts",
+        ":k6_support",
+    ],
+    edition = "2024",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)
+
+rust_quality_targets(
+    targets = [
+        ":api_smoke",
+        ":bursty_uncached_pages",
+        ":media_proxy",
+        ":page_cache",
+        ":reader_journey",
+    ],
+)
+
+rust_binary(
+    name = "reader_journey",
+    srcs = ["k6_runner.rs"],
+    args = ["$(rootpath reader-journey.k6.ts)"],
+    crate_name = "manga_k6_reader_journey",
+    crate_root = "k6_runner.rs",
+    data = [
+        "reader-journey.k6.ts",
+        ":k6_support",
+    ],
+    edition = "2024",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)
+
+rust_binary(
+    name = "page_cache",
+    srcs = ["k6_runner.rs"],
+    args = ["$(rootpath page-cache.k6.ts)"],
+    crate_name = "manga_k6_page_cache",
+    crate_root = "k6_runner.rs",
+    data = [
+        "page-cache.k6.ts",
+        ":k6_support",
+    ],
+    edition = "2024",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)
+
+rust_binary(
+    name = "media_proxy",
+    srcs = ["k6_runner.rs"],
+    args = ["$(rootpath media-proxy.k6.ts)"],
+    crate_name = "manga_k6_media_proxy",
+    crate_root = "k6_runner.rs",
+    data = [
+        "media-proxy.k6.ts",
+        ":k6_support",
+    ],
+    edition = "2024",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)
+
+rust_binary(
+    name = "bursty_uncached_pages",
+    srcs = ["k6_runner.rs"],
+    args = ["$(rootpath bursty-uncached-pages.k6.ts)"],
+    crate_name = "manga_k6_bursty_uncached_pages",
+    crate_root = "k6_runner.rs",
+    data = [
+        "bursty-uncached-pages.k6.ts",
+        ":k6_support",
+    ],
+    edition = "2024",
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)

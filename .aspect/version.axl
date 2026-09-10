@@ -1,0 +1,3 @@
+"""Aspect CLI version pin."""
+
+version("2026.22.44")
