@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, Notify, RwLock};
 
 #[derive(Clone)]
 pub(crate) struct AppConfig {
+    pub(crate) web_root: Option<PathBuf>,
     pub(crate) public_url: Option<String>,
     pub(crate) cache_disk_path: PathBuf,
     pub(crate) backend_api_key: Option<SecretString>,
@@ -124,6 +125,7 @@ pub(crate) async fn build_test_app_state(
 
     build_app_state(AppStateParts {
         config: AppConfig {
+            web_root: None,
             public_url: Some("http://localhost".into()),
             cache_disk_path: cache_path,
             backend_api_key: None,

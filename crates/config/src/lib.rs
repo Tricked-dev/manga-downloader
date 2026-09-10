@@ -18,6 +18,9 @@ pub struct ServerConfig {
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
+    #[setting(env = "WEB_ROOT", parse_env = schematic::env::ignore_empty)]
+    pub web_root: Option<PathBuf>,
+
     #[setting(env = "PUBLIC_URL", parse_env = schematic::env::ignore_empty)]
     pub public_url: Option<String>,
 
@@ -27,6 +30,7 @@ pub struct ServerConfig {
 
 #[derive(Debug, Default)]
 pub struct ServerConfigOverrides {
+    pub web_root: Option<PathBuf>,
     pub public_url: Option<String>,
     pub database_url: Option<String>,
     pub models_dir: Option<PathBuf>,
@@ -49,6 +53,9 @@ impl ServerConfig {
     }
 
     fn apply_overrides(&mut self, overrides: ServerConfigOverrides) {
+        if let Some(web_root) = overrides.web_root {
+            self.web_root = Some(web_root);
+        }
         if let Some(public_url) = overrides.public_url {
             self.public_url = Some(public_url);
         }

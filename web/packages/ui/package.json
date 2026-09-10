@@ -1,0 +1,27 @@
+{
+  "name": "@manga-server/ui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./components/checkbox-row": "./src/components/CheckboxRow.svelte",
+    "./components/empty-panel": "./src/components/EmptyPanel.svelte",
+    "./components/form-field": "./src/components/FormField.svelte",
+    "./components/page-header": "./src/components/PageHeader.svelte",
+    "./components/section-header": "./src/components/SectionHeader.svelte",
+    "./utils": "./src/utils.ts"
+  },
+  "scripts": {
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@lucide/svelte": "1.17.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "svelte": "5.56.0",
+    "svelte-check": "4.4.8",
+    "typescript": "6.0.3"
+  }
+}

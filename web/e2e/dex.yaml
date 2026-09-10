@@ -1,0 +1,21 @@
+# Local browser test fixture only.
+issuer: http://127.0.0.1:5556/dex
+storage:
+  type: sqlite3
+  config:
+    file: /tmp/manga-ui-e2e/dex.db
+web:
+  http: 127.0.0.1:5556
+oauth2:
+  skipApprovalScreen: true
+enablePasswordDB: true
+staticClients:
+  - id: manga-ui
+    secret: browser-fixture-client
+    redirectURIs: [http://localhost:4000/auth/callback]
+    name: Manga UI test
+staticPasswords:
+  - email: reader@example.test
+    hash: "$2b$10$tUHqelqVrUjIkQp0Ycn/2OA/k7rAd2fzPAFICOwXYdmF7H5LRkq.u"
+    username: Browser Reader
+    userID: browser-reader

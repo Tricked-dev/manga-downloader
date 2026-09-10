@@ -71,6 +71,7 @@ pub(super) fn build_router(state: &Arc<AppState>) -> Router {
         ))
         .merge(api::auth::router().with_state(Arc::clone(state)))
         .merge(api::openapi::docs_router(openapi))
+        .merge(super::web::router(state.config.web_root.clone()))
         .route_layer(HttpMetricsLayerBuilder::new().build())
         .layer(ClientIpSource::CfConnectingIp.into_extension())
         .layer(cors)

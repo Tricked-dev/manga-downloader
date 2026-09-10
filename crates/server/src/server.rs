@@ -2,6 +2,7 @@ mod router;
 mod shutdown;
 mod startup;
 mod state;
+mod web;
 
 pub(crate) use startup::run_server;
 #[cfg(test)]

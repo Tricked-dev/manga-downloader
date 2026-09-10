@@ -1,0 +1,41 @@
+{
+  "name": "@manga-server/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./base": "./src/base.ts",
+    "./core": "./src/core.ts",
+    "./generated": "./src/generated.ts",
+    "./generated/endpoints/downloads": "./src/generated/endpoints/downloads/downloads.ts",
+    "./generated/endpoints/info": "./src/generated/endpoints/info/info.ts",
+    "./generated/endpoints/library": "./src/generated/endpoints/library/library.ts",
+    "./generated/endpoints/media": "./src/generated/endpoints/media/media.ts",
+    "./generated/endpoints/settings": "./src/generated/endpoints/settings/settings.ts",
+    "./generated/endpoints/stats": "./src/generated/endpoints/stats/stats.ts",
+    "./generated/endpoints/sources": "./src/generated/endpoints/sources/sources.ts",
+    "./generated/model": "./src/generated/model/index.ts",
+    "./mocks": "./src/mocks.ts",
+    "./models": "./src/models.ts",
+    "./urls": "./src/urls.ts"
+  },
+  "scripts": {
+    "generate:client": "orval --config orval.config.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@faker-js/faker": "10.4.0",
+    "@tanstack/svelte-query": "6.1.33",
+    "better-result": "2.9.2",
+    "msw": "2.14.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "orval": "8.14.0",
+    "oxfmt": "0.52.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.7"
+  }
+}

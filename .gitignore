@@ -64,3 +64,9 @@ apps/svelte/*/.dev.vars
 # Historical inputs are kept locally, not nested repositories in this project.
 /inspo/
 /.devenv/
+
+# Static frontend and generated API client
+**/.svelte-kit/
+web/build/
+web/packages/api-client/openapi.json
+web/packages/api-client/src/generated/

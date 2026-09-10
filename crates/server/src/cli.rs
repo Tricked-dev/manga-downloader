@@ -36,6 +36,9 @@ enum Command {
 
 #[derive(Args, Debug, Default, Clone)]
 struct ServerOptions {
+    /// Load the built web UI from disk instead of the embedded assets.
+    #[arg(long)]
+    web_root: Option<PathBuf>,
     /// External origin, e.g. https://manga.example.com; required for browser sign-in.
     #[arg(long)]
     public_url: Option<String>,
@@ -136,6 +139,7 @@ struct DbMigrateOptions {
 
 #[derive(Serialize)]
 struct ConfigReport {
+    web_root: Option<PathBuf>,
     public_url: Option<String>,
     database_url: String,
     database_backend: backend_persistence::DatabaseBackend,
@@ -263,6 +267,13 @@ fn print_config_report(report: &ConfigReport) {
         "public_url: {}",
         report.public_url.as_deref().unwrap_or("not set")
     );
+    println!(
+        "web_root: {}",
+        report
+            .web_root
+            .as_deref()
+            .map_or("embedded".into(), |path| path.display().to_string())
+    );
     println!("server_addr: {}", report.server_addr);
     println!("models_dir: {}", report.models_dir.display());
     println!(
@@ -285,6 +296,7 @@ fn init_command_tracing() {
 impl ServerOptions {
     fn merge(self, overrides: Self) -> Self {
         Self {
+            web_root: overrides.web_root.or(self.web_root),
             public_url: overrides.public_url.or(self.public_url),
             database_url: overrides.database_url.or(self.database_url),
             models_dir: overrides.models_dir.or(self.models_dir),
@@ -298,6 +310,7 @@ impl ServerOptions {
 impl From<ServerOptions> for ServerConfigOverrides {
     fn from(options: ServerOptions) -> Self {
         Self {
+            web_root: options.web_root,
             public_url: options.public_url,
             database_url: options.database_url,
             models_dir: options.models_dir,
@@ -311,6 +324,7 @@ impl From<ServerOptions> for ServerConfigOverrides {
 impl ConfigReport {
     fn from_config(config: &ServerConfig) -> Self {
         Self {
+            web_root: config.web_root.clone(),
             public_url: config.public_url.clone(),
             database_url: backend_persistence::redacted_database_url(&config.database_url),
             database_backend: backend_persistence::DatabaseBackend::from_url(&config.database_url),

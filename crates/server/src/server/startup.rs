@@ -133,6 +133,7 @@ async fn bootstrap_server(
     telemetry: Telemetry,
 ) -> anyhow::Result<ServerContext> {
     let ServerConfig {
+        web_root,
         public_url,
         database_url,
         models_dir,
@@ -141,6 +142,12 @@ async fn bootstrap_server(
         backend_api_key,
     } = config;
 
+    if let Some(root) = &web_root {
+        anyhow::ensure!(
+            root.join("index.html").is_file(),
+            "WEB_ROOT must contain the built UI index.html"
+        );
+    }
     let db = backend_persistence::Database::open(&database_url).await?;
     db.apply_env_overrides().await?;
 
@@ -191,6 +198,7 @@ async fn bootstrap_server(
     let upscale_queue = crate::jobs::UpscaleQueue::open(&db).await?;
     let state = build_app_state(AppStateParts {
         config: AppConfig {
+            web_root,
             public_url: public_url
                 .map(|url| crate::api::auth::normalize_public_url(&url))
                 .transpose()?,
