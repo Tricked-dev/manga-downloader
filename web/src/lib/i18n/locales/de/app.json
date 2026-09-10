@@ -19,7 +19,7 @@
     "signOut": "Abmelden"
   },
   "appLogo": {
-    "subtitle": "WASM-Plugins",
+    "subtitle": "Deine Manga-Bibliothek",
     "title": "Manga-Server"
   },
   "aria": {
@@ -393,7 +393,7 @@
     "signOutFailed": "Abmelden fehlgeschlagen. Bitte erneut versuchen."
   },
   "meta": {
-    "description": "Selbstgehosteter Manga-Downloader mit WASM-Quell-Plugins und lokalen Exporten.",
+    "description": "Selbst gehostete Manga-Bibliothek mit Comix und Rawkuma.",
     "title": "Manga-Downloader"
   },
   "nav": {
@@ -436,11 +436,11 @@
         "description": "Proxy- und Cache-Seiten zur Anzeige, während heruntergeladene Archivartefakte intakt bleiben.",
         "title": "Leserbewusster Bildfluss"
       },
-      "sourcePlugins": {
-        "description": "Laden Sie Scraper-Plugins separat vom Server, sodass sich das Quellverhalten ändern kann, ohne dass die Benutzeroberfläche neu geschrieben werden muss.",
-        "title": "Quell-Plugins"
-      },
-      "title": "Fähigkeiten"
+      "title": "Fähigkeiten",
+      "sources": {
+        "title": "Integrierte Quellen",
+        "description": "Durchsuche Comix und Rawkuma in derselben Bibliothek."
+      }
     },
     "deployment": {
       "description": "Repository-Details aus Backend-Build-Metadaten und der Bereitstellungsumgebung.",
@@ -470,7 +470,7 @@
       "title": "Gesundheitschecks",
       "unavailable": "Die Backend-Gesundheitsprüfung ist nicht verfügbar"
     },
-    "heroDescription": "Dies ist die Seite zur Instanzüberprüfung. Es zeigt die tatsächlich ausgeführten Web-UI- und Rust-Server-Builds, die vom Backend gemeldeten Integritätsprüfungen und die zum Zeitpunkt der Bereitstellung verfügbaren Repository-Metadaten. Nützlich, wenn sich ein Reader, ein Quell-Plugin oder ein heruntergeladenes Archiv anders als erwartet verhält und Sie wissen müssen, welcher Code auf der Verpackung enthalten ist.",
+    "heroDescription": "App-Version, Serverzustand und Bereitstellungsdetails anzeigen.",
     "heroTitle": "Selbstgehosteter Manga-Downloader.",
     "links": {
       "description": "Für diesen Build konfigurierte Projektverweise.",
@@ -541,18 +541,6 @@
     "autoDownloadCategoryHint": "Beschränken Sie globale automatische Downloads auf eine Bibliothekskategorie. Zum Herunterladen aus jeder Kategorie leer lassen.",
     "autoDownloadNewChapters": "Neue Kapitel automatisch herunterladen",
     "autoDownloadNewChaptersHint": "Laden Sie Kapitel automatisch herunter, wenn sie gefunden werden.",
-    "avif": {
-      "currentWorkers": "Aktuell: {{count}} Arbeiter",
-      "description": "Konfigurieren Sie das globale AVIF-Konvertierungsverhalten für Downloads und Neukodierung.",
-      "parallelConversions": "Parallele Konvertierungen",
-      "parallelConversionsHint": "Maximale Anzahl an Seiten, die während der aktiven Arbeit gleichzeitig in AVIF konvertiert werden.",
-      "upscale": "Heruntergeladene Mangas neu kodieren",
-      "upscaleDescription": "Stellt einen Durchgang über heruntergeladene Archive in die Warteschlange und schreibt Bilder mit der konfigurierten Qualität jeder Quelle in AVIF um.",
-      "upscaleExisting": "Vorhandene Downloads neu kodieren",
-      "upscaleResult": "{{images}} Bild(er) in {{archives}} Archiv(en) neu kodiert",
-      "reencoding": "Neukodierung...",
-      "title": "AVIF-Einstellungen"
-    },
     "backendApi": "Backend-API",
     "backendApiDescription": "Schützen Sie direkte Backend-API-Anfragen mit einem Bearer-Token",
     "cache": {
@@ -570,33 +558,7 @@
       "pathHint": "Starten Sie das Backend nach dem Speichern neu, um die Änderungen des Cache-Pfads zu übernehmen.",
       "title": "Antwortcache"
     },
-    "archiveIndex": {
-      "archives": "Archive",
-      "blobBytes": "Blob-Bytes",
-      "cleanupResult": "{{count}} veraltete Indexzeile(n) entfernt",
-      "cleanupStale": "Veraltete bereinigen",
-      "cleaning": "Bereinigung...",
-      "clear": "Index leeren",
-      "clearResult": "{{count}} Indexzeile(n) gelöscht",
-      "clearing": "Wird geleert...",
-      "description": "Persistente Seiteneintragsindizes für heruntergeladene .tar.zst-Kapitel.",
-      "pages": "Seiten",
-      "rebuild": "Neu aufbauen",
-      "rebuilding": "Neuaufbau...",
-      "staleRows": "Veraltete Zeilen",
-      "title": "Index heruntergeladener Archive"
-    },
     "description": "Konfigurieren Sie Ihren Manga-Downloader",
-    "discord": {
-      "botToken": "Bot-Token",
-      "botTokenHint": "Als Anwendungseinstellung gespeichert. Starten Sie das Backend nach dem Speichern neu, um die Verbindung zum Gateway-Bot wiederherzustellen.",
-      "botTokenPlaceholder": "Geben Sie das Bot-Token ein",
-      "channelId": "Benachrichtigungskanal-ID",
-      "channelIdHint": "Optional. Benachrichtigungen zu neuen Kapiteln werden auf diesem Kanal veröffentlicht, wenn der Discord-Bot ausgeführt wird.",
-      "description": "Konfigurieren Sie die Gateway-Bot- und Bibliotheksaktualisierungsbenachrichtigungen",
-      "notice": "Slash-Befehle werden nach dem Neustart ausgeführt. Fügen Sie eine Kanal-ID hinzu, um Benachrichtigungen über Bibliotheksaktualisierungen zu aktivieren.",
-      "title": "Zwietracht"
-    },
     "downloadConcurrency": {
       "concurrentChapters": "Gleichzeitige Kapitel",
       "concurrentChaptersHint": "Maximale Anzahl aktiver Kapitel-Download-Jobs gleichzeitig. Starten Sie das Backend nach dem Speichern neu, um den Worker-Pool anzupassen.",
@@ -666,12 +628,12 @@
     "capabilities": "Fähigkeiten",
     "deletePlugin": "Plugin löschen",
     "deleting": "Löschen...",
-    "description": "Durchsuchen Sie aktivierte Quellen und verwalten Sie installierte Plugins von einer Oberfläche aus.",
+    "description": "Durchsuche deine Quellen und wähle aus, welche aktiviert sind.",
     "enabled": "Ermöglicht",
     "enabledSources": "Aktivierte Quellen",
     "homepage": "Homepage:",
     "hideNsfw": "NSFW-Titel ausblenden",
-    "hideNsfwDescription": "Filtern Sie diese Quelle an der BFF-Grenze und suchen Sie nach Seiten.",
+    "hideNsfwDescription": "Titel für Erwachsene in der Quellensuche ausblenden.",
     "info": "Info",
     "installed": "Installiert am {{date}}",
     "installedPlugins": "Installierte Plugins",
@@ -683,9 +645,9 @@
     "noArtifactHistory": "Es wurde kein Artefaktverlauf aufgezeichnet.",
     "noCapabilities": "Keine Fähigkeiten",
     "noEnabledSources": "Keine aktivierten Quellen",
-    "noEnabledSourcesDescription": "Aktivieren Sie ein installiertes Plugin, um einen Quellkatalog zu durchsuchen.",
+    "noEnabledSourcesDescription": "Aktiviere eine Quelle, um ihren Katalog zu durchsuchen.",
     "noSources": "Keine Quellen erkannt",
-    "noSourcesDescription": "Laden Sie ein kompiliertes .wasm-Plugin hoch, um loszulegen.",
+    "noSourcesDescription": "Der Server hat keine Quellen gemeldet. Prüfe die Verbindung und Konfiguration.",
     "noneReported": "keiner gemeldet",
     "plugin": "Plugin",
     "pluginApi": "Plugin-API",
@@ -727,7 +689,11 @@
     "status": "Status",
     "title": "Quellen",
     "upload": "Hochladen",
-    "uploading": "Hochladen..."
+    "uploading": "Hochladen...",
+    "manage": "Quellen verwalten",
+    "available": "Verfügbare Quellen",
+    "manageDescription": "Deaktiviere eine Quelle, um sie beim Durchsuchen auszublenden. Heruntergeladene Kapitel bleiben verfügbar.",
+    "enable": "{{source}} aktivieren"
   },
   "errors": {
     "application": "Anwendungsfehler",

@@ -1,51 +1,67 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard", ":configMigration"],
-  "labels": ["dependencies"],
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":configMigration"
+  ],
+  "labels": [
+    "dependencies"
+  ],
   "timezone": "America/New_York",
-  "schedule": ["after 12am and before 1am"],
+  "schedule": [
+    "after 12am and before 1am"
+  ],
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["after 12am and before 1am"]
+    "schedule": [
+      "after 12am and before 1am"
+    ]
   },
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Update Rust toolchain channel in third_party/rust/rust-toolchain.toml",
-      "managerFilePatterns": ["/^third_party/rust/rust-toolchain\\.toml$/"],
-      "matchStrings": ["channel\\s*=\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
-      "depNameTemplate": "rust",
-      "packageNameTemplate": "rust-lang/rust",
-      "datasourceTemplate": "github-tags",
-      "versioningTemplate": "semver"
-    }
-  ],
   "packageRules": [
     {
       "description": "Group GitHub Actions updates",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github-actions"
     },
     {
       "description": "Group Rust crate updates",
-      "matchManagers": ["cargo"],
+      "matchManagers": [
+        "cargo"
+      ],
       "groupName": "rust crates"
     },
     {
       "description": "Group Rust toolchain updates",
-      "matchPackageNames": ["rust-lang/rust"],
+      "matchPackageNames": [
+        "rust-lang/rust"
+      ],
       "groupName": "rust toolchain"
     },
     {
       "description": "Group frontend dependency updates",
-      "matchManagers": ["npm"],
-      "matchFileNames": ["package.json", "pnpm-lock.yaml", "apps/svelte/**", "libs/svelte/**"],
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "package.json",
+        "bun.lock",
+        "web/**"
+      ],
       "groupName": "frontend dependencies"
     },
     {
       "description": "Group Nix flake input updates",
-      "matchManagers": ["nix"],
+      "matchManagers": [
+        "nix"
+      ],
       "groupName": "nix flake inputs"
     }
+  ],
+  "ignorePaths": [
+    "inspo/**",
+    "vendor/**"
   ]
 }

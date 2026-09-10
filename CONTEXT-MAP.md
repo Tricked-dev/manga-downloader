@@ -7,5 +7,4 @@
 - [Persistence](crates/persistence/CONTEXT.md): SQLite and PostgreSQL schemas, connection selection and write coordination.
 - [Authentication](crates/server/src/api/auth/CONTEXT.md): OIDC, durable sessions, bearer credentials and public sharing.
 - [Web application](web/CONTEXT.md): static assets, browser state and API integration.
-
 - [Reader clients](clients/CONTEXT.md): Aidoku and Mihon packages, builds, authentication and API contracts.

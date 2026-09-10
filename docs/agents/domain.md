@@ -18,13 +18,13 @@ This repo uses a multi-context layout:
 /
 |-- CONTEXT-MAP.md
 |-- docs/adr/                          # system-wide decisions
-|-- apps/rust/
+|-- crates/
 |   |-- CONTEXT.md
 |   `-- docs/adr/                      # Rust backend-specific decisions
-|-- apps/svelte/
+|-- web/
 |   |-- CONTEXT.md
 |   `-- docs/adr/                      # Svelte frontend-specific decisions
-`-- apps/clients/
+`-- clients/
     |-- CONTEXT.md
     `-- docs/adr/                      # client-specific decisions
 ```

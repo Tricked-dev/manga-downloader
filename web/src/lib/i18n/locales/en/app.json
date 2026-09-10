@@ -19,7 +19,7 @@
     "signOut": "Sign out"
   },
   "appLogo": {
-    "subtitle": "WASM plugins",
+    "subtitle": "Your manga library",
     "title": "Manga Server"
   },
   "aria": {
@@ -393,7 +393,7 @@
     "signOutFailed": "Unable to sign out. Please try again."
   },
   "meta": {
-    "description": "Self-hosted manga downloader with WASM source plugins and local exports.",
+    "description": "Self-hosted manga library with Comix and Rawkuma sources.",
     "title": "Manga Downloader"
   },
   "nav": {
@@ -436,11 +436,11 @@
         "description": "Proxy and cache pages for display while leaving downloaded archive artifacts intact.",
         "title": "Reader-aware image flow"
       },
-      "sourcePlugins": {
-        "description": "Load scraper plugins separately from the server so source behavior can change without UI rewrites.",
-        "title": "Source plugins"
-      },
-      "title": "Capabilities"
+      "title": "Capabilities",
+      "sources": {
+        "title": "Built-in sources",
+        "description": "Browse Comix and Rawkuma from the same library."
+      }
     },
     "deployment": {
       "description": "Repository details from backend build metadata and deployment environment.",
@@ -470,7 +470,7 @@
       "title": "Health checks",
       "unavailable": "Backend health check is unavailable"
     },
-    "heroDescription": "This is the instance checkup page. It shows the web UI and Rust server builds that are actually running, the health checks reported by the backend, and the repository metadata available at deploy time. Useful when a reader, source plugin, or downloaded archive behaves differently than expected and you need to know what code is on the box.",
+    "heroDescription": "View the running app version, server health and deployment details.",
     "heroTitle": "Self-hosted manga downloader.",
     "links": {
       "description": "Project references configured for this build.",
@@ -541,18 +541,6 @@
     "autoDownloadCategoryHint": "Limit global auto-downloads to one library category. Leave empty to download from every category.",
     "autoDownloadNewChapters": "Auto-download new chapters",
     "autoDownloadNewChaptersHint": "Automatically download chapters when found.",
-    "avif": {
-      "currentWorkers": "Current: {{count}} worker(s)",
-      "description": "Configure global AVIF conversion behavior for downloads and re-encoding.",
-      "parallelConversions": "Parallel Conversions",
-      "parallelConversionsHint": "Maximum number of pages converted to AVIF at the same time across active work.",
-      "upscale": "Re-encode Downloaded Manga",
-      "upscaleDescription": "Queues a pass over downloaded archives and rewrites images to AVIF using each source's configured quality.",
-      "upscaleExisting": "Re-encode Existing Downloads",
-      "upscaleResult": "Re-encoded {{images}} image(s) across {{archives}} archive(s)",
-      "reencoding": "Re-encoding...",
-      "title": "AVIF Settings"
-    },
     "backendApi": "Backend API",
     "backendApiDescription": "Protect direct backend API requests with a bearer token",
     "cache": {
@@ -570,33 +558,7 @@
       "pathHint": "Restart backend after saving to apply cache path changes.",
       "title": "Response Cache"
     },
-    "archiveIndex": {
-      "archives": "Archives",
-      "blobBytes": "Blob Bytes",
-      "cleanupResult": "Removed {{count}} stale archive index row(s)",
-      "cleanupStale": "Cleanup Stale",
-      "cleaning": "Cleaning...",
-      "clear": "Clear Index",
-      "clearResult": "Cleared {{count}} archive index row(s)",
-      "clearing": "Clearing...",
-      "description": "Persistent page-entry indexes for downloaded .tar.zst chapters.",
-      "pages": "Pages",
-      "rebuild": "Rebuild",
-      "rebuilding": "Rebuilding...",
-      "staleRows": "Stale Rows",
-      "title": "Downloaded Archive Index"
-    },
     "description": "Configure your manga downloader",
-    "discord": {
-      "botToken": "Bot Token",
-      "botTokenHint": "Stored as an application setting. Restart the backend after saving to reconnect the gateway bot.",
-      "botTokenPlaceholder": "Enter bot token",
-      "channelId": "Notification Channel ID",
-      "channelIdHint": "Optional. New chapter notifications post to this channel when the Discord bot is running.",
-      "description": "Configure the gateway bot and library update notifications",
-      "notice": "Slash commands will run after restart. Add a channel ID to enable library update notifications.",
-      "title": "Discord"
-    },
     "downloadConcurrency": {
       "concurrentChapters": "Concurrent Chapters",
       "concurrentChaptersHint": "Maximum number of chapter download jobs active at once. Restart the backend after saving to resize the worker pool.",
@@ -666,12 +628,12 @@
     "capabilities": "Capabilities",
     "deletePlugin": "Delete Plugin",
     "deleting": "Deleting...",
-    "description": "Browse enabled sources and manage installed plugins from one surface.",
+    "description": "Browse your sources and choose which ones are enabled.",
     "enabled": "Enabled",
     "enabledSources": "Enabled Sources",
     "homepage": "Homepage:",
     "hideNsfw": "Hide NSFW titles",
-    "hideNsfwDescription": "Filter this source at the BFF boundary and search pages.",
+    "hideNsfwDescription": "Hide adult titles in source searches.",
     "info": "Info",
     "installed": "Installed {{date}}",
     "installedPlugins": "Installed Plugins",
@@ -683,9 +645,9 @@
     "noArtifactHistory": "No artifact history recorded.",
     "noCapabilities": "No capabilities",
     "noEnabledSources": "No enabled sources",
-    "noEnabledSourcesDescription": "Enable an installed plugin to browse a source catalog.",
+    "noEnabledSourcesDescription": "Enable a source to browse its catalog.",
     "noSources": "No sources detected",
-    "noSourcesDescription": "Upload a compiled .wasm plugin to get started.",
+    "noSourcesDescription": "The server did not report any sources. Check its connection and configuration.",
     "noneReported": "none reported",
     "plugin": "Plugin",
     "pluginApi": "Plugin API",
@@ -727,7 +689,11 @@
     "status": "Status",
     "title": "Sources",
     "upload": "Upload",
-    "uploading": "Uploading..."
+    "uploading": "Uploading...",
+    "manage": "Manage sources",
+    "available": "Available sources",
+    "manageDescription": "Disable a source to hide it from browsing. Your downloaded chapters stay available.",
+    "enable": "Enable {{source}}"
   },
   "errors": {
     "application": "Application error",

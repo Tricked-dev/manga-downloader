@@ -19,7 +19,7 @@
     "signOut": "Esci"
   },
   "appLogo": {
-    "subtitle": "Plugin WASM",
+    "subtitle": "La tua libreria manga",
     "title": "Server Manga"
   },
   "aria": {
@@ -393,7 +393,7 @@
     "signOutFailed": "Impossibile uscire. Riprova."
   },
   "meta": {
-    "description": "Downloader di manga self-hosted con plug-in sorgente WASM ed esportazioni locali.",
+    "description": "Libreria manga self-hosted con Comix e Rawkuma.",
     "title": "Scaricatore di manga"
   },
   "nav": {
@@ -436,11 +436,11 @@
         "description": "Pagine proxy e cache da visualizzare lasciando intatti gli artefatti dell'archivio scaricati.",
         "title": "Flusso di immagini consapevole del lettore"
       },
-      "sourcePlugins": {
-        "description": "Carica i plug-in dello scraper separatamente dal server in modo che il comportamento dell'origine possa cambiare senza riscritture dell'interfaccia utente.",
-        "title": "Plugin di origine"
-      },
-      "title": "Capacità"
+      "title": "Capacità",
+      "sources": {
+        "title": "Fonti integrate",
+        "description": "Esplora Comix e Rawkuma dalla stessa libreria."
+      }
     },
     "deployment": {
       "description": "Dettagli del repository dai metadati della build backend e dall'ambiente di distribuzione.",
@@ -470,7 +470,7 @@
       "title": "Controlli sanitari",
       "unavailable": "Il controllo dello stato del backend non è disponibile"
     },
-    "heroDescription": "Questa è la pagina di controllo dell'istanza. Mostra l'interfaccia utente Web e le build del server Rust effettivamente in esecuzione, i controlli di integrità riportati dal backend e i metadati del repository disponibili al momento della distribuzione. Utile quando un lettore, un plugin sorgente o un archivio scaricato si comporta diversamente dal previsto ed è necessario sapere quale codice è presente sulla confezione.",
+    "heroDescription": "Visualizza la versione dell’app, lo stato del server e i dettagli della distribuzione.",
     "heroTitle": "Downloader di manga self-hosted.",
     "links": {
       "description": "Riferimenti al progetto configurati per questa build.",
@@ -541,18 +541,6 @@
     "autoDownloadCategoryHint": "Limita i download automatici globali a una categoria di libreria. Lascia vuoto per scaricare da ogni categoria.",
     "autoDownloadNewChapters": "Scarica automaticamente i nuovi capitoli",
     "autoDownloadNewChaptersHint": "Scarica automaticamente i capitoli quando vengono trovati.",
-    "avif": {
-      "currentWorkers": "Attuale: {{count}} lavoratore/i",
-      "description": "Configura il comportamento di conversione AVIF globale per i download e la ricodifica.",
-      "parallelConversions": "Conversioni parallele",
-      "parallelConversionsHint": "Numero massimo di pagine convertite in AVIF contemporaneamente nel lavoro attivo.",
-      "upscale": "Ricodificare il manga scaricato",
-      "upscaleDescription": "Accoda un passaggio sugli archivi scaricati e riscrive le immagini in AVIF utilizzando la qualità configurata di ciascuna origine.",
-      "upscaleExisting": "Ricodificare i download esistenti",
-      "upscaleResult": "Ricodificato/i {{images}} immagine/i in {{archives}} archivio/i",
-      "reencoding": "Ricodifica...",
-      "title": "Impostazioni AVIF"
-    },
     "backendApi": "API di back-end",
     "backendApiDescription": "Proteggi le richieste API di backend dirette con un token al portatore",
     "cache": {
@@ -570,33 +558,7 @@
       "pathHint": "Riavvia il backend dopo il salvataggio per applicare le modifiche al percorso della cache.",
       "title": "Cache delle risposte"
     },
-    "archiveIndex": {
-      "archives": "Archivi",
-      "blobBytes": "Byte blob",
-      "cleanupResult": "Rimosse {{count}} riga/e obsolete dell'indice",
-      "cleanupStale": "Pulisci obsoleti",
-      "cleaning": "Pulizia...",
-      "clear": "Svuota indice",
-      "clearResult": "Cancellate {{count}} riga/e dell'indice",
-      "clearing": "Cancellazione...",
-      "description": "Indici persistenti delle pagine per capitoli .tar.zst scaricati.",
-      "pages": "Pagine",
-      "rebuild": "Ricostruisci",
-      "rebuilding": "Ricostruzione...",
-      "staleRows": "Righe obsolete",
-      "title": "Indice archivi scaricati"
-    },
     "description": "Configura il tuo downloader di manga",
-    "discord": {
-      "botToken": "Gettone bot",
-      "botTokenHint": "Memorizzato come impostazione dell'applicazione. Riavvia il backend dopo aver salvato per riconnettere il bot gateway.",
-      "botTokenPlaceholder": "Inserisci il token del bot",
-      "channelId": "ID del canale di notifica",
-      "channelIdHint": "Opzionale. Le notifiche dei nuovi capitoli vengono pubblicate su questo canale quando il bot Discord è in esecuzione.",
-      "description": "Configurare il bot del gateway e le notifiche di aggiornamento della libreria",
-      "notice": "I comandi barra verranno eseguiti dopo il riavvio. Aggiungi un ID canale per abilitare le notifiche di aggiornamento della libreria.",
-      "title": "Discordia"
-    },
     "downloadConcurrency": {
       "concurrentChapters": "Capitoli simultanei",
       "concurrentChaptersHint": "Numero massimo di download di capitoli attivi contemporaneamente. Riavvia il backend dopo il salvataggio per ridimensionare il pool di worker.",
@@ -666,12 +628,12 @@
     "capabilities": "Capacità",
     "deletePlugin": "Elimina plug-in",
     "deleting": "Eliminazione...",
-    "description": "Sfoglia le fonti abilitate e gestisci i plugin installati da un'unica superficie.",
+    "description": "Esplora le tue fonti e scegli quali abilitare.",
     "enabled": "Abilitato",
     "enabledSources": "Sorgenti abilitate",
     "homepage": "Pagina iniziale:",
     "hideNsfw": "Nascondi i titoli NSFW",
-    "hideNsfwDescription": "Filtra questa fonte al confine del BFF e cerca nelle pagine.",
+    "hideNsfwDescription": "Nascondi i titoli per adulti nelle ricerche.",
     "info": "Informazioni",
     "installed": "Installato il {{data}}",
     "installedPlugins": "Plugin installati",
@@ -683,9 +645,9 @@
     "noArtifactHistory": "Nessuna cronologia degli artefatti registrata.",
     "noCapabilities": "Nessuna capacità",
     "noEnabledSources": "Nessuna origine abilitata",
-    "noEnabledSourcesDescription": "Abilita un plugin installato per sfogliare un catalogo di origine.",
+    "noEnabledSourcesDescription": "Abilita una fonte per esplorarne il catalogo.",
     "noSources": "Nessuna fonte rilevata",
-    "noSourcesDescription": "Carica un plugin .wasm compilato per iniziare.",
+    "noSourcesDescription": "Il server non ha restituito fonti. Controlla la connessione e la configurazione.",
     "noneReported": "nessuno segnalato",
     "plugin": "Collegare",
     "pluginApi": "API del plugin",
@@ -727,7 +689,11 @@
     "status": "Stato",
     "title": "Fonti",
     "upload": "Caricamento",
-    "uploading": "Caricamento..."
+    "uploading": "Caricamento...",
+    "manage": "Gestisci fonti",
+    "available": "Fonti disponibili",
+    "manageDescription": "Disabilita una fonte per nasconderla durante la navigazione. I capitoli scaricati restano disponibili.",
+    "enable": "Abilita {{source}}"
   },
   "errors": {
     "application": "Errore dell'applicazione",

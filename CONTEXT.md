@@ -85,7 +85,7 @@ An activity fact recording how many Chapter Pages became locally available when 
 _Avoid_: archive page count event
 
 **Chapter Downloaded**:
-An activity fact recorded when a Downloaded Archive is created for one Local Library Chapter. Reencoding a Downloaded Archive does not create another Chapter Downloaded fact.
+An activity fact recorded when a Downloaded Archive is created for one Local Library Chapter. Appending an upscaled variant to a Downloaded Archive does not create another Chapter Downloaded fact.
 _Avoid_: download completed event
 
 ## Example Dialogue
@@ -130,19 +130,15 @@ Developer: "Is a completed download the same thing as the archive on disk?"
 
 Domain expert: "No. The Download is the work record. The Downloaded Archive is the durable local artifact created when that work completes."
 
-Developer: "If indexing fails after a download completes, is the archive invalid?"
+Developer: "Is there a separate downloaded archive index to maintain?"
 
-Domain expert: "No. The Downloaded Archive exists; the derived state needs to be repaired."
-
-Developer: "Is the Downloaded Archive Index the same thing as page cache or read-ahead state?"
-
-Domain expert: "No. The Downloaded Archive Index records page-entry facts for the Downloaded Archive. Page cache and read-ahead state are operational reader infrastructure."
+Domain expert: "No. BBF owns the page and asset index inside each Downloaded Archive."
 
 Developer: "Are stats only current database counts?"
 
 Domain expert: "No. Stats Projection combines current totals with activity over time."
 
-Developer: "Does reencoding a downloaded archive count as downloading a chapter again?"
+Developer: "Does upscaling a downloaded archive count as downloading a chapter again?"
 
 Domain expert: "No. Chapter Downloaded is recorded when the Downloaded Archive is created, not when its representation changes."
 

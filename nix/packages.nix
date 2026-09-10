@@ -49,7 +49,9 @@ let
     }
   );
   web = pkgs.stdenvNoCC.mkDerivation {
-    pname = "manga-web";
+    # Fixed-output paths otherwise reuse an old web bundle when inputs change.
+    # The headless build depends on this source tree and supplies the API schema.
+    pname = "manga-web-${builtins.substring 0 12 (builtins.hashString "sha256" (toString headless))}";
     inherit version src;
     nativeBuildInputs = [
       bun
@@ -58,7 +60,7 @@ let
     ];
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
-    outputHash = "sha256-i72NFID7El5xD+pyMZYtR30VISPUhe/7AOydGyPgAt4=";
+    outputHash = "sha256-qvMUSeOyJIUSvLuPzw1I+Jlk5RWzpzZktuXZ2cs7Qe4=";
     dontConfigure = true;
     dontFixup = true;
     SOURCE_DATE_EPOCH = "1";
@@ -71,6 +73,14 @@ let
       patchShebangs node_modules web/node_modules web/packages/api-client/node_modules
       bun run --cwd web prepare
       bun run --cwd web/packages/api-client generate:client
+      # SvelteKit otherwise embeds Date.now() as its app version. Hash only
+      # frontend inputs and the exported schema, independently of this FOD hash.
+      export MANGA_WEB_VERSION="$(
+        {
+          printf '%s\0' package.json bun.lock web/package.json web/svelte.config.js web/vite.config.ts web/packages/api-client/openapi.json
+          find web/src web/packages/api-client/src web/packages/ui/src web/static -type f -print0
+        } | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1
+      )"
       bun run build:web
       runHook postBuild
     '';

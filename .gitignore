@@ -7,7 +7,6 @@ data/
 manga.db
 manga.db-shm
 manga.db-wal
-.last_plugin_change
 
 # Local agent tooling
 .agents/skills/
@@ -16,46 +15,25 @@ manga.db-wal
 
 # Rust build output
 target/
-**/.wasmtime-cache/
 rustc-ice-*.txt
 *.tsbuildinfo
 
-# Bazel output symlinks
-/bazel-*
-
-# Generated client/plugin artifacts
-libs/svelte/api-client/openapi.json
-libs/svelte/api-client/src/generated/
+# Generated artifacts
 clients/*/package.aix
 clients/*/build/
-plugins/*.wasm
-plugins/*.wasm.metadata.json
 .build/
-packaging/staging/
 result
 result-*
 
-# Svelte dependencies/build
+# Frontend dependencies/build
 node_modules/
-apps/svelte/*/node_modules/
-apps/svelte/*/.output/
-apps/svelte/*/.vercel/
-apps/svelte/*/.netlify/
-apps/svelte/*/.wrangler/
-apps/svelte/*/.svelte-kit/
-apps/svelte/*/build/
-.sonda/
 **/.sonda/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-apps/svelte/*/vite.config.js.timestamp-*
-apps/svelte/*/vite.config.ts.timestamp-*
 
 # Environment/local secrets
 .env
 .env.*
-user.bazelrc
-apps/svelte/*/.dev.vars
 !.env.example
 !.env.test
 

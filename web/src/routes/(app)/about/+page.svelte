@@ -133,8 +133,8 @@
         description: $t("app.about.capabilities.libraryFirst.description"),
       },
       {
-        title: $t("app.about.capabilities.sourcePlugins.title"),
-        description: $t("app.about.capabilities.sourcePlugins.description"),
+        title: $t("app.about.capabilities.sources.title"),
+        description: $t("app.about.capabilities.sources.description"),
       },
       {
         title: $t("app.about.capabilities.readerAware.title"),

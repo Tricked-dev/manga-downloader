@@ -19,7 +19,7 @@
     "signOut": "Cerrar sesión"
   },
   "appLogo": {
-    "subtitle": "Plugins WASM",
+    "subtitle": "Tu biblioteca de manga",
     "title": "Manga Server"
   },
   "aria": {
@@ -393,7 +393,7 @@
     "signOutFailed": "No se pudo cerrar la sesión. Inténtalo de nuevo."
   },
   "meta": {
-    "description": "Descargador de manga autoalojado con plugins de fuentes WASM y exportaciones locales.",
+    "description": "Biblioteca de manga autoalojada con Comix y Rawkuma.",
     "title": "Descargador de manga"
   },
   "nav": {
@@ -436,11 +436,11 @@
         "description": "Sirve páginas mediante proxy y caché para mostrarlas sin modificar los archivos descargados.",
         "title": "Flujo de imágenes para lectura"
       },
-      "sourcePlugins": {
-        "description": "Carga plugins de scraping separados del servidor para que las fuentes puedan cambiar sin reescribir la interfaz.",
-        "title": "Plugins de fuentes"
-      },
-      "title": "Capacidades"
+      "title": "Capacidades",
+      "sources": {
+        "title": "Fuentes integradas",
+        "description": "Explora Comix y Rawkuma desde la misma biblioteca."
+      }
     },
     "deployment": {
       "description": "Detalles de repositorio desde metadatos de build del backend y el entorno de despliegue.",
@@ -470,7 +470,7 @@
       "title": "Comprobaciones de salud",
       "unavailable": "El health check del backend no está disponible"
     },
-    "heroDescription": "Esta es la página de comprobación de la instancia. Muestra los builds de la interfaz web y el servidor Rust que se están ejecutando, los health checks reportados por el backend y los metadatos de repositorio disponibles en el despliegue. Es útil cuando un lector, plugin de fuente o archivo descargado se comporta de forma inesperada y necesitas saber qué código está en la máquina.",
+    "heroDescription": "Consulta la versión de la aplicación, el estado del servidor y los detalles del despliegue.",
     "heroTitle": "Descargador de manga autoalojado.",
     "links": {
       "description": "Referencias del proyecto configuradas para este build.",
@@ -541,18 +541,6 @@
     "autoDownloadCategoryHint": "Limita las descargas automáticas globales a una categoría de biblioteca. Déjalo vacío para descargar desde cualquier categoría.",
     "autoDownloadNewChapters": "Descargar capítulos nuevos automáticamente",
     "autoDownloadNewChaptersHint": "Descarga capítulos automáticamente cuando se encuentren.",
-    "avif": {
-      "currentWorkers": "Actual: {{count}} worker(s)",
-      "description": "Configura la conversión AVIF global para descargas y recodificación.",
-      "parallelConversions": "Conversiones paralelas",
-      "parallelConversionsHint": "Número máximo de páginas convertidas a AVIF al mismo tiempo entre trabajos activos.",
-      "upscale": "Recodificar manga descargado",
-      "upscaleDescription": "Pone en cola una pasada sobre archivos descargados y reescribe imágenes a AVIF usando la calidad configurada de cada fuente.",
-      "upscaleExisting": "Recodificar descargas existentes",
-      "upscaleResult": "{{images}} imágenes recodificadas en {{archives}} archivos",
-      "reencoding": "Recodificando...",
-      "title": "Ajustes AVIF"
-    },
     "backendApi": "API backend",
     "backendApiDescription": "Protege solicitudes directas a la API backend con un token bearer",
     "cache": {
@@ -570,33 +558,7 @@
       "pathHint": "Reinicia el backend después de guardar para aplicar cambios de ruta de caché.",
       "title": "Caché de respuestas"
     },
-    "archiveIndex": {
-      "archives": "Archivos",
-      "blobBytes": "Bytes del blob",
-      "cleanupResult": "Se eliminaron {{count}} fila(s) obsoleta(s) del índice",
-      "cleanupStale": "Limpiar obsoletos",
-      "cleaning": "Limpiando...",
-      "clear": "Borrar índice",
-      "clearResult": "Se borraron {{count}} fila(s) del índice",
-      "clearing": "Borrando...",
-      "description": "Índices persistentes de entradas de página para capítulos .tar.zst descargados.",
-      "pages": "Páginas",
-      "rebuild": "Reconstruir",
-      "rebuilding": "Reconstruyendo...",
-      "staleRows": "Filas obsoletas",
-      "title": "Índice de archivos descargados"
-    },
     "description": "Configura tu descargador de manga",
-    "discord": {
-      "botToken": "Token del bot",
-      "botTokenHint": "Se guarda como ajuste de la aplicación. Reinicia el backend después de guardar para reconectar el bot gateway.",
-      "botTokenPlaceholder": "Introduce el token del bot",
-      "channelId": "ID del canal de notificaciones",
-      "channelIdHint": "Opcional. Las notificaciones de capítulos nuevos se publican en este canal cuando el bot de Discord está ejecutándose.",
-      "description": "Configura el bot gateway y las notificaciones de actualización de biblioteca",
-      "notice": "Los comandos slash funcionarán después de reiniciar. Añade un ID de canal para activar notificaciones de actualización de biblioteca.",
-      "title": "Discord"
-    },
     "downloadConcurrency": {
       "concurrentChapters": "Capítulos simultáneos",
       "concurrentChaptersHint": "Número máximo de trabajos de descarga de capítulos activos a la vez. Reinicia el backend después de guardar para redimensionar el grupo de workers.",
@@ -666,12 +628,12 @@
     "capabilities": "Capacidades",
     "deletePlugin": "Eliminar plugin",
     "deleting": "Eliminando...",
-    "description": "Explora fuentes activadas y administra plugins instalados desde una sola superficie.",
+    "description": "Explora tus fuentes y elige cuáles están activadas.",
     "enabled": "Activado",
     "enabledSources": "Fuentes activadas",
     "homepage": "Página principal:",
     "hideNsfw": "Ocultar títulos NSFW",
-    "hideNsfwDescription": "Filtra esta fuente en el límite BFF y en páginas de búsqueda.",
+    "hideNsfwDescription": "Ocultar títulos para adultos en las búsquedas.",
     "info": "Info",
     "installed": "Instalado {{date}}",
     "installedPlugins": "Plugins instalados",
@@ -683,9 +645,9 @@
     "noArtifactHistory": "No hay historial de artefactos registrado.",
     "noCapabilities": "Sin capacidades",
     "noEnabledSources": "No hay fuentes activadas",
-    "noEnabledSourcesDescription": "Activa un plugin instalado para explorar un catálogo de fuente.",
+    "noEnabledSourcesDescription": "Activa una fuente para explorar su catálogo.",
     "noSources": "No se detectaron fuentes",
-    "noSourcesDescription": "Sube un plugin .wasm compilado para empezar.",
+    "noSourcesDescription": "El servidor no ha devuelto ninguna fuente. Comprueba su conexión y configuración.",
     "noneReported": "ninguna reportada",
     "plugin": "Plugin",
     "pluginApi": "API del plugin",
@@ -727,7 +689,11 @@
     "status": "Estado",
     "title": "Fuentes",
     "upload": "Subir",
-    "uploading": "Subiendo..."
+    "uploading": "Subiendo...",
+    "manage": "Gestionar fuentes",
+    "available": "Fuentes disponibles",
+    "manageDescription": "Desactiva una fuente para ocultarla al explorar. Los capítulos descargados seguirán disponibles.",
+    "enable": "Activar {{source}}"
   },
   "errors": {
     "application": "Error de aplicación",

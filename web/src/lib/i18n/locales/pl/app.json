@@ -19,7 +19,7 @@
     "signOut": "Wyloguj się"
   },
   "appLogo": {
-    "subtitle": "Wtyczki WASM",
+    "subtitle": "Twoja biblioteka mangi",
     "title": "Serwer Mangi"
   },
   "aria": {
@@ -393,7 +393,7 @@
     "signOutFailed": "Nie udało się wylogować. Spróbuj ponownie."
   },
   "meta": {
-    "description": "Samodzielny program do pobierania mangi z wtyczkami źródłowymi WASM i lokalnym eksportem.",
+    "description": "Samodzielnie hostowana biblioteka mangi ze źródłami Comix i Rawkuma.",
     "title": "Narzędzie do pobierania mangi"
   },
   "nav": {
@@ -436,11 +436,11 @@
         "description": "Strony proxy i pamięci podręcznej do wyświetlania, pozostawiając pobrane artefakty archiwalne nienaruszone.",
         "title": "Przepływ obrazu dostosowany do czytelnika"
       },
-      "sourcePlugins": {
-        "description": "Ładuj wtyczki skrobaka oddzielnie od serwera, aby zachowanie źródła mogło się zmienić bez konieczności przepisywania interfejsu użytkownika.",
-        "title": "Wtyczki źródłowe"
-      },
-      "title": "Możliwości"
+      "title": "Możliwości",
+      "sources": {
+        "title": "Wbudowane źródła",
+        "description": "Przeglądaj Comix i Rawkuma w tej samej bibliotece."
+      }
     },
     "deployment": {
       "description": "Szczegóły repozytorium z metadanych kompilacji zaplecza i środowiska wdrażania.",
@@ -470,7 +470,7 @@
       "title": "Kontrole stanu zdrowia",
       "unavailable": "Kontrola stanu zaplecza jest niedostępna"
     },
-    "heroDescription": "To jest strona sprawdzania instancji. Pokazuje interfejs sieciowy i kompilacje serwerów Rust, które faktycznie działają, kontrole stanu raportowane przez backend oraz metadane repozytorium dostępne w czasie wdrażania. Przydatne, gdy czytnik, wtyczka źródłowa lub pobrane archiwum zachowują się inaczej niż oczekiwano i trzeba wiedzieć, jaki kod znajduje się na pudełku.",
+    "heroDescription": "Sprawdź wersję aplikacji, stan serwera i szczegóły wdrożenia.",
     "heroTitle": "Samodzielny program do pobierania mangi.",
     "links": {
       "description": "Referencje projektu skonfigurowane dla tej kompilacji.",
@@ -541,18 +541,6 @@
     "autoDownloadCategoryHint": "Ogranicz globalne automatyczne pobieranie do jednej kategorii biblioteki. Pozostaw puste, aby pobrać z każdej kategorii.",
     "autoDownloadNewChapters": "Automatyczne pobieranie nowych rozdziałów",
     "autoDownloadNewChaptersHint": "Automatycznie pobieraj rozdziały, gdy zostaną znalezione.",
-    "avif": {
-      "currentWorkers": "Obecnie: {{count}} pracowników",
-      "description": "Skonfiguruj globalne zachowanie konwersji AVIF dla pobierania i ponownego kodowania.",
-      "parallelConversions": "Konwersje równoległe",
-      "parallelConversionsHint": "Maksymalna liczba stron konwertowanych do formatu AVIF w tym samym czasie podczas aktywnej pracy.",
-      "upscale": "Zakoduj ponownie pobraną mangę",
-      "upscaleDescription": "Kolejkuje przepuszczanie pobranych archiwów i przepisuje obrazy do formatu AVIF, korzystając z jakości skonfigurowanej dla każdego źródła.",
-      "upscaleExisting": "Zakoduj ponownie istniejące pliki do pobrania",
-      "upscaleResult": "Ponownie zakodowane obrazy ({{images}}) w archiwach {{archives}}",
-      "reencoding": "Ponowne kodowanie...",
-      "title": "Ustawienia AVIF"
-    },
     "backendApi": "Interfejs API zaplecza",
     "backendApiDescription": "Chroń bezpośrednie żądania API zaplecza za pomocą tokena okaziciela",
     "cache": {
@@ -570,33 +558,7 @@
       "pathHint": "Uruchom ponownie backend po zapisaniu, aby zastosować zmiany ścieżki pamięci podręcznej.",
       "title": "Pamięć podręczna odpowiedzi"
     },
-    "archiveIndex": {
-      "archives": "Archiwa",
-      "blobBytes": "Bajty bloba",
-      "cleanupResult": "Usunięto {{count}} nieaktualnych wierszy indeksu",
-      "cleanupStale": "Wyczyść nieaktualne",
-      "cleaning": "Czyszczenie...",
-      "clear": "Wyczyść indeks",
-      "clearResult": "Wyczyszczono {{count}} wierszy indeksu",
-      "clearing": "Czyszczenie...",
-      "description": "Trwałe indeksy wpisów stron dla pobranych rozdziałów .tar.zst.",
-      "pages": "Strony",
-      "rebuild": "Przebuduj",
-      "rebuilding": "Przebudowa...",
-      "staleRows": "Nieaktualne wiersze",
-      "title": "Indeks pobranych archiwów"
-    },
     "description": "Skonfiguruj swój program do pobierania mangi",
-    "discord": {
-      "botToken": "Token bota",
-      "botTokenHint": "Przechowywane jako ustawienie aplikacji. Po zapisaniu uruchom ponownie backend, aby ponownie połączyć się z botem bramy.",
-      "botTokenPlaceholder": "Wpisz token bota",
-      "channelId": "Identyfikator kanału powiadomień",
-      "channelIdHint": "Fakultatywny. Powiadomienia o nowych rozdziałach są publikowane na tym kanale, gdy bot Discord jest uruchomiony.",
-      "description": "Skonfiguruj powiadomienia o aktualizacji bota bramy i biblioteki",
-      "notice": "Polecenia z ukośnikiem zostaną uruchomione po ponownym uruchomieniu. Dodaj identyfikator kanału, aby włączyć powiadomienia o aktualizacjach biblioteki.",
-      "title": "Niezgoda"
-    },
     "discovery": {
       "categories": "Kategorie biblioteczne",
       "categoriesHint": "Oddzielone przecinkami. Używane podczas dodawania mangi do biblioteki.",
@@ -658,12 +620,12 @@
     "capabilities": "Możliwości",
     "deletePlugin": "Usuń wtyczkę",
     "deleting": "Usuwanie...",
-    "description": "Przeglądaj włączone źródła i zarządzaj zainstalowanymi wtyczkami z jednego poziomu.",
+    "description": "Przeglądaj źródła i wybierz, które mają być włączone.",
     "enabled": "Włączony",
     "enabledSources": "Włączone źródła",
     "homepage": "Strona główna:",
     "hideNsfw": "Ukryj tytuły NSFW",
-    "hideNsfwDescription": "Filtruj to źródło na granicy BFF i na stronach wyszukiwania.",
+    "hideNsfwDescription": "Ukryj tytuły dla dorosłych w wynikach wyszukiwania.",
     "info": "Informacje",
     "installed": "Zainstalowano {{data}}",
     "installedPlugins": "Zainstalowane wtyczki",
@@ -675,9 +637,9 @@
     "noArtifactHistory": "Nie zarejestrowano historii artefaktów.",
     "noCapabilities": "Brak możliwości",
     "noEnabledSources": "Brak włączonych źródeł",
-    "noEnabledSourcesDescription": "Włącz zainstalowaną wtyczkę, aby przeglądać katalog źródłowy.",
+    "noEnabledSourcesDescription": "Włącz źródło, aby przeglądać jego katalog.",
     "noSources": "Nie wykryto żadnych źródeł",
-    "noSourcesDescription": "Aby rozpocząć, prześlij skompilowaną wtyczkę .wasm.",
+    "noSourcesDescription": "Serwer nie zgłosił żadnych źródeł. Sprawdź połączenie i konfigurację.",
     "noneReported": "żaden nie zgłosił się",
     "plugin": "Wtyczka",
     "pluginApi": "API wtyczki",
@@ -719,7 +681,11 @@
     "status": "Status",
     "title": "Źródła",
     "upload": "Wgrywać",
-    "uploading": "Przesyłanie..."
+    "uploading": "Przesyłanie...",
+    "manage": "Zarządzaj źródłami",
+    "available": "Dostępne źródła",
+    "manageDescription": "Wyłącz źródło, aby ukryć je podczas przeglądania. Pobrane rozdziały pozostaną dostępne.",
+    "enable": "Włącz {{source}}"
   },
   "errors": {
     "application": "Błąd aplikacji",

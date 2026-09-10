@@ -54,12 +54,12 @@
 </script>
 
 <svelte:head><title>{$t("app.sources.title")} | {$t("app.appLogo.title")}</title></svelte:head>
-<PageHeader title={$t("app.sources.title")} description="Browse your sources and choose which ones are enabled." />
+<PageHeader title={$t("app.sources.title")} description={$t("app.sources.description")} />
 {#if error}
   <Alert variant="destructive"><AlertTitle>{$t("app.sources.requestFailed")}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
 {/if}
 <Tabs value="catalog" class="space-y-4">
-  <TabsList><TabsTrigger value="catalog">{$t("app.sources.catalog")}</TabsTrigger><TabsTrigger value="manage">Manage sources</TabsTrigger></TabsList>
+  <TabsList><TabsTrigger value="catalog">{$t("app.sources.catalog")}</TabsTrigger><TabsTrigger value="manage">{$t("app.sources.manage")}</TabsTrigger></TabsList>
   <TabsContent value="catalog">
     <Card class="overflow-visible gap-0">
       <CardHeader><CardTitle>{$t("app.sources.enabledSources")}</CardTitle><CardDescription>{$t("app.sources.catalogCount", { count: activeSources.length, suffix: activeSources.length === 1 ? "" : "s" })}</CardDescription></CardHeader>
@@ -71,10 +71,10 @@
     </Card>
   </TabsContent>
   <TabsContent value="manage">
-    <Card><CardHeader><CardTitle>Available sources</CardTitle><CardDescription>Disable a source to hide it from browsing. Your downloaded chapters stay available.</CardDescription></CardHeader>
+    <Card><CardHeader><CardTitle>{$t("app.sources.available")}</CardTitle><CardDescription>{$t("app.sources.manageDescription")}</CardDescription></CardHeader>
       <CardContent class="divide-y divide-border">
         {#each sources as source (source.name)}
-          <div class="flex items-center justify-between gap-4 py-4"><SourceSummaryCell {source} /><Switch aria-label={`Enable ${source.display_name}`} checked={source.enabled} disabled={Boolean(toggling[source.name])} onCheckedChange={(enabled) => setSourceEnabled(source, enabled)} /></div>
+          <div class="flex items-center justify-between gap-4 py-4"><SourceSummaryCell {source} /><Switch aria-label={$t("app.sources.enable", { source: source.display_name })} checked={source.enabled} disabled={Boolean(toggling[source.name])} onCheckedChange={(enabled) => setSourceEnabled(source, enabled)} /></div>
         {/each}
       </CardContent>
     </Card>
