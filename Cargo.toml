@@ -9,6 +9,7 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
+libbbf = { package = "libbbf-rs", git = "https://github.com/Tricked-dev/libbbf-rs", rev = "9ed7f0be50053a8fce5f098dcec52b365209439b" }
 scraper = "0.24"
 async-trait = "0.1.89"
 anyhow = { version = "1.0.102" }
@@ -88,3 +89,7 @@ uuid = { version = "1.23.3", default-features = false, features = ["serde", "v4"
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 zstd = { version = "0.13.3", default-features = false, features = ["zstdmt"] }
 mimalloc = "0.1.48"
+
+# For local BBF development, uncomment after updating the sibling checkout.
+# [patch."https://github.com/Tricked-dev/libbbf-rs"]
+# libbbf-rs = { path = "../libbbf-rs" }
