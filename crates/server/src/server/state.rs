@@ -1,9 +1,5 @@
-use crate::{
-    app::chapter_pages::DownloadedPageTransformCache, archive_index::ArchiveIndexService,
-    downloader,
-};
+use crate::downloader;
 use backend_cache::MangaCache;
-use backend_page_extraction::DownloadedPageExtractionScheduler;
 use backend_sources::SourceRegistry;
 use backend_telemetry::Telemetry;
 use secrecy::SecretString;
@@ -37,9 +33,6 @@ pub(crate) struct AppState {
     pub(crate) source_registry: RwLock<SourceRegistry>,
     pub(crate) cache: MangaCache,
     pub(crate) upscaler: backend_upscale::Upscaler,
-    pub(crate) archive_index: Arc<ArchiveIndexService>,
-    pub(crate) extraction_scheduler: Arc<DownloadedPageExtractionScheduler>,
-    pub(crate) downloaded_page_transform_cache: DownloadedPageTransformCache,
     pub(crate) telemetry: Telemetry,
     pub(crate) download_queue_notify: Notify,
     pub(crate) active_download_cancellations:
@@ -73,9 +66,6 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         source_registry: RwLock::new(source_registry),
         cache,
         upscaler,
-        archive_index: Arc::new(ArchiveIndexService::new()),
-        extraction_scheduler: Arc::new(DownloadedPageExtractionScheduler::default()),
-        downloaded_page_transform_cache: DownloadedPageTransformCache::default(),
         telemetry,
         download_queue_notify: Notify::new(),
         active_download_cancellations: Mutex::new(HashMap::new()),

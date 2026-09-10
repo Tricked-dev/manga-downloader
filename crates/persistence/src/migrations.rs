@@ -46,5 +46,9 @@ pub(crate) const MIGRATIONS: &[DatabaseMigration] = &[
         "background_jobs",
         include_str!("../migrations/0009_background_jobs.sql"),
     ),
-    DatabaseMigration::new(10, "native_sources", include_str!("../migrations/0010_native_sources.sql")),
+    DatabaseMigration::new(
+        10,
+        "native_sources",
+        include_str!("../migrations/0010_native_sources.sql"),
+    ),
 ];

@@ -52,39 +52,7 @@ const MEDIA_PROXY_STAGE_DURATION_SECONDS: &str = "manga_server_media_proxy_stage
 const SEARCH_CACHE_WARM_RUNS: &str = "manga_server_search_cache_warm_runs_total";
 const SEARCH_CACHE_WARM_DURATION_SECONDS: &str = "manga_server_search_cache_warm_duration_seconds";
 const SEARCH_CACHE_WARM_QUERIES: &str = "manga_server_search_cache_warm_queries_total";
-const ARCHIVE_INDEX_REQUESTS: &str = "manga_server_archive_index_requests_total";
-const ARCHIVE_INDEX_BUILDS: &str = "manga_server_archive_index_builds_total";
-const ARCHIVE_INDEX_BUILD_DURATION_SECONDS: &str =
-    "manga_server_archive_index_build_duration_seconds";
-const ARCHIVE_INDEX_ENTRIES: &str = "manga_server_archive_index_entries";
-const ARCHIVE_INDEX_PAGES: &str = "manga_server_archive_index_pages";
-const ARCHIVE_INDEX_BLOB_BYTES: &str = "manga_server_archive_index_blob_bytes";
-const ARCHIVE_INDEX_CLEANUP_ROWS: &str = "manga_server_archive_index_cleanup_rows_total";
 const DOWNLOADED_PAGE_REQUESTS: &str = "manga_server_downloaded_page_requests_total";
-const DOWNLOADED_PAGE_EXTRACT_DURATION_SECONDS: &str =
-    "manga_server_downloaded_page_extract_duration_seconds";
-const DOWNLOADED_PAGE_EXTRACT_PAGES: &str = "manga_server_downloaded_page_extract_pages_total";
-const DOWNLOADED_PAGE_EXTRACT_WINDOW_PAGES: &str =
-    "manga_server_downloaded_page_extract_window_pages";
-const DOWNLOADED_PAGE_EXTRACT_QUEUE_DEPTH: &str =
-    "manga_server_downloaded_page_extraction_scheduler_queue_depth";
-const DOWNLOADED_PAGE_EXTRACT_QUEUE_WAIT_SECONDS: &str =
-    "manga_server_downloaded_page_extraction_scheduler_queue_wait_seconds";
-const DOWNLOADED_PAGE_EXTRACT_BATCH_REQUESTS: &str =
-    "manga_server_downloaded_page_extraction_scheduler_batch_requests";
-const DOWNLOADED_PAGE_EXTRACT_BATCH_ARCHIVES: &str =
-    "manga_server_downloaded_page_extraction_scheduler_batch_archives";
-const DOWNLOADED_PAGE_EXTRACT_GROUP_REQUESTS: &str =
-    "manga_server_downloaded_page_extraction_scheduler_group_requests";
-const DOWNLOADED_PAGE_EXTRACT_GROUP_PAGES: &str =
-    "manga_server_downloaded_page_extraction_scheduler_group_pages";
-const DOWNLOADED_PAGE_EXTRACT_WORKER_DURATION_SECONDS: &str =
-    "manga_server_downloaded_page_extraction_scheduler_worker_duration_seconds";
-const DOWNLOADED_PAGE_RESPONSE_BUILD_DURATION_SECONDS: &str =
-    "manga_server_downloaded_page_response_build_duration_seconds";
-const DOWNLOADED_PAGE_EXTRACT_BACKPRESSURE: &str =
-    "manga_server_downloaded_page_extraction_scheduler_backpressure_total";
-
 pub mod trace {
     use super::{Duration, fmt};
     use opentelemetry::trace::TraceContextExt as _;
@@ -562,84 +530,8 @@ impl Metrics {
             "Search cache warm queries by source and outcome."
         );
         describe_counter!(
-            ARCHIVE_INDEX_REQUESTS,
-            "Downloaded archive index lookups by result."
-        );
-        describe_counter!(
-            ARCHIVE_INDEX_BUILDS,
-            "Downloaded archive index build attempts by trigger and outcome."
-        );
-        describe_histogram!(
-            ARCHIVE_INDEX_BUILD_DURATION_SECONDS,
-            "Downloaded archive index build duration in seconds."
-        );
-        describe_gauge!(
-            ARCHIVE_INDEX_ENTRIES,
-            "Downloaded archive index rows currently persisted."
-        );
-        describe_gauge!(
-            ARCHIVE_INDEX_PAGES,
-            "Downloaded archive pages currently represented in persisted indexes."
-        );
-        describe_gauge!(
-            ARCHIVE_INDEX_BLOB_BYTES,
-            "Downloaded archive index postcard blob bytes currently persisted."
-        );
-        describe_counter!(
-            ARCHIVE_INDEX_CLEANUP_ROWS,
-            "Downloaded archive index rows removed by cleanup reason."
-        );
-        describe_counter!(
             DOWNLOADED_PAGE_REQUESTS,
             "Downloaded reader page requests by page-index bucket and outcome."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_DURATION_SECONDS,
-            "Downloaded archive page extraction duration in seconds by mode and outcome."
-        );
-        describe_counter!(
-            DOWNLOADED_PAGE_EXTRACT_PAGES,
-            "Downloaded archive pages extracted by mode."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_WINDOW_PAGES,
-            "Downloaded archive extraction window size in pages by mode."
-        );
-        describe_gauge!(
-            DOWNLOADED_PAGE_EXTRACT_QUEUE_DEPTH,
-            "Downloaded page extraction scheduler queue depth."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_QUEUE_WAIT_SECONDS,
-            "Downloaded page extraction scheduler queue wait time in seconds."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_BATCH_REQUESTS,
-            "Downloaded page extraction scheduler coordinator batch size in requests."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_BATCH_ARCHIVES,
-            "Downloaded page extraction scheduler coordinator batch size in archive groups."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_GROUP_REQUESTS,
-            "Downloaded page extraction scheduler worker group size in requests."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_GROUP_PAGES,
-            "Downloaded page extraction scheduler worker group size in pages."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_EXTRACT_WORKER_DURATION_SECONDS,
-            "Downloaded page extraction scheduler worker runtime in seconds by outcome."
-        );
-        describe_histogram!(
-            DOWNLOADED_PAGE_RESPONSE_BUILD_DURATION_SECONDS,
-            "Downloaded page response assembly duration in seconds by mode."
-        );
-        describe_counter!(
-            DOWNLOADED_PAGE_EXTRACT_BACKPRESSURE,
-            "Downloaded page extraction scheduler backpressure events by reason."
         );
         Self { recorder: () }
     }
@@ -928,136 +820,11 @@ impl Metrics {
         .increment(1);
     }
 
-    /// Records an archive-index lookup result.
-    pub fn record_archive_index_request(&self, result: &str) {
-        counter!(ARCHIVE_INDEX_REQUESTS, self.labels([("result", result)])).increment(1);
-    }
-
-    /// Records an archive-index build attempt and duration.
-    pub fn record_archive_index_build(&self, trigger: &str, outcome: &str, duration: Duration) {
-        counter!(
-            ARCHIVE_INDEX_BUILDS,
-            self.labels([("trigger", trigger), ("outcome", outcome)])
-        )
-        .increment(1);
-        histogram!(
-            ARCHIVE_INDEX_BUILD_DURATION_SECONDS,
-            self.labels([("trigger", trigger)])
-        )
-        .record(duration);
-    }
-
-    /// Sets aggregate archive-index gauges.
-    pub fn set_archive_index_stats(&self, entries: usize, pages: usize, blob_bytes: usize) {
-        gauge!(ARCHIVE_INDEX_ENTRIES).set(usize_to_f64(entries));
-        gauge!(ARCHIVE_INDEX_PAGES).set(usize_to_f64(pages));
-        gauge!(ARCHIVE_INDEX_BLOB_BYTES).set(usize_to_f64(blob_bytes));
-    }
-
-    /// Records archive-index rows removed for a cleanup reason.
-    pub fn record_archive_index_cleanup_rows(&self, reason: &str, rows: usize) {
-        counter!(
-            ARCHIVE_INDEX_CLEANUP_ROWS,
-            self.labels([("reason", reason)])
-        )
-        .increment(u64::try_from(rows).unwrap_or(u64::MAX));
-    }
-
     /// Records a downloaded-reader page request outcome.
     pub fn record_downloaded_page_request(&self, page_bucket: &'static str, outcome: &str) {
         counter!(
             DOWNLOADED_PAGE_REQUESTS,
             self.labels([("page_bucket", page_bucket), ("outcome", outcome)])
-        )
-        .increment(1);
-    }
-
-    /// Records downloaded-page archive extraction timing and page count.
-    pub fn record_downloaded_page_extract(
-        &self,
-        mode: &'static str,
-        outcome: &str,
-        duration: Duration,
-        pages: usize,
-    ) {
-        histogram!(
-            DOWNLOADED_PAGE_EXTRACT_DURATION_SECONDS,
-            self.labels([("mode", mode), ("outcome", outcome)])
-        )
-        .record(duration);
-
-        if outcome == "success" {
-            counter!(DOWNLOADED_PAGE_EXTRACT_PAGES, self.labels([("mode", mode)]))
-                .increment(u64::try_from(pages).unwrap_or(u64::MAX));
-            histogram!(
-                DOWNLOADED_PAGE_EXTRACT_WINDOW_PAGES,
-                self.labels([("mode", mode)])
-            )
-            .record(usize_to_f64(pages));
-        }
-    }
-
-    /// Sets the downloaded-page extraction scheduler queue depth.
-    pub fn set_downloaded_page_extract_queue_depth(&self, depth: usize) {
-        gauge!(DOWNLOADED_PAGE_EXTRACT_QUEUE_DEPTH).set(usize_to_f64(depth));
-    }
-
-    /// Records queue wait time for a downloaded-page extraction request.
-    pub fn record_downloaded_page_extract_queue_wait(&self, outcome: &str, duration: Duration) {
-        histogram!(
-            DOWNLOADED_PAGE_EXTRACT_QUEUE_WAIT_SECONDS,
-            self.labels([("outcome", outcome)])
-        )
-        .record(duration);
-    }
-
-    /// Records coordinator batch sizes for downloaded-page extraction.
-    pub fn record_downloaded_page_extract_batch(&self, requests: usize, archives: usize) {
-        histogram!(DOWNLOADED_PAGE_EXTRACT_BATCH_REQUESTS).record(usize_to_f64(requests));
-        histogram!(DOWNLOADED_PAGE_EXTRACT_BATCH_ARCHIVES).record(usize_to_f64(archives));
-    }
-
-    /// Records worker group sizes for downloaded-page extraction.
-    pub fn record_downloaded_page_extract_group(&self, requests: usize, pages: usize) {
-        histogram!(DOWNLOADED_PAGE_EXTRACT_GROUP_REQUESTS).record(usize_to_f64(requests));
-        histogram!(DOWNLOADED_PAGE_EXTRACT_GROUP_PAGES).record(usize_to_f64(pages));
-    }
-
-    /// Records a downloaded-page extraction worker outcome and work size.
-    pub fn record_downloaded_page_extract_worker(
-        &self,
-        outcome: &str,
-        duration: Duration,
-        requests: usize,
-        pages: usize,
-    ) {
-        histogram!(
-            DOWNLOADED_PAGE_EXTRACT_WORKER_DURATION_SECONDS,
-            self.labels([("outcome", outcome)])
-        )
-        .record(duration);
-        self.record_downloaded_page_extract_group(requests, pages);
-    }
-
-    /// Records downloaded-page response assembly duration.
-    pub fn record_downloaded_page_response_build(
-        &self,
-        mode: &'static str,
-        duration: Duration,
-        _pages: usize,
-    ) {
-        histogram!(
-            DOWNLOADED_PAGE_RESPONSE_BUILD_DURATION_SECONDS,
-            self.labels([("mode", mode)])
-        )
-        .record(duration);
-    }
-
-    /// Records a scheduler backpressure event.
-    pub fn record_downloaded_page_extract_backpressure(&self, reason: &str) {
-        counter!(
-            DOWNLOADED_PAGE_EXTRACT_BACKPRESSURE,
-            self.labels([("reason", reason)])
         )
         .increment(1);
     }
@@ -1077,10 +844,5 @@ fn labels<const N: usize>(pairs: [(&'static str, &str); N]) -> Vec<Label> {
 
 #[allow(clippy::cast_precision_loss)]
 fn u64_to_f64(value: u64) -> f64 {
-    value as f64
-}
-
-#[allow(clippy::cast_precision_loss)]
-fn usize_to_f64(value: usize) -> f64 {
     value as f64
 }

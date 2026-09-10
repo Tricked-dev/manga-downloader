@@ -4,7 +4,6 @@ use backend_persistence::{Database, DownloadWorkStatus, DownloadWorkTransition};
 const FETCH_PHASE_END: f64 = 60.0;
 const FETCH_PROGRESS_PERSIST_STEP: f64 = 5.0;
 const CONVERSION_PHASE_END: f64 = 95.0;
-const CONVERSION_PROGRESS_PERSIST_STEP: f64 = 2.5;
 
 pub(crate) fn external_status_requires_cancellation(status: &str) -> bool {
     DownloadWorkStatus::external_label_requires_cancellation(status)
@@ -29,13 +28,6 @@ impl DownloadWorkPhase {
         Self {
             transition: DownloadWorkTransition::FetchingPages,
             progress: 0.0,
-        }
-    }
-
-    const fn transforming_assets_started() -> Self {
-        Self {
-            transition: DownloadWorkTransition::TransformingAssets,
-            progress: FETCH_PHASE_END,
         }
     }
 
@@ -90,11 +82,6 @@ impl<'a> DownloadWorkStateProgression<'a> {
         self.enter_phase(DownloadWorkPhase::fetching_pages()).await
     }
 
-    pub(crate) async fn transforming_assets_started(&self) -> Result<()> {
-        self.enter_phase(DownloadWorkPhase::transforming_assets_started())
-            .await
-    }
-
     pub(crate) async fn transforming_assets_completed(&self) -> Result<()> {
         self.enter_phase(DownloadWorkPhase::transforming_assets_completed())
             .await
@@ -116,13 +103,6 @@ impl<'a> DownloadWorkStateProgression<'a> {
     pub(crate) async fn failed(&self, error: &str) -> Result<()> {
         self.transition_to_phase(DownloadWorkPhase::failed(), Some(error))
             .await
-    }
-
-    pub(crate) fn conversion_progress(&self, total_pages: usize) -> DownloadConversionProgress<'a> {
-        DownloadConversionProgress {
-            progression: *self,
-            policy: ConversionProgressPolicy::new(total_pages),
-        }
     }
 
     pub(crate) fn fetch_progress(&self, total_pages: usize) -> DownloadFetchProgress<'a> {
@@ -167,25 +147,6 @@ impl DownloadFetchProgress<'_> {
     }
 }
 
-pub(crate) struct DownloadConversionProgress<'a> {
-    progression: DownloadWorkStateProgression<'a>,
-    policy: ConversionProgressPolicy,
-}
-
-impl DownloadConversionProgress<'_> {
-    pub(crate) async fn refresh(&mut self, converted_pages: usize) -> Result<()> {
-        let progress = self.policy.progress_percent(converted_pages);
-        if self.policy.should_persist(progress) {
-            self.progression
-                .db
-                .update_download_progress(self.progression.download_id, progress)
-                .await?;
-            self.policy.mark_persisted(progress);
-        }
-        Ok(())
-    }
-}
-
 struct FetchProgressPolicy {
     total_pages: usize,
     last_persisted_progress: f64,
@@ -220,41 +181,6 @@ impl FetchProgressPolicy {
     }
 }
 
-struct ConversionProgressPolicy {
-    total_pages: usize,
-    last_persisted_progress: f64,
-}
-
-impl ConversionProgressPolicy {
-    const fn new(total_pages: usize) -> Self {
-        Self {
-            total_pages,
-            last_persisted_progress: FETCH_PHASE_END,
-        }
-    }
-
-    fn progress_percent(&self, converted_pages: usize) -> f64 {
-        if self.total_pages == 0 {
-            return FETCH_PHASE_END;
-        }
-
-        let converted_pages = converted_pages.min(self.total_pages);
-        let converted_pages = f64::from(u32::try_from(converted_pages).unwrap_or(u32::MAX));
-        let total_pages = f64::from(u32::try_from(self.total_pages).unwrap_or(u32::MAX));
-        FETCH_PHASE_END
-            + ((converted_pages / total_pages) * (CONVERSION_PHASE_END - FETCH_PHASE_END))
-    }
-
-    fn should_persist(&self, progress: f64) -> bool {
-        progress >= CONVERSION_PHASE_END
-            || progress >= self.last_persisted_progress + CONVERSION_PROGRESS_PERSIST_STEP
-    }
-
-    fn mark_persisted(&mut self, progress: f64) {
-        self.last_persisted_progress = progress;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,13 +192,6 @@ mod tests {
             DownloadWorkPhase {
                 transition: DownloadWorkTransition::FetchingPages,
                 progress: 0.0,
-            }
-        );
-        assert_eq!(
-            DownloadWorkPhase::transforming_assets_started(),
-            DownloadWorkPhase {
-                transition: DownloadWorkTransition::TransformingAssets,
-                progress: FETCH_PHASE_END,
             }
         );
         assert_eq!(
@@ -295,35 +214,6 @@ mod tests {
     fn terminal_download_work_phases_reset_progress() {
         assert_eq!(DownloadWorkPhase::cancelled().progress, 0.0);
         assert_eq!(DownloadWorkPhase::failed().progress, 0.0);
-    }
-
-    #[test]
-    fn conversion_progress_spans_fetch_to_conversion_completion() {
-        let policy = ConversionProgressPolicy::new(10);
-
-        assert_eq!(policy.progress_percent(0), FETCH_PHASE_END);
-        assert_eq!(policy.progress_percent(5), 77.5);
-        assert_eq!(policy.progress_percent(10), CONVERSION_PHASE_END);
-        assert_eq!(policy.progress_percent(12), CONVERSION_PHASE_END);
-    }
-
-    #[test]
-    fn conversion_progress_for_empty_page_set_stays_at_fetch_boundary() {
-        let policy = ConversionProgressPolicy::new(0);
-
-        assert_eq!(policy.progress_percent(4), FETCH_PHASE_END);
-    }
-
-    #[test]
-    fn conversion_progress_persists_by_step_or_completion() {
-        let mut policy = ConversionProgressPolicy::new(100);
-
-        assert!(!policy.should_persist(62.4));
-        assert!(policy.should_persist(62.5));
-        policy.mark_persisted(62.5);
-
-        assert!(!policy.should_persist(64.9));
-        assert!(policy.should_persist(CONVERSION_PHASE_END));
     }
 
     #[test]

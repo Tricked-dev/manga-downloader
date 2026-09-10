@@ -70,6 +70,7 @@ impl DownloadedArchivePathResolver {
 pub(crate) fn archive_path_for_download(download_path: &str, download: &DownloadRow) -> PathBuf {
     backend_core::download_archive_path(
         download_path,
+        &download.manga_source,
         &download.manga_title,
         download.chapter_number,
     )

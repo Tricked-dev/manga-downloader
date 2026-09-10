@@ -17,7 +17,6 @@ use tokio::time::Duration;
 
 const DEFAULT_UPDATE_INTERVAL: Duration = Duration::from_hours(1);
 const SECONDS_PER_HOUR: f64 = 3600.0;
-const DEFAULT_AVIF_QUALITY: u8 = 80;
 pub(crate) const DEFAULT_DOWNLOAD_CONCURRENT_CHAPTERS: usize = 2;
 pub(crate) const DEFAULT_DOWNLOAD_PAGE_FETCH_CONCURRENCY: usize = 2;
 const MAX_DOWNLOAD_CONCURRENCY: usize = 32;
@@ -190,35 +189,6 @@ impl SettingsInterface<'_> {
         Ok(AutoDownloadSettings { enabled, category })
     }
 
-    pub(crate) async fn source_avif_enabled(&self, source: &str) -> Result<bool> {
-        Ok(self
-            .db
-            .get_setting(&source_setting_key(source, "avif_enabled"))
-            .await?
-            .is_some_and(|value| value == "true"))
-    }
-
-    pub(crate) async fn source_avif_quality(&self, source: &str) -> Result<u8> {
-        let value = self
-            .db
-            .get_setting(&source_setting_key(source, "avif_quality"))
-            .await?;
-
-        Ok(value
-            .as_deref()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(DEFAULT_AVIF_QUALITY))
-    }
-
-    pub(crate) async fn avif_conversion_workers(&self) -> Result<usize> {
-        self.bounded_positive_usize(
-            SettingKey::AvifConversionWorkers,
-            backend_image::DEFAULT_AVIF_CONVERSION_WORKERS,
-            usize::MAX,
-        )
-        .await
-    }
-
     pub(crate) async fn download_concurrent_chapters(&self) -> Result<usize> {
         self.bounded_positive_usize(
             SettingKey::DownloadConcurrentChapters,
@@ -278,7 +248,6 @@ pub async fn update(
     interface(&state.db).set_many(settings).await?;
 
     crate::app::route_snapshot_invalidation::settings_changed(state);
-    state.downloaded_page_transform_cache.clear();
 
     if changes.download_path_changed() {
         crate::downloader::invalidate_download_storage_usage(state).await;
@@ -308,18 +277,6 @@ pub(crate) async fn auto_download(db: &Database) -> Result<AutoDownloadSettings>
     interface(db).auto_download().await
 }
 
-pub(crate) async fn source_avif_enabled(db: &Database, source: &str) -> Result<bool> {
-    interface(db).source_avif_enabled(source).await
-}
-
-pub(crate) async fn source_avif_quality(db: &Database, source: &str) -> Result<u8> {
-    interface(db).source_avif_quality(source).await
-}
-
-pub(crate) async fn avif_conversion_workers(db: &Database) -> Result<usize> {
-    interface(db).avif_conversion_workers().await
-}
-
 pub(crate) async fn download_concurrent_chapters(db: &Database) -> Result<usize> {
     interface(db).download_concurrent_chapters().await
 }
@@ -330,10 +287,6 @@ pub(crate) async fn download_page_fetch_concurrency(db: &Database) -> Result<usi
 
 pub(crate) async fn max_download_storage_bytes(db: &Database) -> Result<Option<u64>> {
     interface(db).max_download_storage_bytes().await
-}
-
-fn source_setting_key(source: &str, setting: &str) -> String {
-    format!("source.{source}.{setting}")
 }
 
 fn update_interval_from_hours(value: &str) -> Option<Duration> {
@@ -355,6 +308,14 @@ fn parse_storage_limit_bytes(value: &str) -> Result<Option<u64>> {
             "Invalid max_download_storage_bytes value: {normalized}. Use bytes or a KiB/MiB/GiB value."
         )
     })
+}
+
+/// A source can disable automatic upscaling while retaining the global default.
+pub(crate) async fn source_auto_upscale(db: &Database, source: &str) -> Result<bool> {
+    Ok(db
+        .get_setting(&format!("source.{source}.auto_upscale"))
+        .await?
+        .is_none_or(|value| value == "true"))
 }
 
 #[cfg(test)]

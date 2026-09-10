@@ -51,10 +51,6 @@ impl DownloadCancellation {
             self.notify.notified().await;
         }
     }
-
-    pub(super) fn atomic_flag(&self) -> &AtomicBool {
-        &self.flag
-    }
 }
 
 pub async fn request_download_cancel(state: &Arc<AppState>, id: &str) -> bool {

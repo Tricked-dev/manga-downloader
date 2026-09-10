@@ -266,31 +266,28 @@ pub async fn refresh_downloaded_comicinfo(
 
         rewrite_tasks.spawn(async move {
             let changed_archive_path = archive_path.clone();
-            tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-                let page_count = backend_image::count_zstd_folder_images(&archive_path)?;
-                let comicinfo_xml = backend_core::build_comicinfo_xml(
-                    &manga_title,
-                    &manga_description,
-                    &manga_author,
-                    &manga_genres,
-                    &backend_core::ComicInfoChapterMetadata {
-                        title: &chapter_title,
-                        number: chapter_number,
-                        count: comicinfo_count,
-                        date_uploaded: &date_uploaded,
-                        page_count,
-                        age_rating,
-                        source_url: None,
-                        language: Some(&language),
-                        credits: comicinfo_credits.as_borrowed(),
-                    },
-                );
+            let page_count = backend_storage::inspect(archive_path.clone())
+                .await?
+                .page_count;
+            let comicinfo_xml = backend_core::build_comicinfo_xml(
+                &manga_title,
+                &manga_description,
+                &manga_author,
+                &manga_genres,
+                &backend_core::ComicInfoChapterMetadata {
+                    title: &chapter_title,
+                    number: chapter_number,
+                    count: comicinfo_count,
+                    date_uploaded: &date_uploaded,
+                    page_count,
+                    age_rating,
+                    source_url: None,
+                    language: Some(&language),
+                    credits: comicinfo_credits.as_borrowed(),
+                },
+            );
 
-                backend_image::rewrite_zstd_folder_comicinfo_xml(&archive_path, &comicinfo_xml)?;
-                Ok(())
-            })
-            .await
-            .map_err(|error| anyhow::anyhow!("Failed to rewrite ComicInfo.xml: {error}"))??;
+            backend_storage::update_comicinfo(archive_path, comicinfo_xml).await?;
             Ok(DownloadedArchiveMetadataChanged {
                 download_id,
                 chapter_id,
@@ -343,7 +340,8 @@ async fn refresh_manga_metadata_strict(
 
     let source_manga = {
         let pm = source_registry.read().await;
-        pm.get_manga_details(&manga.source, &manga.source_id).await
+        pm.get_manga_details(&manga.source, &manga.source_id)
+            .await
             .map_err(AppError::internal)?
     };
 

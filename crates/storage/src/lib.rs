@@ -342,6 +342,19 @@ pub async fn publish(staged: PathBuf, destination: PathBuf) -> Result<()> {
     .context("BBF publication task failed")?
 }
 
+/// Keep a complete archive mapped and locked until its HTTP body is released.
+pub async fn read_archive(path: PathBuf) -> Result<Bytes> {
+    tokio::task::spawn_blocking(move || {
+        let mut mapped = map(&path)?;
+        let reader = mapped.mapped.reader();
+        validate_index(&reader.indexed()?)?;
+        mapped.range = 0..mapped.mapped.len();
+        Ok(Bytes::from_owner(mapped))
+    })
+    .await
+    .context("BBF archive read task failed")?
+}
+
 pub async fn inspect(path: PathBuf) -> Result<ChapterInfo> {
     tokio::task::spawn_blocking(move || {
         let mapped = map(&path)?;

@@ -118,8 +118,6 @@ pub struct LibraryUpdateResponse {
     pub new_chapters: usize,
 }
 
-
-
 #[derive(Serialize, ToSchema)]
 pub struct SetSourceEnabledResponse {
     pub ok: bool,
@@ -129,6 +127,7 @@ pub struct SetSourceEnabledResponse {
 
 #[derive(Serialize, ToSchema)]
 pub struct SourceSettingsResponse {
+    pub auto_upscale: bool,
     pub name: String,
     pub hide_nsfw: bool,
 }
@@ -148,47 +147,6 @@ impl OperationStatusResponse {
     pub const fn ok() -> Self {
         Self { ok: true }
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
-pub struct ArchiveIndexJobResponse {
-    pub running: bool,
-    pub trigger: String,
-    pub indexed_archives: usize,
-    pub skipped_archives: usize,
-    pub failed_archives: usize,
-    pub removed_rows: usize,
-    pub message: String,
-}
-
-impl Default for ArchiveIndexJobResponse {
-    fn default() -> Self {
-        Self {
-            running: false,
-            trigger: "idle".to_string(),
-            indexed_archives: 0,
-            skipped_archives: 0,
-            failed_archives: 0,
-            removed_rows: 0,
-            message: "Archive index idle".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
-pub struct ArchiveIndexStatusResponse {
-    pub indexed_archives: usize,
-    pub indexed_pages: usize,
-    pub index_blob_bytes: usize,
-    pub stale_rows: usize,
-    pub memory_entries: usize,
-    pub job: ArchiveIndexJobResponse,
-}
-
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
-pub struct ArchiveIndexCleanupResponse {
-    pub ok: bool,
-    pub removed_rows: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, ToSchema)]
@@ -249,12 +207,6 @@ impl RefreshLibraryMetadataResponse {
             files_rewritten,
         }
     }
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct ReencodeDownloadResponse {
-    pub ok: bool,
-    pub images_reencoded: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, ToSchema)]

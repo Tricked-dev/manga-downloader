@@ -581,33 +581,11 @@ name = "backend-image"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "backend-fs",
  "cc",
  "criterion",
- "fs4 1.1.0",
  "image",
- "mime_guess",
- "natord",
  "pkg-config",
- "quick-xml",
- "rayon",
- "serde",
- "tar",
  "tempfile",
- "zstd",
-]
-
-[[package]]
-name = "backend-page-extraction"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "backend-fs",
- "backend-image",
- "backend-telemetry",
- "rayon",
- "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -715,6 +693,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1981,16 +1960,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "filetime"
-version = "0.2.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
-dependencies = [
- "cfg-if",
- "libc",
-]
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2121,7 +2090,7 @@ dependencies = [
  "foyer-common",
  "foyer-memory",
  "foyer-tokio",
- "fs4 0.13.1",
+ "fs4",
  "futures-core",
  "futures-util",
  "hashbrown 0.16.1",
@@ -2156,16 +2125,6 @@ checksum = "8640e34b88f7652208ce9e88b1a37a2ae95227d84abec377ccd3c5cfeb141ed4"
 dependencies = [
  "rustix",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "fs4"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
-dependencies = [
- "rustix",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3379,10 +3338,10 @@ dependencies = [
  "backend-core",
  "backend-fs",
  "backend-image",
- "backend-page-extraction",
  "backend-persistence",
  "backend-runtime",
  "backend-sources",
+ "backend-storage",
  "backend-telemetry",
  "backend-tls",
  "backend-upscale",
@@ -3394,6 +3353,7 @@ dependencies = [
  "futures-util",
  "garde 0.23.0",
  "http",
+ "image",
  "jiff",
  "metrics",
  "mimalloc",
@@ -3675,12 +3635,6 @@ dependencies = [
  "quote",
  "syn 2.0.117",
 ]
-
-[[package]]
-name = "natord"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "308d96db8debc727c3fd9744aac51751243420e46edf401010908da7f8d5e57c"
 
 [[package]]
 name = "ndarray"
@@ -5644,16 +5598,6 @@ name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
-
-[[package]]
-name = "tar"
-version = "0.4.46"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
-dependencies = [
- "filetime",
- "libc",
-]
 
 [[package]]
 name = "tempfile"

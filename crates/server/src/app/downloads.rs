@@ -67,7 +67,7 @@ pub struct ClearFailedDownloadsResult {
 }
 
 pub struct DownloadArchive {
-    pub file: backend_fs::AsyncFile,
+    pub body: axum::body::Bytes,
     pub filename: String,
 }
 
@@ -415,7 +415,7 @@ pub async fn open_archive(db: &Database, id: &str) -> Result<DownloadArchive, Ap
     let archive = downloaded_archive_resolution::require_existing_completed_archive(db, id).await?;
 
     Ok(DownloadArchive {
-        file: backend_fs::open_async_file(&archive.archive_path).await?,
+        body: backend_storage::read_archive(archive.archive_path.clone()).await?,
         filename: backend_core::download_archive_filename(archive.download.chapter_number),
     })
 }

@@ -23,12 +23,8 @@ pub enum MediaProxyResult {
     },
 }
 
-#[derive(Clone, Copy)]
-pub enum MediaProxyFormat {
-    Avif,
-}
+pub use backend_image::OutputFormat as MediaProxyFormat;
 
-const MEDIA_PROXY_AVIF_QUALITY: u8 = 80;
 const MEDIA_PROXY_FETCH_TIMEOUT: Duration = Duration::from_secs(8);
 
 pub(crate) fn media_proxy_url(source: &str, spec: &str) -> String {
@@ -469,6 +465,8 @@ pub fn media_proxy_format_from_query(
     match format.map(str::trim).filter(|value| !value.is_empty()) {
         None => Ok(None),
         Some("avif") => Ok(Some(MediaProxyFormat::Avif)),
+        Some("webp") => Ok(Some(MediaProxyFormat::Webp)),
+        Some("jpeg" | "jpg") => Ok(Some(MediaProxyFormat::Jpeg)),
         Some(value) => Err(AppError::bad_request(anyhow::anyhow!(
             "Unsupported media image format `{value}`"
         ))),
@@ -481,19 +479,17 @@ fn media_cache_key(
     width: Option<u32>,
 ) -> String {
     match (format, width) {
-        (Some(MediaProxyFormat::Avif), Some(width)) => {
-            format!("format=avif:width={width}:{source_cache_key}")
-        }
-        (Some(MediaProxyFormat::Avif), None) => format!("format=avif:{source_cache_key}"),
-        (None, _) => source_cache_key.to_string(),
+        (None, None) => source_cache_key.to_string(),
+        _ => format!(
+            "format={}:width={}:v2:{source_cache_key}",
+            media_proxy_format_label(format.or(Some(MediaProxyFormat::Avif))),
+            width.map_or_else(|| "native".to_string(), |value| value.to_string())
+        ),
     }
 }
 
 fn media_proxy_format_label(format: Option<MediaProxyFormat>) -> &'static str {
-    match format {
-        Some(MediaProxyFormat::Avif) => "avif",
-        None => "original",
-    }
+    format.map_or("original", MediaProxyFormat::as_str)
 }
 
 #[autometrics]
@@ -511,92 +507,30 @@ async fn apply_proxy_format(
     if let Some(width) = width {
         span.record("width", width);
     }
-    match format {
-        Some(MediaProxyFormat::Avif) if width.is_some() || !is_avif_content_type(&content_type) => {
-            let conversion_started = Instant::now();
-            let conversion = tokio::task::spawn_blocking(move || {
-                backend_image::convert_to_avif_with_max_width_timed(
-                    &body,
-                    MEDIA_PROXY_AVIF_QUALITY,
-                    width.unwrap_or(backend_image::DEFAULT_AVIF_TARGET_WIDTH),
-                )
-            })
-            .await
-            .map_err(|error| {
-                AppError::from(anyhow::anyhow!("AVIF conversion task failed: {error}"))
-            })?;
-
-            let (avif_body, timings) = match conversion {
-                Ok(result) => result,
-                Err(error) => {
-                    trace::record_error(&span, &error);
-                    trace::record_duration(&span, conversion_started.elapsed());
-                    metrics.record_media_proxy_stage(
-                        source,
-                        format_label,
-                        "avif_convert",
-                        "error",
-                        conversion_started.elapsed(),
-                    );
-                    return Err(AppError::from(error));
-                }
-            };
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "decode",
-                "success",
-                timings.decode,
-            );
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "resize",
-                "success",
-                timings.resize,
-            );
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "colorspace",
-                "success",
-                timings.colorspace,
-            );
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "encode",
-                "success",
-                timings.encode,
-            );
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "avif_convert",
-                "success",
-                conversion_started.elapsed(),
-            );
-            trace::record_outcome(&span, "converted");
-            trace::record_duration(&span, conversion_started.elapsed());
-            Ok((avif_body, "image/avif".to_string()))
-        }
-        _ => {
-            trace::record_outcome(&span, "passthrough");
-            trace::record_duration(&span, Duration::ZERO);
-            metrics.record_media_proxy_stage(
-                source,
-                format_label,
-                "passthrough",
-                "success",
-                Duration::ZERO,
-            );
-            Ok((body, content_type))
-        }
+    if format.is_none() && width.is_none() {
+        trace::record_outcome(&span, "passthrough");
+        return Ok((body, content_type));
     }
-}
-
-fn is_avif_content_type(content_type: &str) -> bool {
-    backend_core::is_avif_content_type(content_type)
+    if width == Some(0) {
+        return Err(AppError::bad_request(anyhow::anyhow!(
+            "width must be greater than zero"
+        )));
+    }
+    let format = format.unwrap_or(MediaProxyFormat::Avif);
+    let started = Instant::now();
+    let result =
+        tokio::task::spawn_blocking(move || backend_image::transform(&body, format, width))
+            .await
+            .map_err(|error| anyhow::anyhow!("image conversion task failed: {error}"))?;
+    metrics.record_media_proxy_stage(
+        source,
+        format_label,
+        "convert",
+        if result.is_ok() { "success" } else { "error" },
+        started.elapsed(),
+    );
+    trace::record_duration(&span, started.elapsed());
+    Ok((result?, format.content_type().to_string()))
 }
 
 fn media_ref_from_query(url: Option<&str>, spec: Option<&str>) -> Result<MediaRefSpec, AppError> {

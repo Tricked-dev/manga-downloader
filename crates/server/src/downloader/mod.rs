@@ -7,8 +7,7 @@ use backend_sources::{
 };
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_graceful::{ShutdownGuard, WeakShutdownGuard};
 use uuid::Uuid;
@@ -43,8 +42,6 @@ use crate::{
     },
 };
 
-const CONVERSION_PROGRESS_REFRESH: Duration = Duration::from_secs(1);
-
 fn elapsed_ms(started_at: Instant) -> u64 {
     u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
@@ -52,8 +49,6 @@ fn elapsed_ms(started_at: Instant) -> u64 {
 struct CompletedDownload {
     source: String,
     total_pages: usize,
-    avif_enabled: bool,
-    avif_quality: u8,
     archive_path: PathBuf,
     archive_size_bytes: u64,
 }
@@ -71,11 +66,6 @@ impl DownloadPipeline {
             processing_slots: Arc::new(Semaphore::new(worker_count.max(1))),
         }
     }
-}
-
-async fn remove_if_exists(path: &std::path::Path) -> Result<()> {
-    let _ = backend_fs::remove_file_if_present(path).await?;
-    Ok(())
 }
 
 async fn stage_page_bytes(staging_dir: &Path, filename: &str, bytes: &[u8]) -> Result<PathBuf> {
@@ -103,7 +93,6 @@ async fn cleanup_download_staging_dir(path: &Path) {
 async fn fetch_series_cover_archive_entry(
     state: &Arc<AppState>,
     manga: &backend_persistence::MangaRow,
-    avif_quality: u8,
     cancel_flag: &DownloadCancellation,
 ) -> Result<Option<(String, Vec<u8>)>> {
     ensure_not_cancelled(cancel_flag)?;
@@ -133,17 +122,7 @@ async fn fetch_series_cover_archive_entry(
 
     ensure_not_cancelled(cancel_flag)?;
 
-    let conversion_task = tokio::task::spawn_blocking(move || {
-        backend_image::convert_to_avif(&cover_bytes, avif_quality)
-            .context("failed to convert series cover to AVIF")
-    });
-    let avif_bytes = tokio::select! {
-        () = cancel_flag.cancelled() => return Err(cancelled_error()),
-        result = conversion_task => result
-            .map_err(|e| anyhow::anyhow!("Cover conversion task failed: {e}"))??,
-    };
-
-    Ok(Some(("cover.avif".to_string(), avif_bytes)))
+    Ok(Some(("cover.image".to_string(), cover_bytes.to_vec())))
 }
 
 fn ensure_not_cancelled(flag: &DownloadCancellation) -> Result<()> {
@@ -299,8 +278,6 @@ async fn process_next_download(
                 manga_title = %download.manga_title,
                 chapter_title = %download.chapter_title,
                 total_pages = completed.total_pages,
-                avif_enabled = completed.avif_enabled,
-                avif_quality = completed.avif_quality,
                 archive_bytes = completed.archive_size_bytes,
                 archive_path = %completed.archive_path.display(),
                 duration_ms = elapsed_ms(started_at),
@@ -411,8 +388,6 @@ async fn download_chapter(
             "Chapter Pages Resolved",
         );
 
-        let avif_enabled = settings::source_avif_enabled(&state.db, &manga.source).await?;
-        let avif_quality = settings::source_avif_quality(&state.db, &manga.source).await?;
         let media_client = {
             let pm = state.source_registry.read().await;
             pm.media_client(&manga.source)?
@@ -422,7 +397,7 @@ async fn download_chapter(
 
         work_state.fetching_pages().await?;
 
-        let mut pages = fetch_chapter_pages(
+        let pages = fetch_chapter_pages(
             state,
             download,
             &page_refs,
@@ -444,68 +419,16 @@ async fn download_chapter(
                 .map_err(|error| anyhow::anyhow!("Download processing gate closed: {error}"))?,
         };
 
-        if avif_enabled {
-            ensure_not_cancelled(cancel_flag)?;
-            let worker_threads = settings::avif_conversion_workers(&state.db)
-                .await?
-                .min(backend_image::cpu_worker_budget());
-            let conversion_cancel_flag = Arc::clone(cancel_flag);
-            let converted_pages = Arc::new(AtomicUsize::new(0));
-            let conversion_progress = Arc::clone(&converted_pages);
-            work_state.transforming_assets_started().await?;
-            let conversion_started_at = Instant::now();
-            let mut conversion_task = tokio::task::spawn_blocking(move || {
-                backend_image::convert_staged_pages_to_avif_with_workers_cancelable_progress(
-                    pages,
-                    avif_quality,
-                    worker_threads,
-                    Some(conversion_cancel_flag.atomic_flag()),
-                    Some(conversion_progress.as_ref()),
-                )
-            });
-            let mut progress_refresh = tokio::time::interval(CONVERSION_PROGRESS_REFRESH);
-            progress_refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            let mut progress_persistence = work_state.conversion_progress(fetched_page_count);
-            let conversion_result = loop {
-                tokio::select! {
-                    () = cancel_flag.cancelled() => return Err(cancelled_error()),
-                    result = &mut conversion_task => {
-                        break result
-                            .map_err(|e| anyhow::anyhow!("AVIF conversion task failed: {e}"))?;
-                    }
-                    _ = progress_refresh.tick() => {
-                        progress_persistence
-                            .refresh(converted_pages.load(Ordering::Relaxed))
-                            .await?;
-                    }
-                }
-            };
-            pages = match conversion_result {
-                Ok(converted_pages) => converted_pages,
-                Err(_error) if cancel_flag.is_cancelled() => return Err(cancelled_error()),
-                Err(error) => return Err(error),
-            };
-            work_state.transforming_assets_completed().await?;
-            ensure_not_cancelled(cancel_flag)?;
-            tracing::trace!(
-                download_id = %download.id,
-                chapter_id = %download.chapter_id,
-                pages = fetched_page_count,
-                avif_quality,
-                worker_threads,
-                duration_ms = elapsed_ms(conversion_started_at),
-                "Chapter Pages Converted",
-            );
-        } else {
-            work_state.transforming_assets_completed().await?;
-        }
-
-        // Keep a single folder per series so archives, metadata, and cover art stay grouped.
-        let manga_dir = PathBuf::from(&download_path)
-            .join(backend_core::sanitize_filename(&download.manga_title));
-        let archive_filename = backend_core::download_archive_filename(chapter.chapter_number);
-        let archive_path = manga_dir.join(&archive_filename);
-        let staged_archive_path = staging_dir.join(archive_filename);
+        work_state.transforming_assets_completed().await?;
+        let archive_path = backend_core::download_archive_path(
+            &download_path,
+            &manga.source,
+            &download.manga_title,
+            chapter.chapter_number,
+        );
+        let staged_archive_path = staging_dir.join(backend_core::download_archive_filename(
+            chapter.chapter_number,
+        ));
 
         work_state.archiving().await?;
         let archive_started_at = Instant::now();
@@ -539,30 +462,26 @@ async fn download_chapter(
                 credits: comicinfo_credits.as_borrowed(),
             },
         );
-        let cover_entry =
-            fetch_series_cover_archive_entry(state, &manga, avif_quality, cancel_flag).await?;
-
-        let staged_archive_path_for_task = staged_archive_path.clone();
+        let cover_entry = fetch_series_cover_archive_entry(state, &manga, cancel_flag).await?;
+        let cover = if let Some((name, bytes)) = cover_entry {
+            Some(stage_page_bytes(&staging_dir, &name, &bytes).await?)
+        } else {
+            None
+        };
         let archive_cancel_flag = Arc::clone(cancel_flag);
-        let archive_workers = backend_image::archive_compression_worker_threads(
-            backend_image::cpu_worker_budget(),
-            fetched_page_count + usize::from(cover_entry.is_some()) + 1,
-        );
-        let archive_result = tokio::task::spawn_blocking(move || {
-            backend_image::build_zstd_folder_from_paths_cancelable_with_workers(
-                &pages,
-                &staged_archive_path_for_task,
-                Some(&comicinfo_xml),
-                cover_entry,
-                Some(archive_cancel_flag.atomic_flag()),
-                archive_workers,
-            )
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("archive build task failed: {e}"))?;
+        let archive_result = backend_storage::write_originals(
+            staged_archive_path.clone(),
+            backend_storage::OriginalChapter {
+                pages: pages.into_iter().map(|(_, path)| path).collect(),
+                comicinfo_xml,
+                cover,
+            },
+            move || archive_cancel_flag.is_cancelled(),
+        )
+        .await;
         match archive_result {
             Ok(()) => {}
-            Err(_error) if cancel_flag.is_cancelled() => return Err(cancelled_error()),
+            Err(_) if cancel_flag.is_cancelled() => return Err(cancelled_error()),
             Err(error) => return Err(error),
         }
         let archive_size = backend_fs::file_size(&staged_archive_path).await?;
@@ -597,11 +516,6 @@ async fn download_chapter(
             return Err(cancelled_error());
         }
 
-        // Older builds wrote sidecar metadata and a loose cover image in the series folder.
-        remove_if_exists(&manga_dir.join("ComicInfo.xml")).await?;
-        remove_if_exists(&manga_dir.join("cover.jpg")).await?;
-        remove_if_exists(&manga_dir.join("cover.avif")).await?;
-
         ensure_not_cancelled(cancel_flag)?;
 
         tracing::trace!(
@@ -610,7 +524,6 @@ async fn download_chapter(
             path = %archive_path.display(),
             pages = fetched_page_count,
             source_pages = total_pages,
-            avif_enabled,
             archive_bytes = archive_size,
             archive_duration_ms = elapsed_ms(archive_started_at),
             elapsed_ms = elapsed_ms(started_at),
@@ -620,8 +533,6 @@ async fn download_chapter(
         Ok(CompletedDownload {
             source: manga.source,
             total_pages: fetched_page_count,
-            avif_enabled,
-            avif_quality,
             archive_path,
             archive_size_bytes: archive_size,
         })

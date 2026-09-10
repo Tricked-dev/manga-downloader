@@ -1,5 +1,5 @@
 use axum::{Json, http::StatusCode, response::IntoResponse};
-use backend_sources::{SourceRegistryError, SourceError};
+use backend_sources::{SourceError, SourceRegistryError};
 use backend_telemetry::{record_request_error, trace};
 use serde::Serialize;
 

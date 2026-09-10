@@ -7,13 +7,13 @@ use backend_core::{
 
 #[test]
 fn download_archive_paths_are_sanitized_and_stable() {
-    let path = download_archive_path("/tmp/manga", "Series / Name", 12.0);
+    let path = download_archive_path("/tmp/manga", "comix", "Series / Name", 12.0);
 
     assert_eq!(
         path.to_string_lossy(),
-        "/tmp/manga/Series _ Name/12.tar.zst"
+        "/tmp/manga/comix/Series _ Name/12.bbf"
     );
-    assert_eq!(download_archive_filename(12.5), "12.5.tar.zst");
+    assert_eq!(download_archive_filename(12.5), "12.5.bbf");
 }
 
 #[test]

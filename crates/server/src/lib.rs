@@ -2,7 +2,6 @@
 
 mod api;
 mod app;
-mod archive_index;
 mod build_info;
 mod cli;
 mod comicinfo;

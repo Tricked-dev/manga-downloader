@@ -1,11 +1,18 @@
-use std::{sync::Arc, time::Instant};
+use crate::{
+    AppState,
+    api::{
+        dto::{SetSourceEnabledResponse, SourceSettingsResponse},
+        error::AppError,
+    },
+    app::route_snapshot_invalidation,
+};
 use anyhow::Context as _;
 use autometrics::autometrics;
 use backend_persistence::{Database, SourceRecordInput};
-use backend_sources::{SourceRegistry, SourceInfo};
+use backend_sources::{SourceInfo, SourceRegistry};
 use backend_telemetry::trace;
+use std::{sync::Arc, time::Instant};
 use tracing::Instrument as _;
-use crate::{AppState, api::{dto::{SetSourceEnabledResponse, SourceSettingsResponse}, error::AppError}, app::route_snapshot_invalidation};
 
 #[autometrics]
 #[tracing::instrument(name = "app.sources.plugin.set_enabled", skip_all, fields(source = %name, enabled, outcome = tracing::field::Empty))]
@@ -53,6 +60,7 @@ pub async fn update_source_settings(
     state: &Arc<AppState>,
     name: &str,
     hide_nsfw: Option<bool>,
+    auto_upscale: Option<bool>,
 ) -> Result<SourceSettingsResponse, AppError> {
     let span = tracing::Span::current();
     let plugins = state.source_registry.read().await;
@@ -69,6 +77,15 @@ pub async fn update_source_settings(
         trace::record_outcome(&db_span, "success");
         trace::record_duration(&db_span, db_started_at.elapsed());
     }
+    if let Some(enabled) = auto_upscale {
+        state
+            .db
+            .set_setting(
+                &format!("source.{name}.auto_upscale"),
+                if enabled { "true" } else { "false" },
+            )
+            .await?;
+    }
     source_settings_changed(state, name);
     state
         .telemetry
@@ -77,6 +94,7 @@ pub async fn update_source_settings(
     trace::record_outcome(&span, "success");
 
     Ok(SourceSettingsResponse {
+        auto_upscale: super::settings::source_auto_upscale(&state.db, name).await?,
         name: name.to_owned(),
         hide_nsfw: state.db.get_source_hide_nsfw(name).await?,
     })
@@ -116,12 +134,10 @@ pub(crate) fn source_record_input(source: &SourceInfo) -> SourceRecordInput {
 }
 
 fn source_enabled_changed(state: &AppState, source: &str, enabled: bool) {
-    state.downloaded_page_transform_cache.clear();
     route_snapshot_invalidation::source_enabled_changed(state, source, enabled);
 }
 
 fn source_settings_changed(state: &AppState, source: &str) {
-    state.downloaded_page_transform_cache.clear();
     route_snapshot_invalidation::source_settings_changed(state, source);
 }
 

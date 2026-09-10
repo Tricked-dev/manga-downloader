@@ -118,8 +118,6 @@ async fn report_download_state(state: &AppState) -> HealthCheckResponse {
     )
 }
 
-
-
 fn process_readiness_check(shutdown_drain: &ShutdownDrain) -> HealthCheckResponse {
     if shutdown_drain.is_draining() {
         return HealthCheckResponse::failed(

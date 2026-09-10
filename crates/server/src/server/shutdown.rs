@@ -115,9 +115,9 @@ fn spawn_server_tasks(
         }
     });
 
-    let archive_index_rebuild = shutdown.spawn_task_fn({
+    let upscale = shutdown.spawn_task_fn({
         let state = Arc::clone(state);
-        move |guard| async move { jobs::run_archive_index_rebuild_worker(state, guard).await }
+        move |guard| async move { jobs::run_upscale_worker(state, guard).await }
     });
 
     let tokio_runtime_metrics = shutdown.spawn_task_fn(|guard| async move {
@@ -156,7 +156,7 @@ fn spawn_server_tasks(
             scheduler,
             search_cache,
             database_cleanup,
-            archive_index_rebuild,
+            upscale,
             tokio_runtime_metrics,
         },
         server,
@@ -173,7 +173,7 @@ struct BackgroundTasks {
     scheduler: JoinHandle<anyhow::Result<()>>,
     search_cache: Option<JoinHandle<anyhow::Result<()>>>,
     database_cleanup: JoinHandle<anyhow::Result<()>>,
-    archive_index_rebuild: JoinHandle<anyhow::Result<()>>,
+    upscale: JoinHandle<anyhow::Result<()>>,
     tokio_runtime_metrics: JoinHandle<anyhow::Result<()>>,
 }
 
@@ -185,7 +185,7 @@ impl BackgroundTasks {
             await_task("search cache refresher", search_cache).await?;
         }
         await_task("database cleanup", self.database_cleanup).await?;
-        await_task("archive index rebuild worker", self.archive_index_rebuild).await?;
+        await_task("upscale worker", self.upscale).await?;
         await_task("tokio runtime metrics reporter", self.tokio_runtime_metrics).await?;
         Ok(())
     }

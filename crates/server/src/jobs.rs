@@ -12,86 +12,77 @@ use futures_util::{
 use serde::{Serialize, de::DeserializeOwned};
 use tokio_graceful::ShutdownGuard;
 
-use crate::{AppState, app::archive_index_maintenance};
+use crate::{AppState, app::upscaling};
 
-const ARCHIVE_INDEX_REBUILD_QUEUE: &str = "archive_index_rebuild";
-const ARCHIVE_INDEX_REBUILD_WORKER: &str = "archive-index-rebuild-worker";
+const UPSCALE_QUEUE: &str = "upscale";
+const UPSCALE_WORKER: &str = "upscale-worker";
 const DEFAULT_MAX_ATTEMPTS: i64 = 3;
 const JOB_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ArchiveIndexRebuildJob {
-    trigger: String,
+pub(crate) struct UpscaleJob {
+    download_id: String,
+    scale: u32,
 }
 
-impl ArchiveIndexRebuildJob {
-    fn new(trigger: &str) -> Self {
+impl UpscaleJob {
+    fn new(download_id: &str, scale: u32) -> Self {
         Self {
-            trigger: trigger.to_string(),
+            download_id: download_id.to_string(),
+            scale,
         }
     }
 }
 
-pub(crate) async fn enqueue_archive_index_rebuild(
+pub(crate) async fn enqueue_upscale(
     state: &Arc<AppState>,
-    trigger: &str,
+    download_id: &str,
+    scale: u32,
 ) -> anyhow::Result<String> {
-    let mut storage = ToastyJobStorage::<ArchiveIndexRebuildJob>::new(
-        state.db.clone(),
-        ARCHIVE_INDEX_REBUILD_QUEUE,
-    );
+    let mut storage = ToastyJobStorage::<UpscaleJob>::new(state.db.clone(), UPSCALE_QUEUE);
     storage
-        .push(ArchiveIndexRebuildJob::new(trigger))
+        .push(UpscaleJob::new(download_id, scale))
         .await
-        .map_err(|error| anyhow::anyhow!("failed to enqueue archive index rebuild: {error}"))?;
+        .map_err(|error| anyhow::anyhow!("failed to enqueue upscale: {error}"))?;
     Ok(storage.last_enqueued_id.unwrap_or_default())
 }
 
-pub(crate) async fn run_archive_index_rebuild_worker(
+pub(crate) async fn run_upscale_worker(
     state: Arc<AppState>,
     shutdown: ShutdownGuard,
 ) -> anyhow::Result<()> {
     let recovered = state
         .db
-        .recover_interrupted_background_jobs(ARCHIVE_INDEX_REBUILD_QUEUE)
+        .recover_interrupted_background_jobs(UPSCALE_QUEUE)
         .await?;
     if recovered > 0 {
         tracing::warn!(
             recovered,
-            queue = ARCHIVE_INDEX_REBUILD_QUEUE,
+            queue = UPSCALE_QUEUE,
             "Interrupted Background Jobs Recovered On Startup",
         );
     }
 
-    let storage = ToastyJobStorage::<ArchiveIndexRebuildJob>::new(
-        state.db.clone(),
-        ARCHIVE_INDEX_REBUILD_QUEUE,
-    );
+    let storage = ToastyJobStorage::<UpscaleJob>::new(state.db.clone(), UPSCALE_QUEUE);
     let ack = ToastyJobAck::new(state.db.clone());
-    let worker = WorkerBuilder::new(ARCHIVE_INDEX_REBUILD_WORKER)
+    let worker = WorkerBuilder::new(UPSCALE_WORKER)
         .backend(storage)
         .ack_with(ack)
-        .build(move |job: ArchiveIndexRebuildJob| {
+        .build(move |job: UpscaleJob| {
             let state = Arc::clone(&state);
-            async move { archive_index_maintenance::run_queued_rebuild(state, job.trigger).await }
+            async move { upscaling::run(state, &job.download_id, job.scale).await }
         });
 
     let shutdown = shutdown.clone_weak();
-    tracing::info!(
-        queue = ARCHIVE_INDEX_REBUILD_QUEUE,
-        "Archive Index Rebuild Worker Started",
-    );
+    tracing::info!(queue = UPSCALE_QUEUE, "Upscale Worker Started",);
     worker
         .run_until(async move {
             shutdown.cancelled().await;
             Ok::<(), apalis::prelude::WorkerError>(())
         })
         .await
-        .map_err(|error| anyhow::anyhow!("archive index rebuild worker failed: {error}"))?;
-    tracing::info!(
-        queue = ARCHIVE_INDEX_REBUILD_QUEUE,
-        "Archive Index Rebuild Worker Stopped",
-    );
+        .map_err(|error| anyhow::anyhow!("upscale worker failed: {error}"))?;
+    tracing::info!(queue = UPSCALE_QUEUE, "Upscale Worker Stopped",);
 
     Ok(())
 }

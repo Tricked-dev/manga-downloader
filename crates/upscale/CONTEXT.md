@@ -9,3 +9,5 @@ The **Model Cache** is keyed by graph path, follows manifest selection by source
 **Upscale Output** is lossless AVIF: libavif/libaom, full range, 4:4:4, identity RGB matrix, and lossless quantization. Pixel equality after decoding is the acceptance criterion. Encoding uses at most two CPU threads; model inference remains on the GPU.
 
 The diagnostic `upscale` example uses the same worker and saves ONNX execution profiles. Profiles and real GPU execution are required evidence beyond compilation and tests that reject CPU requests.
+
+Chapter jobs run through apalis with one consumer. Completion of original downloads enqueues a job when both `auto_upscale` and `source.<key>.auto_upscale` permit it (both default to true). `POST /v1/downloads/{id}/upscale` requests a rerun. The job stages one GPU output at a time and publishes all pages together with the original footer hash as a concurrency guard. Missing models finish the job without retries.

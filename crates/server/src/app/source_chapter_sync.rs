@@ -117,7 +117,9 @@ async fn source_chapter_inserts(
 ) -> Result<Vec<ChapterInsert>, AppError> {
     let source_chapters = {
         let plugins = source_registry.read().await;
-        plugins.get_chapter_list(&manga.source, &manga.source_id).await?
+        plugins
+            .get_chapter_list(&manga.source, &manga.source_id)
+            .await?
     };
 
     Ok(source_chapters

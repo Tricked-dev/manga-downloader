@@ -3,19 +3,9 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{
     AppState,
     api::error::AppError,
-    app::{downloaded_archive_derived_state, downloaded_archive_resolution, settings},
+    app::{downloaded_archive_resolution, route_snapshot_invalidation},
 };
 use autometrics::autometrics;
-use backend_persistence::DownloadRow;
-use rayon::{ThreadPoolBuilder, prelude::*};
-
-#[derive(Clone)]
-struct ReencodeArchiveJob {
-    download_id: String,
-    chapter_id: String,
-    archive_path: PathBuf,
-    avif_quality: u8,
-}
 
 #[allow(dead_code)]
 pub(crate) struct DownloadedArchiveCreated {
@@ -35,33 +25,11 @@ pub(crate) struct DownloadedArchiveDeleted {
     pub(crate) removed_size_bytes: u64,
 }
 
-#[allow(dead_code)]
-pub(crate) struct DownloadedArchiveReencoded {
-    pub(crate) download_id: String,
-    pub(crate) chapter_id: String,
-    pub(crate) download_path: String,
-    pub(crate) archive_path: PathBuf,
-    pub(crate) avif_quality: u8,
-    pub(crate) images_reencoded: usize,
-}
-
 pub(crate) struct DownloadedArchiveMetadataChanged {
     pub(crate) download_id: String,
     pub(crate) chapter_id: String,
     pub(crate) download_path: String,
     pub(crate) archive_path: PathBuf,
-}
-
-pub(crate) struct DownloadedArchiveReencodedItem {
-    pub(crate) download_id: String,
-    pub(crate) chapter_id: String,
-    pub(crate) archive_path: PathBuf,
-}
-
-pub(crate) struct DownloadedArchivesReencoded {
-    pub(crate) files_processed: usize,
-    pub(crate) images_reencoded: usize,
-    pub(crate) archives: Vec<DownloadedArchiveReencodedItem>,
 }
 
 #[autometrics(track_concurrency)]
@@ -92,12 +60,23 @@ pub(crate) async fn downloaded_archive_created(
         page_count,
         archive_size_bytes,
     };
-    downloaded_archive_derived_state::downloaded_archive_created(
+    route_snapshot_invalidation::downloaded_archive_created(
         state,
-        &created,
-        archive_resolver.download_path(),
-    )
-    .await;
+        &created.download_id,
+        &created.chapter_id,
+    );
+    refresh_storage(state, archive_resolver.download_path()).await;
+    match super::upscaling::automatic_enabled(state, &download.manga_source).await {
+        Ok(true) => {
+            if let Err(error) = crate::jobs::enqueue_upscale(state, download_id, 2).await {
+                tracing::error!(download_id, error = %error, "Failed to queue automatic upscale");
+            }
+        }
+        Ok(false) => {}
+        Err(error) => {
+            tracing::error!(download_id, error = %error, "Failed to read automatic upscale settings")
+        }
+    }
 
     tracing::info!(
         download_id = %created.download_id,
@@ -118,7 +97,7 @@ pub(crate) async fn downloaded_archive_deleted(
 ) -> Result<DownloadedArchiveDeleted, AppError> {
     let archive =
         downloaded_archive_resolution::require_completed_archive(&state.db, download_id).await?;
-    let removed_size_bytes = backend_fs::remove_file_if_present(&archive.archive_path).await?;
+    let removed_size_bytes = backend_storage::remove(archive.archive_path.clone()).await?;
 
     state
         .db
@@ -132,7 +111,17 @@ pub(crate) async fn downloaded_archive_deleted(
         archive_path: archive.archive_path,
         removed_size_bytes,
     };
-    downloaded_archive_derived_state::downloaded_archive_deleted(state, &deleted).await;
+    route_snapshot_invalidation::downloaded_archive_deleted(
+        state,
+        &deleted.download_id,
+        &deleted.chapter_id,
+    );
+    crate::downloader::update_download_storage_usage_delta(
+        state,
+        &deleted.download_path,
+        crate::downloader::negative_storage_delta(deleted.removed_size_bytes),
+    )
+    .await;
 
     tracing::info!(
         download_id = %deleted.download_id,
@@ -146,50 +135,16 @@ pub(crate) async fn downloaded_archive_deleted(
 }
 
 #[autometrics(track_concurrency)]
-pub(crate) async fn downloaded_archive_reencoded(
-    state: &Arc<AppState>,
-    download_id: &str,
-) -> Result<DownloadedArchiveReencoded, AppError> {
-    let archive =
-        downloaded_archive_resolution::require_existing_completed_archive(&state.db, download_id)
-            .await?;
-    let avif_quality = resolve_avif_quality(state, &archive.download).await?;
-    let avif_conversion_workers = resolved_avif_conversion_workers(state).await?;
-    let images_reencoded = reencode_archive(
-        archive.archive_path.clone(),
-        avif_quality,
-        avif_conversion_workers,
-    )
-    .await?;
-
-    let reencoded = DownloadedArchiveReencoded {
-        download_id: archive.download.id,
-        chapter_id: archive.download.chapter_id,
-        download_path: archive.download_path,
-        archive_path: archive.archive_path,
-        avif_quality,
-        images_reencoded,
-    };
-    downloaded_archive_derived_state::downloaded_archive_reencoded(state, &reencoded).await;
-
-    tracing::info!(
-        download_id = %reencoded.download_id,
-        chapter_id = %reencoded.chapter_id,
-        archive_path = %reencoded.archive_path.display(),
-        images_reencoded,
-        avif_quality,
-        "Downloaded Archive Reencoded",
-    );
-
-    Ok(reencoded)
-}
-
-#[autometrics(track_concurrency)]
 pub(crate) async fn downloaded_archive_metadata_changed(
     state: &Arc<AppState>,
     changed: &DownloadedArchiveMetadataChanged,
 ) {
-    downloaded_archive_derived_state::downloaded_archive_metadata_changed(state, changed).await;
+    route_snapshot_invalidation::downloaded_archive_metadata_changed(
+        state,
+        &changed.download_id,
+        &changed.chapter_id,
+    );
+    refresh_storage(state, &changed.download_path).await;
 
     tracing::info!(
         download_id = %changed.download_id,
@@ -199,137 +154,14 @@ pub(crate) async fn downloaded_archive_metadata_changed(
     );
 }
 
-#[autometrics(track_concurrency)]
-pub(crate) async fn downloaded_archives_reencoded(
-    state: &Arc<AppState>,
-) -> Result<DownloadedArchivesReencoded, AppError> {
-    let archive_resolver = downloaded_archive_resolution::path_resolver(&state.db).await?;
-    let download_path = archive_resolver.download_path().to_string();
-    let archives = downloaded_archive_resolution::existing_completed_archives(&state.db).await?;
-    let mut archive_jobs = Vec::new();
-
-    for archive in archives {
-        let avif_quality = resolve_avif_quality(state, &archive.download).await?;
-        archive_jobs.push(ReencodeArchiveJob {
-            download_id: archive.download.id,
-            chapter_id: archive.download.chapter_id,
-            archive_path: archive.archive_path,
-            avif_quality,
-        });
+async fn refresh_storage(state: &Arc<AppState>, download_path: &str) {
+    crate::downloader::invalidate_download_storage_usage(state).await;
+    if let Err(error) =
+        crate::downloader::get_download_storage_usage_bytes(state, download_path).await
+    {
+        tracing::warn!(error = %error, "Failed to refresh chapter storage usage");
     }
-
-    let avif_conversion_workers = resolved_avif_conversion_workers(state).await?;
-    let files_processed = archive_jobs.len();
-    let images_reencoded = reencode_archives(archive_jobs.clone(), avif_conversion_workers).await?;
-
-    let result = DownloadedArchivesReencoded {
-        files_processed,
-        images_reencoded,
-        archives: archive_jobs
-            .into_iter()
-            .map(|job| DownloadedArchiveReencodedItem {
-                download_id: job.download_id,
-                chapter_id: job.chapter_id,
-                archive_path: job.archive_path,
-            })
-            .collect(),
-    };
-    downloaded_archive_derived_state::downloaded_archives_bulk_reencoded(
-        state,
-        &result,
-        &download_path,
-    )
-    .await;
-
-    tracing::info!(
-        files_processed,
-        images_reencoded,
-        "Downloaded Archives Reencoded",
-    );
-
-    Ok(result)
 }
-
-async fn resolve_avif_quality(
-    state: &Arc<AppState>,
-    download: &DownloadRow,
-) -> Result<u8, AppError> {
-    Ok(settings::source_avif_quality(&state.db, &download.manga_source).await?)
-}
-
-async fn resolved_avif_conversion_workers(state: &Arc<AppState>) -> Result<usize, AppError> {
-    Ok(settings::avif_conversion_workers(&state.db)
-        .await?
-        .min(backend_image::cpu_worker_budget()))
-}
-
-async fn reencode_archive(
-    archive_path: PathBuf,
-    avif_quality: u8,
-    avif_conversion_workers: usize,
-) -> Result<usize, AppError> {
-    tokio::task::spawn_blocking(move || {
-        backend_image::reencode_zstd_folder_to_avif_with_workers(
-            &archive_path,
-            avif_quality,
-            avif_conversion_workers,
-        )
-    })
-    .await
-    .map_err(|error| anyhow::anyhow!("Re-encode task failed: {error}"))?
-    .map_err(AppError::from)
-}
-
-async fn reencode_archives(
-    archive_jobs: Vec<ReencodeArchiveJob>,
-    avif_conversion_workers: usize,
-) -> Result<usize, AppError> {
-    tokio::task::spawn_blocking(move || -> anyhow::Result<usize> {
-        let available_workers = backend_image::cpu_worker_budget();
-        if archive_jobs.is_empty() {
-            return Ok(0);
-        }
-
-        let file_parallelism =
-            backend_core::reencode_file_parallelism(archive_jobs.len(), available_workers)
-                .min(avif_conversion_workers);
-        let per_file_workers = backend_core::reencode_per_file_workers(
-            file_parallelism,
-            available_workers.min(avif_conversion_workers),
-        )
-        .min((avif_conversion_workers / file_parallelism.max(1)).max(1));
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(file_parallelism)
-            .build()?;
-        let images_reencoded = pool.install(|| -> anyhow::Result<usize> {
-            archive_jobs
-                .par_iter()
-                .map(|job| {
-                    let converted = backend_image::reencode_zstd_folder_to_avif_with_workers(
-                        &job.archive_path,
-                        job.avif_quality,
-                        per_file_workers,
-                    )?;
-                    tracing::info!(
-                        download_id = %job.download_id,
-                        chapter_id = %job.chapter_id,
-                        archive_path = %job.archive_path.display(),
-                        images_reencoded = converted,
-                        avif_quality = job.avif_quality,
-                        "Downloaded Archive Reencoded",
-                    );
-                    Ok(converted)
-                })
-                .try_reduce(|| 0usize, |acc, converted| Ok(acc + converted))
-        })?;
-
-        Ok(images_reencoded)
-    })
-    .await
-    .map_err(|error| AppError::from(anyhow::anyhow!("Failed to run re-encode task: {error}")))?
-    .map_err(AppError::from)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,19 +186,26 @@ mod tests {
             )
             .await
             .expect("archive directory should be created");
-            tokio::fs::write(&archive_path, b"not-a-valid-archive")
-                .await
-                .expect("archive fixture should be written");
+            write_test_archive(
+                &archive_path,
+                &[
+                    ("001.png", valid_png_page_bytes()),
+                    ("002.png", valid_png_page_bytes()),
+                    ("003.png", valid_png_page_bytes()),
+                ],
+            )
+            .await;
+            let size = file_size(&archive_path);
 
             let created =
-                downloaded_archive_created(&state, &download_id, 3, archive_path.clone(), 19)
+                downloaded_archive_created(&state, &download_id, 3, archive_path.clone(), size)
                     .await
-                    .expect("creation should tolerate repairable index rebuild failure");
+                    .expect("creation should record the sealed BBF");
             assert_eq!(created.download_id, download_id);
             assert_eq!(created.chapter_id, chapter_id);
             assert_eq!(created.archive_path, archive_path);
             assert_eq!(created.page_count, 3);
-            assert_eq!(created.archive_size_bytes, 19);
+            assert_eq!(created.archive_size_bytes, size);
 
             let chapter = state
                 .db
@@ -398,7 +237,7 @@ mod tests {
             assert_eq!(deleted.download_id, download_id);
             assert_eq!(deleted.chapter_id, chapter_id);
             assert_eq!(deleted.archive_path, archive_path);
-            assert_eq!(deleted.removed_size_bytes, 19);
+            assert_eq!(deleted.removed_size_bytes, size);
             assert!(!backend_fs::path_exists(&deleted.archive_path));
             assert!(
                 state
@@ -416,168 +255,6 @@ mod tests {
                 .expect("chapter lookup should succeed")
                 .expect("chapter should still exist");
             assert!(!chapter.downloaded);
-        });
-    }
-
-    #[test]
-    fn reencoding_does_not_record_another_downloaded_chapter_fact() {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("test runtime should initialize");
-
-        runtime.block_on(async {
-            let state = test_state().await;
-            let (download_id, chapter_id, archive_path) = seed_queued_download(&state).await;
-            write_test_archive(&archive_path, &[("001.png", valid_png_page_bytes())]);
-
-            downloaded_archive_created(
-                &state,
-                &download_id,
-                1,
-                archive_path.clone(),
-                file_size(&archive_path),
-            )
-            .await
-            .expect("downloaded archive should be created");
-            let before = state
-                .db
-                .get_stats_overview()
-                .await
-                .expect("stats should load");
-
-            let reencoded = downloaded_archive_reencoded(&state, &download_id)
-                .await
-                .expect("downloaded archive should reencode");
-            assert_eq!(reencoded.download_id, download_id);
-            assert_eq!(reencoded.chapter_id, chapter_id);
-            assert_eq!(reencoded.images_reencoded, 1);
-
-            let after = state
-                .db
-                .get_stats_overview()
-                .await
-                .expect("stats should load");
-            assert_eq!(
-                after.totals.chapters_downloaded,
-                before.totals.chapters_downloaded
-            );
-            assert_eq!(
-                after.totals.pages_downloaded,
-                before.totals.pages_downloaded
-            );
-        });
-    }
-
-    #[test]
-    fn metadata_change_rebuilds_archive_state_without_new_downloaded_fact() {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("test runtime should initialize");
-
-        runtime.block_on(async {
-            let state = test_state().await;
-            let (download_id, chapter_id, archive_path) = seed_queued_download(&state).await;
-            write_test_archive(&archive_path, &[("001.png", valid_png_page_bytes())]);
-
-            downloaded_archive_created(
-                &state,
-                &download_id,
-                1,
-                archive_path.clone(),
-                file_size(&archive_path),
-            )
-            .await
-            .expect("downloaded archive should be created");
-            let before = state
-                .db
-                .get_stats_overview()
-                .await
-                .expect("stats should load");
-
-            state.archive_index.invalidate_chapter(&chapter_id);
-            assert!(
-                state
-                    .archive_index
-                    .cached_chapter_pages(&chapter_id)
-                    .is_none()
-            );
-
-            let download_path = settings::download_path(&state.db)
-                .await
-                .expect("download path should resolve");
-            downloaded_archive_metadata_changed(
-                &state,
-                &DownloadedArchiveMetadataChanged {
-                    download_id: download_id.clone(),
-                    chapter_id: chapter_id.clone(),
-                    download_path,
-                    archive_path,
-                },
-            )
-            .await;
-
-            assert!(
-                state
-                    .archive_index
-                    .cached_chapter_pages(&chapter_id)
-                    .is_some()
-            );
-            let after = state
-                .db
-                .get_stats_overview()
-                .await
-                .expect("stats should load");
-            assert_eq!(
-                after.totals.chapters_downloaded,
-                before.totals.chapters_downloaded
-            );
-            assert_eq!(
-                after.totals.pages_downloaded,
-                before.totals.pages_downloaded
-            );
-        });
-    }
-
-    #[test]
-    fn bulk_reencoding_refreshes_archive_index_state_per_archive() {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("test runtime should initialize");
-
-        runtime.block_on(async {
-            let state = test_state().await;
-            let (download_id, chapter_id, archive_path) = seed_queued_download(&state).await;
-            write_test_archive(&archive_path, &[("001.png", valid_png_page_bytes())]);
-
-            downloaded_archive_created(
-                &state,
-                &download_id,
-                1,
-                archive_path.clone(),
-                file_size(&archive_path),
-            )
-            .await
-            .expect("downloaded archive should be created");
-            let before = state
-                .archive_index
-                .cached_chapter_pages(&chapter_id)
-                .expect("created archive should cache page facts");
-            assert_eq!(before[0].content_type, "image/png");
-
-            let result = downloaded_archives_reencoded(&state)
-                .await
-                .expect("bulk reencode should succeed");
-            assert_eq!(result.files_processed, 1);
-            assert_eq!(result.images_reencoded, 1);
-
-            let after = state
-                .archive_index
-                .cached_chapter_pages(&chapter_id)
-                .expect("bulk reencode should rebuild page facts");
-            assert_eq!(after[0].content_type, "image/avif");
         });
     }
 
@@ -700,7 +377,7 @@ mod tests {
         (download_id, chapter_id, archive_path)
     }
 
-    fn write_test_archive(archive_path: &Path, entries: &[(&str, &[u8])]) {
+    async fn write_test_archive(archive_path: &Path, entries: &[(&str, &[u8])]) {
         let page_dir = archive_path
             .parent()
             .expect("archive path should have a parent")
@@ -714,8 +391,17 @@ mod tests {
                 ((*name).to_string(), path)
             })
             .collect::<Vec<_>>();
-        backend_image::build_zstd_folder_from_paths(&pages, archive_path, None, None)
-            .expect("archive should be built");
+        backend_storage::write_originals(
+            archive_path.to_path_buf(),
+            backend_storage::OriginalChapter {
+                pages: pages.into_iter().map(|(_, path)| path).collect(),
+                comicinfo_xml: "<ComicInfo/>".into(),
+                cover: None,
+            },
+            || false,
+        )
+        .await
+        .expect("archive should be built");
     }
 
     fn file_size(path: &PathBuf) -> u64 {

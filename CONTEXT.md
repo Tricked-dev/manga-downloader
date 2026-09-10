@@ -33,7 +33,7 @@ An ordered reference to a Chapter Page that can be read during a reader session.
 _Avoid_: page URL, image URL, raw media reference
 
 **Chapter Page Warming**:
-Preparing nearby Chapter Pages so the reader can display them with less waiting. Chapter Page Warming may cross to the next Local Library Chapter when local library ordering identifies one, and is defined in terms of Chapter Pages rather than source URLs, cache entries, or archive extraction details.
+Preparing nearby Source Chapter Pages so the reader can display them with less waiting. Downloaded pages are read directly from mapped BBF assets. Chapter Page Warming may cross to the next Local Library Chapter when local library ordering identifies one, and is defined in terms of Chapter Pages rather than source URLs, cache entries, or archive extraction details.
 _Avoid_: image prefetch, cache priming, archive pre-extract
 
 **Source Catalog**:
@@ -45,24 +45,20 @@ A queue or work record for fetching a chapter into local storage. A Download may
 _Avoid_: archive, downloaded chapter
 
 **Download Work State**:
-The persisted state and public label for a Download work record as it moves through queueing, fetching, conversion, archiving, cancellation, failure, or completion. Download Work State belongs to the Download work record; creating or removing a durable local reading artifact is Downloaded Archive Lifecycle.
+The persisted state and public label for a Download work record as it moves through queueing, fetching, sealing originals, cancellation, failure, or completion. Download Work State belongs to the Download work record; creating or removing a durable local reading artifact is Downloaded Archive Lifecycle.
 _Avoid_: stage string, ad hoc download status
 
 **Downloaded Archive**:
-The durable local reading artifact produced by a completed Download. A Downloaded Archive can be indexed, deleted, reencoded, and read as Downloaded Chapter Pages.
-_Avoid_: download record, archive file
+The BBF container produced by a completed Download. It lives under source, series title, and chapter number. Its original section preserves native source bytes after required descrambling. A later background job can append an upscaled section without copying originals.
+_Avoid_: download record, extracted folder
 
-**Downloaded Archive Index**:
-Derived state for a Downloaded Archive that records ordered page-entry facts needed to read Downloaded Chapter Pages. It can be rebuilt or invalidated without changing the Downloaded Archive itself.
-_Avoid_: extraction queue, page cache, read-ahead state
-
-**Archive Index Maintenance**:
-Operations that inspect, rebuild, clear, or remove stale Downloaded Archive Index rows, then coordinate the repairable derived-state effects needed after that maintenance. Archive Index Maintenance changes index state; it does not create, delete, or reencode Downloaded Archives.
-_Avoid_: settings maintenance, route cleanup
+**Page Variant**:
+One representation of the same ordered logical pages: original or upscaled. Readers prefer upscaled when present, can request original explicitly, and preserve native dimensions unless width is requested. Format conversion is optional and cached by asset content, variant, format, and width.
+_Avoid_: separate chapter, extracted page cache
 
 **Downloaded Archive Lifecycle**:
-The set of domain changes that create, delete, or reencode a Downloaded Archive. Deletion means a previously completed Downloaded Archive stopped being the durable local artifact for a Local Library Chapter; failed download cleanup, retry, cancellation, and queue record removal are Download lifecycle concerns unless they remove a completed archive. Reencoding means the same durable artifact changed representation in place, not that one Downloaded Archive was deleted and another was created. The Downloaded Archive remains valid even when derived state, such as an index, must be rebuilt later.
-_Avoid_: download lifecycle, file maintenance
+Creation records a completed Download and reading-activity facts after the original section is sealed. Upscaling and metadata updates append to that artifact without recording another download. Deletion removes the artifact and resets the chapter's downloaded state. BBF owns its index; there is no external archive index or extraction queue.
+_Avoid_: download queue state, index maintenance
 
 **Route Snapshot**:
 A short-lived cached response for an HTTP route. A Route Snapshot is operational derived state and can be discarded whenever a domain change makes the cached response possibly stale.

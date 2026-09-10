@@ -13,6 +13,8 @@ name = "manga-server"
 path = "src/main.rs"
 
 [dependencies]
+tempfile.workspace = true
+backend-storage = { path = "../storage" }
 backend-api-types = { path = "../api-types" }
 backend-cache = { path = "../cache" }
 backend-config = { path = "../config" }
@@ -20,7 +22,6 @@ backend-core = { path = "../core" }
 backend-fs = { path = "../fs" }
 backend-image = { path = "../image" }
 backend-upscale = { path = "../upscale" }
-backend-page-extraction = { path = "../page-extraction" }
 backend-persistence = { path = "../persistence" }
 backend-sources = { path = "../sources" }
 backend-runtime = { path = "../runtime" }
@@ -67,8 +68,8 @@ zip.workspace = true
 mimalloc.workspace = true
 
 [dev-dependencies]
+image.workspace = true
 axum-test.workspace = true
-tempfile.workspace = true
 
 [build-dependencies]
 shadow-rs = { workspace = true, features = ["build", "metadata"] }

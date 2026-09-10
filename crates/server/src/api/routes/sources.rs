@@ -14,8 +14,7 @@ use crate::{
     AppState,
     api::{
         dto::{
-            ApiListResponse, ChapterResponse, ErrorEnvelopeResponse, MangaResponse,
-            SearchResponse,
+            ApiListResponse, ChapterResponse, ErrorEnvelopeResponse, MangaResponse, SearchResponse,
             SetSourceEnabledResponse, SourceSettingsResponse,
         },
         error::AppError,
@@ -87,6 +86,7 @@ async fn set_source_enabled(
 #[derive(Deserialize, ToSchema, garde::Validate)]
 #[garde(allow_unvalidated)]
 struct UpdateSourceSettingsRequest {
+    auto_upscale: Option<bool>,
     hide_nsfw: Option<bool>,
 }
 
@@ -130,8 +130,13 @@ async fn update_source_settings(
     Path(name): Path<String>,
     Json(req): Json<UpdateSourceSettingsRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let UpdateSourceSettingsRequest { hide_nsfw } = validation::validate(req)?;
-    let response = source_catalog_changes::update_source_settings(&state, &name, hide_nsfw).await?;
+    let UpdateSourceSettingsRequest {
+        hide_nsfw,
+        auto_upscale,
+    } = validation::validate(req)?;
+    let response =
+        source_catalog_changes::update_source_settings(&state, &name, hide_nsfw, auto_upscale)
+            .await?;
     tracing::info!(
         source = %response.name,
         hide_nsfw = response.hide_nsfw,

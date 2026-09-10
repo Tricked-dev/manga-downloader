@@ -284,6 +284,7 @@ impl ModelCache {
                 None
             };
             let started = Instant::now();
+            tracing::info!(model = %name, %device, "Loading GPU upscale model");
             let model = UpscaleModel::open_gpu(&path, device, &options, profile.as_deref())?;
             ensure!(
                 model.device() == device,
@@ -312,6 +313,7 @@ impl ModelCache {
             tile_size: self.config.tile_size,
             overlap: self.config.overlap,
         };
+        tracing::debug!(model = %name, width = source.width(), height = source.height(), "Starting tiled GPU inference");
         let upscaled = manga_core::upscale_tiled(&mut cached.model, &source, tile)?;
         ensure!(
             upscaled.width()

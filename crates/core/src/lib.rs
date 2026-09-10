@@ -126,26 +126,28 @@ pub fn is_textual_content_type(content_type: &str) -> bool {
 /// Returns the archive path for a downloaded manga chapter.
 pub fn download_archive_path(
     download_path: &str,
+    source: &str,
     manga_title: &str,
     chapter_number: f64,
 ) -> PathBuf {
     Path::new(download_path)
+        .join(sanitize_filename(source))
         .join(sanitize_filename(manga_title))
         .join(download_archive_filename(chapter_number))
 }
 
 #[must_use]
-/// Formats a chapter number as the canonical `.tar.zst` archive filename.
+/// Formats a chapter number as the canonical `.bbf` archive filename.
 pub fn download_archive_filename(chapter_number: f64) -> String {
     format!(
-        "{}.tar.zst",
+        "{}.bbf",
         sanitize_filename(&format_chapter_number(chapter_number))
     )
 }
 
 /// Recursively collects downloaded chapter archive files under `root`.
 pub fn collect_download_archive_files(root: &Path) -> Result<Vec<PathBuf>> {
-    backend_fs::collect_files_with_suffix(root, ".tar.zst")
+    backend_fs::collect_files_with_suffix(root, ".bbf")
 }
 
 #[must_use]

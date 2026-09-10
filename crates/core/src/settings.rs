@@ -17,7 +17,7 @@ pub enum SettingKey {
     LibraryCategories,
     CacheDiskPath,
     CacheMaxMemoryBytes,
-    AvifConversionWorkers,
+    AutoUpscale,
 }
 
 impl SettingKey {
@@ -42,7 +42,7 @@ impl SettingKey {
             Self::LibraryCategories => "library_categories",
             Self::CacheDiskPath => "cache_disk_path",
             Self::CacheMaxMemoryBytes => "cache_max_memory_bytes",
-            Self::AvifConversionWorkers => "avif_conversion_workers",
+            Self::AutoUpscale => "auto_upscale",
         }
     }
 
@@ -65,7 +65,7 @@ impl SettingKey {
             Self::LibraryCategories => "default,downloaded",
             Self::CacheDiskPath => "./data/cache",
             Self::CacheMaxMemoryBytes => "268435456",
-            Self::AvifConversionWorkers => "5",
+            Self::AutoUpscale => "true",
         }
     }
 
@@ -90,7 +90,7 @@ impl SettingKey {
             Self::LibraryCategories => "LIBRARY_CATEGORIES",
             Self::CacheDiskPath => "CACHE_DISK_PATH",
             Self::CacheMaxMemoryBytes => "CACHE_MAX_MEMORY_BYTES",
-            Self::AvifConversionWorkers => "AVIF_CONVERSION_WORKERS",
+            Self::AutoUpscale => "AUTO_UPSCALE",
         }
     }
 
@@ -141,7 +141,7 @@ pub const SETTING_DEFINITIONS: &[SettingDefinition] = &[
     SettingDefinition::new(SettingKey::LibraryCategories),
     SettingDefinition::new(SettingKey::CacheDiskPath),
     SettingDefinition::new(SettingKey::CacheMaxMemoryBytes),
-    SettingDefinition::new(SettingKey::AvifConversionWorkers),
+    SettingDefinition::new(SettingKey::AutoUpscale),
 ];
 
 #[must_use]

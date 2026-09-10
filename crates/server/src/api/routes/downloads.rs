@@ -8,7 +8,6 @@ use axum::{
 };
 use backend_persistence::DownloadRow;
 use serde::Deserialize;
-use tokio_util::io::ReaderStream;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -17,12 +16,12 @@ use crate::{
     api::{
         dto::{
             ApiListResponse, DownloadBulkEnqueueResponse, DownloadEnqueueResponse,
-            ErrorEnvelopeResponse, OperationStatusResponse, ReencodeDownloadResponse,
+            ErrorEnvelopeResponse, OperationStatusResponse,
         },
         error::AppError,
         response_cache, validation,
     },
-    app::{downloaded_archive_lifecycle, downloads},
+    app::downloads,
 };
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
@@ -32,7 +31,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(clear_failed_downloads))
         .routes(routes!(delete_download))
         .routes(routes!(retry_download))
-        .routes(routes!(reencode_download))
+        .routes(routes!(upscale_download))
         .routes(routes!(serve_archive))
 }
 
@@ -220,25 +219,27 @@ async fn retry_download(
 
 #[utoipa::path(
     post,
-    path = "/v1/downloads/{id}/reencode",
+    path = "/v1/downloads/{id}/upscale",
     tag = "downloads",
     params(("id" = String, Path, description = "Download id")),
     responses(
-        (status = OK, body = ReencodeDownloadResponse),
+        (status = ACCEPTED, body = serde_json::Value),
         (status = NOT_FOUND, body = ErrorEnvelopeResponse),
         (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
     )
 )]
-#[tracing::instrument(name = "api.downloads.reencode", skip_all, fields(download_id = %id))]
-async fn reencode_download(
+#[tracing::instrument(name = "api.downloads.upscale", skip_all, fields(download_id = %id))]
+async fn upscale_download(
     State(state): State<Arc<AppState>>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let result = downloaded_archive_lifecycle::downloaded_archive_reencoded(&state, &id).await?;
-    Ok(Json(ReencodeDownloadResponse {
-        ok: true,
-        images_reencoded: result.images_reencoded,
-    }))
+    crate::app::downloaded_archive_resolution::require_existing_completed_archive(&state.db, &id)
+        .await?;
+    let job_id = crate::jobs::enqueue_upscale(&state, &id, 2).await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({ "ok": true, "job_id": job_id })),
+    ))
 }
 
 #[utoipa::path(
@@ -247,7 +248,7 @@ async fn reencode_download(
     tag = "downloads",
     params(("id" = String, Path, description = "Download id")),
     responses(
-        (status = OK, description = "Download archive", content_type = "application/zstd"),
+        (status = OK, description = "Download archive", content_type = "application/vnd.bbf"),
         (status = NOT_FOUND, body = ErrorEnvelopeResponse),
         (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
     )
@@ -259,14 +260,13 @@ async fn serve_archive(
 ) -> Result<impl IntoResponse, AppError> {
     let archive = downloads::open_archive(&state.db, &id).await?;
 
-    let stream = ReaderStream::new(archive.file);
     let response = axum::response::Response::builder()
-        .header(axum::http::header::CONTENT_TYPE, "application/zstd")
+        .header(axum::http::header::CONTENT_TYPE, "application/vnd.bbf")
         .header(
             axum::http::header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{}\"", archive.filename),
         )
-        .body(axum::body::Body::from_stream(stream))
+        .body(axum::body::Body::from(archive.body))
         .map_err(AppError::from)?;
 
     Ok(response)

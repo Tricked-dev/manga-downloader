@@ -1,133 +1,35 @@
 use crate::{
     AppState,
     api::{dto::ApiListResponse, error::AppError},
-    app::downloaded_archive_derived_state,
 };
 use anyhow::Context;
 use autometrics::autometrics;
 use axum::body::Bytes;
 use backend_cache::{CachedImage, MangaCache};
-use backend_page_extraction::{
-    DownloadedPageExtractionScheduler, ExtractionRequestMode, PositionedExtractionResult,
-    PositionedImageTarget,
-};
 use backend_persistence::Database;
 use backend_sources::{
-    SourceRegistry, SourceMediaClient,
+    SourceMediaClient, SourceRegistry,
     fetch::RequestProfile,
-    media::{MediaRefSpec, MediaTransformSpec, encode_media_spec, media_ref_to_spec},
+    media::{MediaRefSpec, encode_media_spec, media_ref_to_spec},
 };
-use dashmap::DashMap;
 use futures_util::{StreamExt, stream};
 use serde::{Deserialize, Serialize};
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 
 mod downloaded_reader;
 
-const DOWNLOADED_PAGE_READ_AHEAD_WINDOW: usize = 4;
-const NEXT_DOWNLOADED_CHAPTER_READ_AHEAD_PAGES: usize = DOWNLOADED_PAGE_READ_AHEAD_WINDOW;
 const NEXT_CHAPTER_READ_AHEAD_TTL: Duration = Duration::from_mins(15);
 const CURRENT_CHAPTER_READ_AHEAD_TTL: Duration = Duration::from_mins(5);
 const MAX_CONCURRENT_IMAGE_READ_AHEAD: usize = 4;
-const DEFAULT_DOWNLOAD_TRANSFORM_AVIF_QUALITY: u8 = 80;
 const SOURCE_PAGE_REFS_CACHE_SCHEMA_VERSION: u8 = 9;
-
-struct DownloadedPageExtractTarget {
-    page: usize,
-    cache_key: String,
-    indexed_content_type: &'static str,
-    file_position: usize,
-}
-
-pub(crate) struct DownloadedPageTransformCache {
-    metadata: DashMap<String, Arc<DownloadedPageTransformMetadata>>,
-}
-
-impl DownloadedPageTransformCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            metadata: DashMap::new(),
-        }
-    }
-
-    fn get(&self, chapter_id: &str) -> Option<Arc<DownloadedPageTransformMetadata>> {
-        self.metadata
-            .get(chapter_id)
-            .map(|entry| Arc::clone(entry.value()))
-    }
-
-    fn insert(
-        &self,
-        chapter_id: &str,
-        metadata: DownloadedPageTransformMetadata,
-    ) -> Arc<DownloadedPageTransformMetadata> {
-        let metadata = Arc::new(metadata);
-        self.metadata
-            .insert(chapter_id.to_string(), Arc::clone(&metadata));
-        metadata
-    }
-
-    pub(crate) fn clear(&self) {
-        self.metadata.clear();
-    }
-}
-
-impl Default for DownloadedPageTransformCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Debug)]
-struct DownloadedPageTransformMetadata {
-    transforms: Vec<Option<MediaTransformSpec>>,
-    avif_quality: u8,
-}
-
-struct ResolvedDownloadedPageTransformMetadata {
-    metadata: DownloadedPageTransformMetadata,
-    cacheable: bool,
-}
-
-impl DownloadedPageTransformMetadata {
-    fn empty() -> Self {
-        Self {
-            transforms: Vec::new(),
-            avif_quality: DEFAULT_DOWNLOAD_TRANSFORM_AVIF_QUALITY,
-        }
-    }
-
-    fn transform_for(&self, page: usize) -> Option<MediaTransformSpec> {
-        self.transforms.get(page).cloned().flatten()
-    }
-}
-
-enum DownloadedPageExtractResult {
-    Completed {
-        requested: DownloadedChapterPage,
-        extracted_pages: usize,
-    },
-    Dropped,
-}
-
-impl DownloadedPageExtractResult {
-    fn extracted_pages(&self) -> usize {
-        match self {
-            Self::Completed {
-                extracted_pages, ..
-            } => *extracted_pages,
-            Self::Dropped => 0,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DownloadedPageReadOptions {
     pub skip_page_cache: bool,
+    pub variant: Option<backend_storage::PageVariant>,
+    pub format: Option<super::media::MediaProxyFormat>,
+    pub width: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -144,6 +46,8 @@ pub struct DownloadedChapterPageReferenceOptions {
 pub struct DownloadedChapterPage {
     pub body: axum::body::Bytes,
     pub content_type: &'static str,
+    pub variant: backend_storage::PageVariant,
+    pub cache_hit: bool,
 }
 
 pub struct SourceChapterPage {
@@ -601,34 +505,6 @@ async fn warm_source_chapter_pages_with_base_url(
     .await
 }
 
-#[autometrics(track_concurrency)]
-async fn warm_next_downloaded_chapter_pages(
-    state: &Arc<AppState>,
-    chapter_id: &str,
-) -> Result<(), AppError> {
-    let Some(next) = state.db.get_next_chapter_by_id(chapter_id).await? else {
-        return Ok(());
-    };
-    if !next.downloaded {
-        return Ok(());
-    }
-
-    let cached_pages = downloaded_reader::warm_downloaded_chapter_start(
-        state,
-        &next.id,
-        NEXT_CHAPTER_READ_AHEAD_TTL,
-    )
-    .await?;
-
-    tracing::debug!(
-        current_chapter_id = %chapter_id,
-        next_chapter_id = %next.id,
-        cached_pages,
-        "Next Downloaded Chapter Page Warming Completed",
-    );
-    Ok(())
-}
-
 fn current_source_chapter_warming_references(
     pages: Vec<SourceChapterPageReference>,
 ) -> Vec<SourceChapterPageReference> {
@@ -638,16 +514,16 @@ fn current_source_chapter_warming_references(
 #[autometrics]
 pub async fn downloaded_chapter_page_references(
     db: &Database,
-    archive_index: &crate::archive_index::ArchiveIndexService,
-    metrics: &backend_telemetry::Metrics,
     chapter_id: &str,
 ) -> Result<ApiListResponse<DownloadedChapterPageReference>, AppError> {
-    let archive = archive_index
-        .get_for_chapter(db, metrics, chapter_id, "lazy")
-        .await?;
+    let archive = super::downloaded_archive_resolution::existing_completed_archive_for_chapter(
+        db, chapter_id,
+    )
+    .await?;
+    let info = backend_storage::inspect(archive.archive_path).await?;
 
     Ok(ApiListResponse::new(
-        (0..archive.page_count())
+        (0..info.page_count)
             .map(|index| DownloadedChapterPageReference {
                 index,
                 chapter_id: chapter_id.to_string(),
@@ -676,423 +552,6 @@ pub async fn read_downloaded_chapter_page(
     downloaded_reader::read_downloaded_chapter_page(state, chapter_id, page, options).await
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-async fn extract_downloaded_page_window(
-    state: &AppState,
-    cache: &MangaCache,
-    extraction_scheduler: &DownloadedPageExtractionScheduler,
-    metrics: &backend_telemetry::Metrics,
-    archive: Arc<crate::archive_index::ResolvedArchiveIndex>,
-    chapter_id: Option<&str>,
-    requested_page: usize,
-    window_size: usize,
-    probe_cached_neighbors: bool,
-    ttl: Option<Duration>,
-    mode: &'static str,
-    skip_page_cache: bool,
-) -> Result<DownloadedPageExtractResult, AppError> {
-    if requested_page >= archive.page_count() {
-        return Err(AppError::not_found(anyhow::anyhow!(
-            "page {requested_page} out of bounds"
-        )));
-    }
-
-    let archive_key = archive.extraction_key();
-    let (window_key, window_lock) = extraction_scheduler
-        .extraction_window_lock(&archive_key, requested_page, window_size)
-        .await;
-    let (window_guard, lock_waited) = match window_lock.try_lock() {
-        Ok(guard) => (guard, false),
-        Err(_) => (window_lock.lock().await, true),
-    };
-
-    let result = async {
-        if !skip_page_cache && lock_waited {
-            let requested_entry = archive.page(requested_page).ok_or_else(|| {
-                AppError::not_found(anyhow::anyhow!("page {requested_page} out of bounds"))
-            })?;
-            if let Some(cached) = cache.get_image(&requested_entry.cache_key).await {
-                let requested = DownloadedChapterPage {
-                    body: cached.body,
-                    content_type: requested_entry.content_type,
-                };
-                let requested =
-                    apply_downloaded_source_transform(state, chapter_id, requested_page, requested)
-                        .await?;
-                return Ok(DownloadedPageExtractResult::Completed {
-                    requested,
-                    extracted_pages: 0,
-                });
-            }
-        }
-
-        let targets = missing_downloaded_page_window(
-            cache,
-            &archive,
-            requested_page,
-            window_size,
-            !skip_page_cache && probe_cached_neighbors,
-        )
-        .await?;
-        if targets.is_empty() {
-            return Err(AppError::internal(anyhow::anyhow!(
-                "downloaded page extraction window had no targets"
-            )));
-        }
-
-        let archive_key = archive.extraction_key();
-        let archive_path = archive.archive_path.clone();
-        let started = Instant::now();
-
-        let target_positions = targets
-            .iter()
-            .map(|target| PositionedImageTarget {
-                file_position: target.file_position,
-                content_type: target.indexed_content_type,
-            })
-            .collect::<Vec<_>>();
-        let extraction_mode = if mode == "read_ahead" {
-            ExtractionRequestMode::ReadAhead
-        } else {
-            ExtractionRequestMode::Foreground
-        };
-        let extracted_result = extraction_scheduler
-            .extract_positioned_images(
-                metrics,
-                archive_key,
-                archive_path,
-                target_positions,
-                extraction_mode,
-            )
-            .await;
-
-        let extracted_entries = match extracted_result {
-            Ok(PositionedExtractionResult::Completed(entries)) => entries,
-            Ok(PositionedExtractionResult::DroppedQueuePressure) => {
-                metrics.record_downloaded_page_extract(
-                    mode,
-                    "dropped_queue_pressure",
-                    started.elapsed(),
-                    targets.len(),
-                );
-                return Ok(DownloadedPageExtractResult::Dropped);
-            }
-            Ok(PositionedExtractionResult::StaleArchive) => {
-                downloaded_archive_derived_state::stale_downloaded_archive_identity_detected(
-                    state,
-                    &archive.archive_path,
-                    chapter_id,
-                    mode,
-                )
-                .await;
-
-                metrics.record_downloaded_page_extract(
-                    mode,
-                    "stale_identity",
-                    started.elapsed(),
-                    targets.len(),
-                );
-                if mode == "read_ahead" {
-                    return Ok(DownloadedPageExtractResult::Dropped);
-                }
-                return Err(AppError::downloaded_page_conflict(anyhow::anyhow!(
-                    "downloaded archive changed while reading page"
-                )));
-            }
-            Err(error) => {
-                metrics.record_downloaded_page_extract(
-                    mode,
-                    "error",
-                    started.elapsed(),
-                    targets.len(),
-                );
-                return Err(AppError::internal(error));
-            }
-        };
-
-        if !archive.identity_is_current() {
-            downloaded_archive_derived_state::stale_downloaded_archive_identity_detected(
-                state,
-                &archive.archive_path,
-                chapter_id,
-                mode,
-            )
-            .await;
-
-            if mode == "read_ahead" {
-                metrics.record_downloaded_page_extract(
-                    mode,
-                    "stale_identity",
-                    started.elapsed(),
-                    targets.len(),
-                );
-                return Ok(DownloadedPageExtractResult::Dropped);
-            }
-
-            metrics.record_downloaded_page_extract(
-                mode,
-                "stale_identity",
-                started.elapsed(),
-                targets.len(),
-            );
-            return Err(AppError::downloaded_page_conflict(anyhow::anyhow!(
-                "downloaded archive changed while reading page"
-            )));
-        }
-
-        metrics.record_downloaded_page_extract(
-            mode,
-            "success",
-            started.elapsed(),
-            extracted_entries.len(),
-        );
-
-        let response_build_started = Instant::now();
-        let mut requested = None;
-        let mut extracted_pages = 0usize;
-        for (target, entry) in targets.into_iter().zip(extracted_entries) {
-            let (image, response_content_type) =
-                cached_image_from_entry(entry, target.indexed_content_type);
-            if target.page == requested_page {
-                requested = Some(DownloadedChapterPage {
-                    body: image.body.clone(),
-                    content_type: response_content_type,
-                });
-            }
-            if !skip_page_cache {
-                if let Some(ttl) = ttl {
-                    cache.insert_image_ttl(target.cache_key, image, ttl);
-                } else {
-                    cache.insert_image(target.cache_key, image);
-                }
-            }
-            extracted_pages += 1;
-        }
-        metrics.record_downloaded_page_response_build(
-            mode,
-            response_build_started.elapsed(),
-            extracted_pages,
-        );
-
-        let requested = requested.ok_or_else(|| {
-            AppError::internal(anyhow::anyhow!(
-                "downloaded page extraction did not include requested page"
-            ))
-        })?;
-        let requested =
-            apply_downloaded_source_transform(state, chapter_id, requested_page, requested).await?;
-
-        Ok(DownloadedPageExtractResult::Completed {
-            requested,
-            extracted_pages,
-        })
-    }
-    .await;
-
-    drop(window_guard);
-    extraction_scheduler
-        .release_extraction_window_lock(&window_key, &window_lock)
-        .await;
-
-    result
-}
-
-async fn missing_downloaded_page_window(
-    cache: &MangaCache,
-    archive: &crate::archive_index::ResolvedArchiveIndex,
-    requested_page: usize,
-    window_size: usize,
-    probe_cached_neighbors: bool,
-) -> Result<Vec<DownloadedPageExtractTarget>, AppError> {
-    let window_start = downloaded_page_window_start(requested_page, window_size);
-    let window_end = downloaded_page_window_end(requested_page, archive.page_count(), window_size);
-    let mut targets = Vec::with_capacity(window_end.saturating_sub(window_start));
-
-    for page in window_start..window_end {
-        let page_entry = archive
-            .page(page)
-            .ok_or_else(|| AppError::not_found(anyhow::anyhow!("page {page} out of bounds")))?;
-        if probe_cached_neighbors
-            && page != requested_page
-            && cache.get_image(&page_entry.cache_key).await.is_some()
-        {
-            continue;
-        }
-
-        targets.push(DownloadedPageExtractTarget {
-            page,
-            cache_key: page_entry.cache_key.clone(),
-            indexed_content_type: page_entry.content_type,
-            file_position: page_entry.file_position,
-        });
-    }
-
-    Ok(targets)
-}
-
-fn cached_image_from_entry(
-    entry: backend_image::EntryBytes,
-    indexed_content_type: &'static str,
-) -> (CachedImage, &'static str) {
-    let content_type = if entry.content_type == "application/octet-stream" {
-        indexed_content_type
-    } else {
-        entry.content_type
-    };
-    (
-        CachedImage {
-            content_type: content_type.to_string(),
-            body: entry.bytes.into(),
-        },
-        content_type,
-    )
-}
-
-async fn apply_downloaded_source_transform(
-    state: &AppState,
-    chapter_id: Option<&str>,
-    page: usize,
-    response: DownloadedChapterPage,
-) -> Result<DownloadedChapterPage, AppError> {
-    let Some(chapter_id) = chapter_id else {
-        return Ok(response);
-    };
-    let metadata = downloaded_page_transform_metadata(state, chapter_id).await?;
-    let Some(transform) = metadata.transform_for(page) else {
-        return Ok(response);
-    };
-    if !should_apply_downloaded_source_transform(&transform, response.content_type) {
-        return Ok(response);
-    }
-
-    match transform {
-        MediaTransformSpec::ComixDescramble5x5 | MediaTransformSpec::ComixDescramble5x5Map(_) => {
-            let quality = metadata.avif_quality;
-            let input = response.body;
-            let body = tokio::task::spawn_blocking(move || {
-                let png = match transform {
-                    MediaTransformSpec::ComixDescramble5x5 => {
-                        backend_image::descramble_comix_5x5_to_png(&input)?
-                    }
-                    MediaTransformSpec::ComixDescramble5x5Map(map) => {
-                        let map: [usize; 25] = map.as_slice().try_into().map_err(|_| {
-                            anyhow::anyhow!("Comix descramble map must contain 25 tiles")
-                        })?;
-                        backend_image::descramble_comix_5x5_with_map_to_png(&input, &map)?
-                    }
-                };
-                backend_image::convert_to_avif(&png, quality)
-            })
-            .await
-            .map_err(|error| {
-                AppError::internal(anyhow::anyhow!(
-                    "downloaded page transform task failed: {error}"
-                ))
-            })?
-            .map_err(AppError::internal)?;
-
-            Ok(DownloadedChapterPage {
-                body: body.into(),
-                content_type: "image/avif",
-            })
-        }
-    }
-}
-
-fn should_apply_downloaded_source_transform(
-    transform: &MediaTransformSpec,
-    content_type: &str,
-) -> bool {
-    match transform {
-        MediaTransformSpec::ComixDescramble5x5 | MediaTransformSpec::ComixDescramble5x5Map(_) => {
-            !content_type_is_avif(content_type)
-        }
-    }
-}
-
-fn content_type_is_avif(content_type: &str) -> bool {
-    backend_core::is_avif_content_type(content_type)
-}
-
-async fn downloaded_page_transform_metadata(
-    state: &AppState,
-    chapter_id: &str,
-) -> Result<Arc<DownloadedPageTransformMetadata>, AppError> {
-    if let Some(metadata) = state.downloaded_page_transform_cache.get(chapter_id) {
-        return Ok(metadata);
-    }
-
-    let resolved = resolve_downloaded_page_transform_metadata(state, chapter_id).await?;
-    if !resolved.cacheable {
-        return Ok(Arc::new(resolved.metadata));
-    }
-
-    Ok(state
-        .downloaded_page_transform_cache
-        .insert(chapter_id, resolved.metadata))
-}
-
-async fn resolve_downloaded_page_transform_metadata(
-    state: &AppState,
-    chapter_id: &str,
-) -> Result<ResolvedDownloadedPageTransformMetadata, AppError> {
-    let Some(chapter) = state.db.get_chapter_by_id(chapter_id).await? else {
-        return Ok(ResolvedDownloadedPageTransformMetadata {
-            metadata: DownloadedPageTransformMetadata::empty(),
-            cacheable: true,
-        });
-    };
-    let Some(manga) = state.db.get_manga_by_id(&chapter.manga_id).await? else {
-        return Ok(ResolvedDownloadedPageTransformMetadata {
-            metadata: DownloadedPageTransformMetadata::empty(),
-            cacheable: true,
-        });
-    };
-    let refs = match source_chapter_page_references(
-        &state.source_registry,
-        &state.cache,
-        manga.source.clone(),
-        chapter.source_id,
-    )
-    .await
-    {
-        Ok(refs) => refs,
-        Err(error) => {
-            tracing::debug!(
-                chapter_id,
-                source = %manga.source,
-                error = %error,
-                "Downloaded Page Transform Metadata Unavailable",
-            );
-            return Ok(ResolvedDownloadedPageTransformMetadata {
-                metadata: DownloadedPageTransformMetadata::empty(),
-                cacheable: false,
-            });
-        }
-    };
-
-    let transforms = refs
-        .items
-        .iter()
-        .map(|reference| reference.media_spec().transform)
-        .collect::<Vec<_>>();
-    let avif_quality = if transforms.iter().any(Option::is_some) {
-        crate::app::settings::source_avif_quality(&state.db, &manga.source)
-            .await
-            .map_err(AppError::from)?
-    } else {
-        DEFAULT_DOWNLOAD_TRANSFORM_AVIF_QUALITY
-    };
-
-    Ok(ResolvedDownloadedPageTransformMetadata {
-        metadata: DownloadedPageTransformMetadata {
-            transforms,
-            avif_quality,
-        },
-        cacheable: true,
-    })
-}
-
 fn downloaded_page_bucket(page: usize) -> &'static str {
     match page {
         0 => "0",
@@ -1102,18 +561,6 @@ fn downloaded_page_bucket(page: usize) -> &'static str {
         100..=199 => "100-199",
         _ => "200+",
     }
-}
-
-fn downloaded_page_window_start(page: usize, window_size: usize) -> usize {
-    let window_size = window_size.max(1);
-    (page / window_size) * window_size
-}
-
-fn downloaded_page_window_end(page: usize, page_count: usize, window_size: usize) -> usize {
-    let window_start = downloaded_page_window_start(page, window_size);
-    window_start
-        .saturating_add(window_size.max(1))
-        .min(page_count)
 }
 
 #[cfg(test)]
@@ -1228,25 +675,5 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1, 2]
         );
-    }
-
-    #[test]
-    fn downloaded_source_transform_skips_already_converted_avif_pages() {
-        assert!(!should_apply_downloaded_source_transform(
-            &MediaTransformSpec::ComixDescramble5x5,
-            "image/avif"
-        ));
-        assert!(!should_apply_downloaded_source_transform(
-            &MediaTransformSpec::ComixDescramble5x5Map((0..25).collect()),
-            "image/avif; charset=binary"
-        ));
-    }
-
-    #[test]
-    fn downloaded_source_transform_applies_to_raw_source_images() {
-        assert!(should_apply_downloaded_source_transform(
-            &MediaTransformSpec::ComixDescramble5x5,
-            "image/webp"
-        ));
     }
 }

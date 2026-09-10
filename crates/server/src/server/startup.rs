@@ -202,7 +202,6 @@ async fn bootstrap_server(
         upscaler,
         telemetry,
     });
-    crate::archive_index::spawn_startup_warm(Arc::clone(&state));
     super::router::spawn_metrics_refresh_loop(Arc::clone(&state));
 
     Ok(ServerContext { state, server_addr })

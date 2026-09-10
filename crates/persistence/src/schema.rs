@@ -135,7 +135,6 @@ pub(crate) struct DownloadEvent {
     pub(crate) created_at: String,
 }
 
-
 #[derive(Clone, Debug, toasty::Model)]
 #[table = "background_jobs"]
 pub(crate) struct BackgroundJob {

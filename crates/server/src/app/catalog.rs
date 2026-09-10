@@ -2,20 +2,19 @@ use std::time::{Duration, Instant};
 
 use crate::api::{
     dto::{
-        ApiListResponse, ChapterResponse, MangaResponse, SearchResponse,
-        SourceSettingsResponse,
+        ApiListResponse, ChapterResponse, MangaResponse, SearchResponse, SourceSettingsResponse,
     },
     error::AppError,
 };
 use autometrics::autometrics;
 use backend_cache::{CacheKey, MangaCache};
 use backend_persistence::{Database, SourceRecordInput};
+use backend_runtime::truncate_for_log;
 use backend_sources::{
-    SourceRegistry, SourceInfo,
+    SourceInfo, SourceRegistry,
     media::{encode_media_spec, media_ref_to_spec},
     types,
 };
-use backend_runtime::truncate_for_log;
 use backend_telemetry::{Metrics, trace};
 use tokio::sync::RwLock;
 use tracing::Instrument as _;
@@ -209,6 +208,7 @@ pub async fn get_source_settings(
 
     trace::record_outcome(&tracing::Span::current(), "success");
     Ok(SourceSettingsResponse {
+        auto_upscale: super::settings::source_auto_upscale(db, name).await?,
         name: name.to_owned(),
         hide_nsfw,
     })
@@ -324,7 +324,10 @@ pub async fn search_source(
     };
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let result = pm.search_manga(&name, &query, page, category.as_deref(), popular).instrument(plugin_span.clone()).await;
+    let result = pm
+        .search_manga(&name, &query, page, category.as_deref(), popular)
+        .instrument(plugin_span.clone())
+        .await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let result = match result {
         Ok(result) => result,
@@ -470,7 +473,10 @@ pub async fn get_manga_details(
     };
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let manga = pm.get_manga_details(&name, &id).instrument(plugin_span.clone()).await;
+    let manga = pm
+        .get_manga_details(&name, &id)
+        .instrument(plugin_span.clone())
+        .await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let manga = match manga {
         Ok(manga) => manga,
@@ -538,7 +544,10 @@ pub async fn get_chapter_list(
     let pm = source_registry.read().await;
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let chapters = pm.get_chapter_list(&name, &id).instrument(plugin_span.clone()).await;
+    let chapters = pm
+        .get_chapter_list(&name, &id)
+        .instrument(plugin_span.clone())
+        .await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let chapters = match chapters {
         Ok(chapters) => chapters,

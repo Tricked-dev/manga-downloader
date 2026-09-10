@@ -93,6 +93,10 @@ struct AddToLibraryRequest {
 
 #[derive(Debug, Default, Deserialize, ToSchema)]
 struct DownloadedChapterPageQuery {
+    #[schema(value_type = Option<String>)]
+    variant: Option<backend_storage::PageVariant>,
+    format: Option<String>,
+    width: Option<u32>,
     #[serde(default, alias = "skip_cache")]
     skip_page_cache: bool,
 }
@@ -263,6 +267,9 @@ async fn get_downloaded_chapter_pages(
     params(
         ("chapter_id" = String, Path, description = "Library chapter id"),
         ("page" = usize, Path, description = "Zero-based page index"),
+        ("variant" = Option<String>, Query, description = "original or upscaled; default prefers upscaled"),
+        ("format" = Option<String>, Query, description = "Optional avif, webp, or jpeg conversion"),
+        ("width" = Option<u32>, Query, description = "Optional maximum width; omitted preserves full resolution"),
         ("skip_page_cache" = Option<bool>, Query, description = "Skip downloaded page image cache reads and writes for this request")
     ),
     responses(
@@ -284,12 +291,17 @@ async fn get_downloaded_chapter_page(
         page,
         DownloadedPageReadOptions {
             skip_page_cache: query.skip_page_cache,
+            variant: query.variant,
+            format: crate::app::media::media_proxy_format_from_query(query.format.as_deref())?,
+            width: query.width,
         },
     )
     .await?;
     Response::builder()
         .status(StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, page.content_type)
+        .header("X-Page-Variant", page.variant.as_str())
+        .header("X-Cache", if page.cache_hit { "HIT" } else { "MISS" })
         .body(axum::body::Body::from(page.body))
         .map_err(AppError::from)
 }

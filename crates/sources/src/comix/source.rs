@@ -205,7 +205,7 @@ impl crate::Source for ComixSource {
     async fn manga(&self, manga_id: &str) -> SourceResult<Manga> {
         let http = &self.http;
         let mut last_error: Option<String> = None;
-        let candidates = candidate_manga_ids(http, &manga_id, true).await;
+        let candidates = candidate_manga_ids(http, manga_id, true).await;
 
         tracing::trace!(
             plugin = "comix",
@@ -267,12 +267,12 @@ impl crate::Source for ComixSource {
 
     async fn chapters(&self, manga_id: &str) -> SourceResult<Vec<Chapter>> {
         let http = &self.http;
-        let id_candidates = candidate_manga_ids(http, &manga_id, true).await;
+        let id_candidates = candidate_manga_ids(http, manga_id, true).await;
         let mut chapter_map = HashMap::new();
         let mut last_chapter_error = None;
 
         for actual_id in id_candidates {
-            let details_response = fetch_chapter_manga_details(http, &manga_id, &actual_id).await;
+            let details_response = fetch_chapter_manga_details(http, manga_id, &actual_id).await;
             if details_response
                 .as_ref()
                 .is_some_and(details_reports_no_chapters)
@@ -288,10 +288,10 @@ impl crate::Source for ComixSource {
             let reported_latest_chapter = details_response
                 .as_ref()
                 .and_then(|response| response.result.latest_chapter);
-            collect_api_chapters(http, &manga_id, &actual_id, &mut chapter_map).await;
+            collect_api_chapters(http, manga_id, &actual_id, &mut chapter_map).await;
             collect_index_fallback_chapters(
                 http,
-                &manga_id,
+                manga_id,
                 &actual_id,
                 details_response.as_ref(),
                 &mut chapter_map,
@@ -299,7 +299,7 @@ impl crate::Source for ComixSource {
             .await;
             if let Some(error) = collect_browser_captured_chapters(
                 http,
-                &manga_id,
+                manga_id,
                 &actual_id,
                 details_response.as_ref(),
                 &mut chapter_map,
@@ -342,7 +342,7 @@ impl crate::Source for ComixSource {
     async fn pages(&self, chapter_id: &str) -> SourceResult<Vec<Page>> {
         let http = &self.http;
         let numeric_chapter_id =
-            chapter_id_from_reader_url(&chapter_id).or_else(|| chapter_id.parse::<i32>().ok());
+            chapter_id_from_reader_url(chapter_id).or_else(|| chapter_id.parse::<i32>().ok());
         let url = numeric_chapter_id
             .map(|chapter_id| chapter_pages_url(&chapter_id.to_string()))
             .unwrap_or_default();
@@ -363,9 +363,9 @@ impl crate::Source for ComixSource {
         };
         let pages = match api_pages {
             Some(Ok(pages))
-                if is_reader_url(&chapter_id) && pages_need_browser_descramble(&pages) =>
+                if is_reader_url(chapter_id) && pages_need_browser_descramble(&pages) =>
             {
-                match fetch_browser_captured_pages(http, &chapter_id).await {
+                match fetch_browser_captured_pages(http, chapter_id).await {
                     Ok(captured_pages) if pages_have_descramble_maps(&captured_pages) => {
                         captured_pages
                     }
@@ -373,18 +373,18 @@ impl crate::Source for ComixSource {
                 }
             }
             Some(Ok(pages)) => pages,
-            Some(Err(err)) if is_reader_url(&chapter_id) => {
+            Some(Err(err)) if is_reader_url(chapter_id) => {
                 tracing::debug!(
                     plugin = "comix",
                     chapter_id = %chapter_id,
                     error = %err.message,
                     "Source Page List API Failed; Trying Browser Capture",
                 );
-                fetch_browser_captured_pages(http, &chapter_id).await?
+                fetch_browser_captured_pages(http, chapter_id).await?
             }
             Some(Err(err)) => return Err(err),
-            None if is_reader_url(&chapter_id) => {
-                fetch_browser_captured_pages(http, &chapter_id).await?
+            None if is_reader_url(chapter_id) => {
+                fetch_browser_captured_pages(http, chapter_id).await?
             }
             None => {
                 return Err(source_error(

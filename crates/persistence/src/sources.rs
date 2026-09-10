@@ -1,9 +1,7 @@
 use anyhow::{Result, anyhow};
 
-use crate::schema::{Source};
-use crate::{
-    Database, SourceRecordInput,
-};
+use crate::schema::Source;
+use crate::{Database, SourceRecordInput};
 
 impl Database {
     /// Inserts or updates all source records from plugin metadata.

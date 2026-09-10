@@ -7,7 +7,6 @@ const DOWNLOADED_ARCHIVE_CREATED_ROUTE_SNAPSHOT_NAMES: &[&str] = &[
     "library:all-chapters",
     "library:list",
     "library:updates",
-    "settings:archive-index",
     "stats:overview",
 ];
 
@@ -15,18 +14,10 @@ const DOWNLOADED_ARCHIVE_DELETED_ROUTE_SNAPSHOT_NAMES: &[&str] = &[
     "downloads:list",
     "library:all-chapters",
     "library:list",
-    "settings:archive-index",
     "stats:overview",
 ];
 
-const DOWNLOADED_ARCHIVE_REENCODED_ROUTE_SNAPSHOT_NAMES: &[&str] =
-    &["settings:archive-index", "stats:overview"];
-
-const DOWNLOADED_ARCHIVE_METADATA_CHANGED_ROUTE_SNAPSHOT_NAMES: &[&str] =
-    &["settings:archive-index", "stats:overview"];
-
-const DOWNLOADED_ARCHIVES_BULK_REENCODED_ROUTE_SNAPSHOT_NAMES: &[&str] =
-    &["settings:archive-index", "stats:overview"];
+const DOWNLOADED_ARCHIVE_METADATA_CHANGED_ROUTE_SNAPSHOT_NAMES: &[&str] = &["stats:overview"];
 
 const SOURCE_CATALOG_ROUTE_SNAPSHOT_NAMES: &[&str] =
     &["library:list", "sources:list", "stats:overview"];
@@ -36,20 +27,16 @@ const LOCAL_LIBRARY_ROUTE_SNAPSHOT_NAMES: &[&str] = &[
     "library:all-chapters",
     "library:list",
     "library:updates",
-    "settings:archive-index",
     "stats:overview",
 ];
 
 const READ_PROGRESS_ROUTE_SNAPSHOT_NAMES: &[&str] = &["library:all-chapters", "stats:overview"];
 
-const SETTINGS_ROUTE_SNAPSHOT_NAMES: &[&str] =
-    &["settings:get", "settings:archive-index", "stats:overview"];
+const SETTINGS_ROUTE_SNAPSHOT_NAMES: &[&str] = &["settings:get", "stats:overview"];
 
 const DATABASE_MAINTENANCE_ROUTE_SNAPSHOT_NAMES: &[&str] = &[];
 
 const STATS_MAINTENANCE_ROUTE_SNAPSHOT_NAMES: &[&str] = &["stats:overview"];
-
-const ARCHIVE_INDEX_MAINTENANCE_ROUTE_SNAPSHOT_NAMES: &[&str] = &["settings:archive-index"];
 
 pub(crate) fn download_list_changed(state: &AppState) {
     invalidate_route_snapshots(state, download_list_route_snapshot_names());
@@ -63,14 +50,6 @@ pub(crate) fn downloaded_archive_deleted(state: &AppState, _download_id: &str, _
     invalidate_route_snapshots(state, downloaded_archive_deleted_route_snapshot_names());
 }
 
-pub(crate) fn downloaded_archive_reencoded(
-    state: &AppState,
-    _download_id: &str,
-    _chapter_id: &str,
-) {
-    invalidate_route_snapshots(state, downloaded_archive_reencoded_route_snapshot_names());
-}
-
 pub(crate) fn downloaded_archive_metadata_changed(
     state: &AppState,
     _download_id: &str,
@@ -82,15 +61,6 @@ pub(crate) fn downloaded_archive_metadata_changed(
     );
 }
 
-pub(crate) fn downloaded_archives_bulk_reencoded(state: &AppState) {
-    invalidate_route_snapshots(
-        state,
-        downloaded_archives_bulk_reencoded_route_snapshot_names(),
-    );
-}
-
-
-
 pub(crate) fn source_enabled_changed(state: &AppState, _source: &str, _enabled: bool) {
     invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
 }
@@ -98,7 +68,6 @@ pub(crate) fn source_enabled_changed(state: &AppState, _source: &str, _enabled: 
 pub(crate) fn source_settings_changed(state: &AppState, _source: &str) {
     invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
 }
-
 
 pub(crate) fn local_library_changed(state: &AppState) {
     invalidate_route_snapshots(state, local_library_route_snapshot_names());
@@ -121,10 +90,6 @@ pub(crate) fn stats_maintenance_completed(state: &AppState) {
     invalidate_route_snapshots(state, stats_maintenance_route_snapshot_names());
 }
 
-pub(crate) fn archive_index_maintenance_completed(state: &AppState) {
-    invalidate_route_snapshots(state, archive_index_maintenance_route_snapshot_names());
-}
-
 fn invalidate_route_snapshots(state: &AppState, names: &[&str]) {
     for name in names {
         state
@@ -145,16 +110,8 @@ const fn downloaded_archive_deleted_route_snapshot_names() -> &'static [&'static
     DOWNLOADED_ARCHIVE_DELETED_ROUTE_SNAPSHOT_NAMES
 }
 
-const fn downloaded_archive_reencoded_route_snapshot_names() -> &'static [&'static str] {
-    DOWNLOADED_ARCHIVE_REENCODED_ROUTE_SNAPSHOT_NAMES
-}
-
 const fn downloaded_archive_metadata_changed_route_snapshot_names() -> &'static [&'static str] {
     DOWNLOADED_ARCHIVE_METADATA_CHANGED_ROUTE_SNAPSHOT_NAMES
-}
-
-const fn downloaded_archives_bulk_reencoded_route_snapshot_names() -> &'static [&'static str] {
-    DOWNLOADED_ARCHIVES_BULK_REENCODED_ROUTE_SNAPSHOT_NAMES
 }
 
 const fn source_catalog_route_snapshot_names() -> &'static [&'static str] {
@@ -182,10 +139,6 @@ const fn stats_maintenance_route_snapshot_names() -> &'static [&'static str] {
     STATS_MAINTENANCE_ROUTE_SNAPSHOT_NAMES
 }
 
-const fn archive_index_maintenance_route_snapshot_names() -> &'static [&'static str] {
-    ARCHIVE_INDEX_MAINTENANCE_ROUTE_SNAPSHOT_NAMES
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,7 +159,6 @@ mod tests {
                     "library:all-chapters",
                     "library:list",
                     "library:updates",
-                    "settings:archive-index",
                     "stats:overview",
                 ],
             ),
@@ -217,24 +169,13 @@ mod tests {
                     "downloads:list",
                     "library:all-chapters",
                     "library:list",
-                    "settings:archive-index",
                     "stats:overview",
                 ],
             ),
             (
-                "downloaded_archive_reencoded",
-                downloaded_archive_reencoded_route_snapshot_names(),
-                &["settings:archive-index", "stats:overview"],
-            ),
-            (
                 "downloaded_archive_metadata_changed",
                 downloaded_archive_metadata_changed_route_snapshot_names(),
-                &["settings:archive-index", "stats:overview"],
-            ),
-            (
-                "downloaded_archives_bulk_reencoded",
-                downloaded_archives_bulk_reencoded_route_snapshot_names(),
-                &["settings:archive-index", "stats:overview"],
+                &["stats:overview"],
             ),
             (
                 "source_enabled_changed",
@@ -254,7 +195,6 @@ mod tests {
                     "library:all-chapters",
                     "library:list",
                     "library:updates",
-                    "settings:archive-index",
                     "stats:overview",
                 ],
             ),
@@ -266,7 +206,7 @@ mod tests {
             (
                 "settings_changed",
                 settings_route_snapshot_names(),
-                &["settings:get", "settings:archive-index", "stats:overview"],
+                &["settings:get", "stats:overview"],
             ),
             (
                 "database_maintenance_completed",
@@ -277,11 +217,6 @@ mod tests {
                 "stats_maintenance_completed",
                 stats_maintenance_route_snapshot_names(),
                 &["stats:overview"],
-            ),
-            (
-                "archive_index_maintenance_completed",
-                archive_index_maintenance_route_snapshot_names(),
-                &["settings:archive-index"],
             ),
         ];
 

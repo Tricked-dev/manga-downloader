@@ -1,9 +1,7 @@
-pub mod archive_index_maintenance;
 pub mod catalog;
 pub mod chapter_pages;
 pub mod clients;
 pub mod download_work_state;
-pub mod downloaded_archive_derived_state;
 pub mod downloaded_archive_lifecycle;
 pub mod downloaded_archive_resolution;
 pub mod downloads;
@@ -18,3 +16,5 @@ pub mod settings;
 pub mod source_catalog_changes;
 pub mod source_chapter_sync;
 pub mod stats_projection;
+
+pub(crate) mod upscaling;

@@ -1,6 +1,6 @@
 use backend_sources::media::{
     FetchRequestSpec, HttpHeaderSpec, MediaRefSpec, MediaTransformSpec, RequestPurposeSpec,
-    decode_media_spec, encode_media_spec, media_spec_to_proxy_url, media_ref_to_spec,
+    decode_media_spec, encode_media_spec, media_ref_to_spec, media_spec_to_proxy_url,
 };
 
 #[test]

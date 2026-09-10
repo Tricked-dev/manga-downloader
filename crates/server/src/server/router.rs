@@ -323,8 +323,8 @@ mod tests {
     use axum::routing::get;
     use axum_test::TestServer;
     use backend_persistence::{ChapterInsert, MangaInsert};
+    use std::fs;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-    use std::{fs, time::Duration};
 
     #[test]
     fn cloudflare_client_ip_parses_valid_header() {
@@ -388,66 +388,102 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn downloaded_page_route_smokes_uncached_and_cached_reads() {
-        let state = test_state("downloaded-page-route").await;
-        let chapter_id = seed_completed_archive(&state, &[("001.jpg", b"page-one")]).await;
+    async fn bbf_page_routes_preserve_originals_select_variants_and_cache_only_conversions() {
+        let state = test_state("bbf-page-routes").await;
+        let pixels = image::RgbImage::from_pixel(1600, 24, image::Rgb([77, 88, 99]));
+        let mut original = std::io::Cursor::new(Vec::new());
+        pixels
+            .write_to(&mut original, image::ImageFormat::Png)
+            .unwrap();
+        let original = original.into_inner();
+        let chapter_id = seed_completed_archive(&state, &[("001.png", &original)]).await;
         let server = TestServer::new(api_router(&state));
-
-        let first = server
-            .get(&format!(
-                "/v1/library/chapters/{chapter_id}/pages/0?skip_page_cache=true"
-            ))
-            .await;
-        first
+        let url = format!("/v1/library/chapters/{chapter_id}/pages/0");
+        let response = server.get(&url).await;
+        response
             .assert_status_ok()
-            .assert_header(CONTENT_TYPE, "image/jpeg");
-        assert_eq!(first.as_bytes().as_ref(), b"page-one");
-
-        let page_entry = state
-            .archive_index
-            .cached_chapter_pages(&chapter_id)
-            .expect("page facts should be cached")
-            .first()
-            .expect("first page should exist")
-            .clone();
-        assert!(
-            state.cache.get_image(&page_entry.cache_key).await.is_none(),
-            "skip_page_cache should avoid cache writes"
-        );
-
-        let uncached_fill = server
-            .get(&format!("/v1/library/chapters/{chapter_id}/pages/0"))
-            .await;
-        uncached_fill.assert_status_ok();
-        assert_eq!(uncached_fill.as_bytes().as_ref(), b"page-one");
-        assert!(
-            state.cache.get_image(&page_entry.cache_key).await.is_some(),
-            "normal route read should fill the page cache"
-        );
-
-        let cached = server
-            .get(&format!("/v1/library/chapters/{chapter_id}/pages/0"))
-            .await;
-        cached.assert_status_ok();
-        assert_eq!(cached.as_bytes().as_ref(), b"page-one");
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn archive_index_maintenance_routes_smoke() {
-        let state = test_state("archive-index-routes").await;
-        let server = TestServer::new(api_router(&state));
-
-        for (method, path) in [
-            (http::Method::GET, "/v1/settings/archive-index"),
-            (http::Method::POST, "/v1/settings/archive-index/rebuild"),
-            (
-                http::Method::POST,
-                "/v1/settings/archive-index/cleanup-stale",
-            ),
-            (http::Method::DELETE, "/v1/settings/archive-index"),
-        ] {
-            server.method(method, path).await.assert_status_ok();
+            .assert_header(CONTENT_TYPE, "image/png")
+            .assert_header("X-Page-Variant", "original");
+        assert_eq!(response.as_bytes().as_ref(), original);
+        drop(response);
+        server
+            .get(&format!("{url}?variant=upscaled"))
+            .await
+            .assert_status_not_found();
+        server
+            .get(&format!("{url}?width=0"))
+            .await
+            .assert_status_bad_request();
+        server
+            .get(&format!("{url}?format=invalid"))
+            .await
+            .assert_status_bad_request();
+        server
+            .get(&format!("/v1/library/chapters/{chapter_id}/pages/1"))
+            .await
+            .assert_status_not_found();
+        for format in ["avif", "webp", "jpeg"] {
+            let converted_url = format!("{url}?format={format}");
+            let first = server.get(&converted_url).await;
+            first.assert_status_ok().assert_header("X-Cache", "MISS");
+            assert_eq!(
+                backend_image::decode_image(first.as_bytes())
+                    .unwrap()
+                    .width(),
+                1600
+            );
+            let second = server.get(&converted_url).await;
+            second.assert_status_ok().assert_header("X-Cache", "HIT");
+            assert_eq!(first.as_bytes(), second.as_bytes());
         }
+        let resized = server.get(&format!("{url}?width=320")).await;
+        resized
+            .assert_status_ok()
+            .assert_header(CONTENT_TYPE, "image/avif");
+        assert_eq!(
+            backend_image::decode_image(resized.as_bytes())
+                .unwrap()
+                .width(),
+            320
+        );
+        let archive =
+            crate::app::downloaded_archive_resolution::existing_completed_archive_for_chapter(
+                &state.db,
+                &chapter_id,
+            )
+            .await
+            .unwrap();
+        let before = backend_storage::inspect(archive.archive_path.clone())
+            .await
+            .unwrap();
+        let upscaled_pixels = image::RgbImage::from_pixel(3200, 48, image::Rgb([12, 34, 56]));
+        let upscaled = backend_image::encode_lossless_avif_rgb(&upscaled_pixels).unwrap();
+        let staged = archive.archive_path.with_extension("avif");
+        tokio::fs::write(&staged, &upscaled).await.unwrap();
+        backend_storage::append_upscaled(
+            archive.archive_path,
+            backend_storage::UpscaledChapter {
+                pages: vec![staged],
+                model: "route-fixture".into(),
+                scale: 2,
+                tile_size: 256,
+                expected_footer_hash: before.footer_hash,
+            },
+            || false,
+        )
+        .await
+        .unwrap();
+        let response = server.get(&url).await;
+        response
+            .assert_status_ok()
+            .assert_header("X-Page-Variant", "upscaled")
+            .assert_header(CONTENT_TYPE, "image/avif");
+        assert_eq!(response.as_bytes().as_ref(), upscaled);
+        let response = server.get(&format!("{url}?variant=original")).await;
+        response
+            .assert_status_ok()
+            .assert_header("X-Page-Variant", "original");
+        assert_eq!(response.as_bytes().as_ref(), original);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -490,44 +526,6 @@ mod tests {
             chapter_ids,
             BTreeSet::from([first_chapter_id.as_str(), second_chapter_id.as_str()])
         );
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn downloaded_page_list_smokes_next_chapter_warming() {
-        let state = test_state("downloaded-page-warming").await;
-        let (first_chapter_id, next_chapter_id) = seed_completed_series_archives(
-            &state,
-            &[("001.jpg", b"first-chapter")],
-            &[("001.jpg", b"next-chapter")],
-        )
-        .await;
-        let next_page = state
-            .archive_index
-            .get_for_chapter(
-                &state.db,
-                &state.telemetry.metrics,
-                &next_chapter_id,
-                "test",
-            )
-            .await
-            .expect("next archive should index")
-            .page(0)
-            .expect("next page should exist")
-            .clone();
-        let server = TestServer::new(api_router(&state));
-
-        server
-            .get(&format!("/v1/library/chapters/{first_chapter_id}/pages"))
-            .await
-            .assert_status_ok();
-
-        for _ in 0..20 {
-            if state.cache.get_image(&next_page.cache_key).await.is_some() {
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(25)).await;
-        }
-        panic!("next downloaded chapter should be warmed into the page cache");
     }
 
     fn api_router(state: &Arc<AppState>) -> axum::Router {
@@ -648,8 +646,17 @@ mod tests {
                 ((*name).to_string(), path)
             })
             .collect::<Vec<_>>();
-        backend_image::build_zstd_folder_from_paths(&pages, &archive_path, None, None)
-            .expect("archive should be built");
+        backend_storage::write_originals(
+            archive_path.clone(),
+            backend_storage::OriginalChapter {
+                pages: pages.into_iter().map(|(_, path)| path).collect(),
+                comicinfo_xml: "<ComicInfo/>".into(),
+                cover: None,
+            },
+            || false,
+        )
+        .await
+        .expect("archive should be built");
         let archive_size = fs::metadata(&archive_path)
             .expect("archive metadata should load")
             .len();

@@ -1,6 +1,5 @@
 #![allow(clippy::missing_errors_doc)]
 
-mod archive_index;
 mod background_jobs;
 mod chapters;
 mod download_work_state;
@@ -26,18 +25,14 @@ use tokio::sync::{Mutex, MutexGuard};
 
 use backend_core::settings::SETTING_DEFINITIONS;
 
-pub use archive_index::{
-    ArchiveIndexCleanupResult, ArchiveIndexIdentity, ArchiveIndexRecord, ArchiveIndexStats,
-};
 pub use backend_core::settings::setting_default;
 pub use background_jobs::{BackgroundJobFailureOutcome, BackgroundJobLease, BackgroundJobStatus};
 pub use download_work_state::{DownloadWorkStatus, DownloadWorkTransition};
 pub use maintenance::DatabaseCleanupResult;
 pub use models::{
     ChapterInsert, ChapterRow, DownloadMetricRow, DownloadRow, MangaInsert, MangaRow,
-    SourceCountRow, SourceRecordInput,
-    StatsActivityPoint, StatsCacheSummary, StatsOverview, StatsRecentChapter, StatsSourceBreakdown,
-    StatsStorageSummary, StatsTotals,
+    SourceCountRow, SourceRecordInput, StatsActivityPoint, StatsCacheSummary, StatsOverview,
+    StatsRecentChapter, StatsSourceBreakdown, StatsStorageSummary, StatsTotals,
 };
 pub use readonly::ReadOnlyDatabase;
 pub use setup::{

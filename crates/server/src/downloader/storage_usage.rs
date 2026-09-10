@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -50,52 +49,7 @@ pub(super) async fn move_archive_into_library(
     staged_path: &Path,
     archive_path: &Path,
 ) -> Result<()> {
-    if let Some(parent) = archive_path.parent() {
-        backend_fs::create_dir_all(parent).await?;
-    }
-
-    let move_result = backend_fs::rename(staged_path, archive_path).await;
-    if let Err(error) = move_result {
-        if is_cross_device_rename_error(&error) {
-            tokio::fs::copy(staged_path, archive_path)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to copy archive from {} to {}",
-                        staged_path.display(),
-                        archive_path.display()
-                    )
-                })?;
-            backend_fs::remove_file(staged_path)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to remove staged archive {} after copy",
-                        staged_path.display()
-                    )
-                })?;
-
-            return Ok(());
-        }
-
-        return Err(error).with_context(|| {
-            format!(
-                "Failed to move archive from {} to {}",
-                staged_path.display(),
-                archive_path.display()
-            )
-        });
-    }
-
-    Ok(())
-}
-
-fn is_cross_device_rename_error(error: &anyhow::Error) -> bool {
-    error.chain().any(|error| {
-        error
-            .downcast_ref::<std::io::Error>()
-            .is_some_and(|error| error.kind() == ErrorKind::CrossesDevices)
-    })
+    backend_storage::publish(staged_path.to_path_buf(), archive_path.to_path_buf()).await
 }
 
 pub(super) async fn reserve_download_storage_for_archive(
