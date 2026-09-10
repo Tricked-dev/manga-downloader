@@ -154,9 +154,41 @@ pub fn database_parent_dir(path: &str) -> Option<&Path> {
         .filter(|parent| !parent.as_os_str().is_empty() && *parent != Path::new("."))
 }
 
-#[must_use]
-/// Builds the immutable read-only SQLite URI for `path`.
-pub fn sqlite_read_only_immutable_uri(path: &str) -> String {
-    let path = path.replace('\\', "/");
-    format!("file:{path}?mode=ro&immutable=1")
+/// Open PostgreSQL through the same type-erased Toasty database interface.
+pub async fn open_postgres_database(
+    url: &str,
+    models: ModelSet,
+    migrations: &[DatabaseMigration],
+) -> Result<Db> {
+    apply_postgres_migrations(url, migrations).await?;
+    let driver = toasty_driver_postgresql::PostgreSQL::new(url)?;
+    let mut builder = Db::builder();
+    builder.models(models);
+    Ok(builder.build(driver).await?)
+}
+
+pub async fn apply_postgres_migrations(url: &str, migrations: &[DatabaseMigration]) -> Result<()> {
+    let driver = toasty_driver_postgresql::PostgreSQL::new(url)?;
+    let mut connection = driver.connect().await?;
+    let applied = connection.applied_migrations().await?;
+    for migration in &applied {
+        if !migrations.iter().any(|known| known.id == migration.id()) {
+            bail!(
+                "PostgreSQL database has an unknown migration id {}",
+                migration.id()
+            );
+        }
+    }
+    for migration in migrations {
+        if !applied.iter().any(|applied| applied.id() == migration.id) {
+            connection
+                .apply_migration(
+                    migration.id,
+                    migration.name,
+                    &Migration::new_sql(migration.sql.trim().to_string()),
+                )
+                .await?;
+        }
+    }
+    Ok(())
 }

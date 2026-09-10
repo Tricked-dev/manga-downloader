@@ -38,7 +38,10 @@ impl Database {
                 .await?;
         }
 
-        run_sqlite_maintenance(self.path())?;
+        if self.backend() == crate::DatabaseBackend::Sqlite {
+            let path = self.path().to_string();
+            tokio::task::spawn_blocking(move || run_sqlite_maintenance(&path)).await??;
+        }
         Ok(result)
     }
 }

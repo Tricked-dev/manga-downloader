@@ -63,6 +63,9 @@ pub struct ChapterRow {
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct DownloadRow {
+    pub upscaled_at: Option<String>,
+    pub upscale_model: Option<String>,
+    pub upscale_scale: Option<u32>,
     pub id: String,
     pub chapter_id: String,
     pub manga_id: String,

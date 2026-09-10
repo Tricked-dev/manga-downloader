@@ -26,6 +26,7 @@ pub(crate) struct Source {
 
 #[derive(Clone, Debug, toasty::Model)]
 #[table = "library_series"]
+#[index(source_key, remote_series_id)]
 pub(crate) struct LibrarySeries {
     #[key]
     #[default(crate::new_id())]
@@ -53,7 +54,14 @@ pub(crate) struct LibrarySeries {
 }
 
 #[derive(Clone, Debug, toasty::Model)]
+#[allow(
+    clippy::duplicated_attributes,
+    reason = "Toasty composite indexes intentionally share columns"
+)]
 #[table = "chapters"]
+#[index(series_id, number, published_at)]
+#[index(series_id, remote_chapter_id)]
+#[index(published_at, number, fetched_at)]
 pub(crate) struct Chapter {
     #[key]
     #[default(crate::new_id())]
@@ -74,7 +82,14 @@ pub(crate) struct Chapter {
 }
 
 #[derive(Clone, Debug, toasty::Model)]
+#[allow(
+    clippy::duplicated_attributes,
+    reason = "Toasty composite indexes intentionally share columns"
+)]
 #[table = "downloads"]
+#[index(status, queued_at)]
+#[index(chapter_id, status, queued_at)]
+#[index(series_id, status)]
 pub(crate) struct Download {
     #[key]
     #[default(crate::new_id())]
@@ -89,6 +104,9 @@ pub(crate) struct Download {
     pub(crate) stage: String,
     pub(crate) error_code: Option<String>,
     pub(crate) error_message: Option<String>,
+    pub(crate) upscaled_at: Option<String>,
+    pub(crate) upscale_model: Option<String>,
+    pub(crate) upscale_scale: Option<i64>,
     pub(crate) file_path: Option<String>,
     pub(crate) file_size_bytes: Option<i64>,
     pub(crate) page_count: i64,
@@ -102,6 +120,7 @@ pub(crate) struct Download {
 
 #[derive(Clone, Debug, toasty::Model)]
 #[table = "stats_events"]
+#[index(created_at, kind)]
 pub(crate) struct StatsEvent {
     #[key]
     #[default(crate::new_id())]
@@ -122,6 +141,7 @@ pub(crate) struct StatsEvent {
 
 #[derive(Clone, Debug, toasty::Model)]
 #[table = "download_events"]
+#[index(download_id, created_at)]
 pub(crate) struct DownloadEvent {
     #[key]
     #[default(crate::new_id())]

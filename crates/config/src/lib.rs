@@ -6,8 +6,8 @@ use std::path::PathBuf;
 #[derive(Debug, schematic::Config)]
 #[config(rename_all = "snake_case")]
 pub struct ServerConfig {
-    #[setting(default = PathBuf::from("./data/manga.db"), env = "DB_PATH", parse_env = schematic::env::ignore_empty)]
-    pub db_path: PathBuf,
+    #[setting(default = "./data/manga.db", env = "DATABASE_URL", parse_env = schematic::env::ignore_empty)]
+    pub database_url: String,
 
     #[setting(default = PathBuf::from("./data/models"), env = "MODELS_DIR", parse_env = schematic::env::ignore_empty)]
     pub models_dir: PathBuf,
@@ -24,7 +24,7 @@ pub struct ServerConfig {
 
 #[derive(Debug, Default)]
 pub struct ServerConfigOverrides {
-    pub db_path: Option<PathBuf>,
+    pub database_url: Option<String>,
     pub models_dir: Option<PathBuf>,
     pub upscale_device: Option<String>,
     pub server_addr: Option<String>,
@@ -51,8 +51,8 @@ impl ServerConfig {
         if let Some(upscale_device) = overrides.upscale_device {
             self.upscale_device = upscale_device;
         }
-        if let Some(db_path) = overrides.db_path {
-            self.db_path = db_path;
+        if let Some(database_url) = overrides.database_url {
+            self.database_url = database_url;
         }
         if let Some(server_addr) = overrides.server_addr {
             self.server_addr = server_addr;

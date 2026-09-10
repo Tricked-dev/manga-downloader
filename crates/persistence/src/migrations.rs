@@ -1,54 +1,11 @@
 use crate::DatabaseMigration;
-
-pub(crate) const MIGRATIONS: &[DatabaseMigration] = &[
-    DatabaseMigration::new(
-        1,
-        "initial_schema",
-        include_str!("../migrations/0001_initial.sql"),
-    ),
-    DatabaseMigration::new(
-        2,
-        "constraints_and_indexes",
-        include_str!("../migrations/0002_constraints_and_indexes.sql"),
-    ),
-    DatabaseMigration::new(
-        3,
-        "plugin_api_v5_clean_break",
-        include_str!("../migrations/0003_plugin_api_v5_clean_break.sql"),
-    ),
-    DatabaseMigration::new(
-        4,
-        "removed_compat_api",
-        include_str!("../migrations/0004_removed_compat_api.sql"),
-    ),
-    DatabaseMigration::new(
-        5,
-        "chapter_read_progress",
-        include_str!("../migrations/0005_chapter_read_progress.sql"),
-    ),
-    DatabaseMigration::new(
-        6,
-        "user_stats",
-        include_str!("../migrations/0006_user_stats.sql"),
-    ),
-    DatabaseMigration::new(
-        7,
-        "downloaded_archive_index",
-        include_str!("../migrations/0007_downloaded_archive_index.sql"),
-    ),
-    DatabaseMigration::new(
-        8,
-        "reader_common_route_indexes",
-        include_str!("../migrations/0008_reader_common_route_indexes.sql"),
-    ),
-    DatabaseMigration::new(
-        9,
-        "background_jobs",
-        include_str!("../migrations/0009_background_jobs.sql"),
-    ),
-    DatabaseMigration::new(
-        10,
-        "native_sources",
-        include_str!("../migrations/0010_native_sources.sql"),
-    ),
-];
+pub(crate) const SQLITE_MIGRATIONS: &[DatabaseMigration] = &[DatabaseMigration::new(
+    1,
+    "initial_schema",
+    include_str!("../migrations/sqlite/0001_initial.sql"),
+)];
+pub(crate) const POSTGRES_MIGRATIONS: &[DatabaseMigration] = &[DatabaseMigration::new(
+    1,
+    "initial_schema",
+    include_str!("../migrations/postgres/0001_initial.sql"),
+)];

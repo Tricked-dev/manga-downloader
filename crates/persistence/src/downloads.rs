@@ -9,6 +9,32 @@ use crate::{
 };
 
 impl Database {
+    /// Record a published upscale without counting a second chapter download.
+    pub async fn mark_upscaled(
+        &self,
+        download_id: &str,
+        model: &str,
+        scale: u32,
+        file_size: u64,
+    ) -> Result<()> {
+        let _write = self.write_guard().await;
+        let mut db = self.executor();
+        Download::filter(
+            Download::fields()
+                .id()
+                .eq(download_id)
+                .and(Download::fields().status().eq("completed")),
+        )
+        .update()
+        .upscaled_at(Some(now_timestamp()))
+        .upscale_model(Some(model.to_string()))
+        .upscale_scale(Some(i64::from(scale)))
+        .file_size_bytes(Some(i64::try_from(file_size).unwrap_or(i64::MAX)))
+        .exec(&mut db)
+        .await?;
+        Ok(())
+    }
+
     /// Enqueues a single chapter download and returns its download id.
     ///
     /// If an active download already exists for the chapter, that id is returned.
@@ -215,6 +241,9 @@ impl Database {
 
     /// Claims the oldest queued download and moves it into the fetch stage.
     pub async fn get_next_queued_download(&self) -> Result<Option<DownloadRow>> {
+        if self.backend() == crate::DatabaseBackend::Postgres {
+            return self.claim_postgres_download().await;
+        }
         let write_guard = self.write_guard().await;
         let mut db = self.executor();
         let mut tx = db.transaction().await?;
@@ -272,6 +301,24 @@ impl Database {
         let mut db = self.executor();
         let mut rows = build_download_rows(&mut db, vec![updated]).await?;
         Ok(rows.pop())
+    }
+
+    /// PostgreSQL workers claim one row atomically across connections/processes.
+    /// Toasty 0.7 does not expose SKIP LOCKED in model queries.
+    async fn claim_postgres_download(&self) -> Result<Option<DownloadRow>> {
+        let mut db = self.executor();
+        let rows = toasty::sql::query(
+            "UPDATE downloads SET status = 'fetching_pages', stage = 'fetching_pages',              progress_percent = 0, error_code = NULL, error_message = NULL,              started_at = COALESCE(started_at, $1), attempt_count = attempt_count + 1              WHERE id = (SELECT id FROM downloads WHERE status = 'queued'              ORDER BY queued_at, id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id"
+        ).bind(now_timestamp()).exec(&mut db).await?;
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+        let id = row
+            .as_record()
+            .and_then(|record| record.first())
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| anyhow!("download claim returned an invalid id"))?;
+        self.get_download_by_id(id).await
     }
 
     /// Requeues interrupted downloads left in non-terminal startup states.
@@ -686,6 +733,11 @@ async fn build_download_rows(
             })?;
 
             Ok(DownloadRow {
+                upscaled_at: download.upscaled_at,
+                upscale_model: download.upscale_model,
+                upscale_scale: download
+                    .upscale_scale
+                    .and_then(|scale| u32::try_from(scale).ok()),
                 id: download.id,
                 chapter_id: chapter.id.clone(),
                 manga_id: series.id.clone(),

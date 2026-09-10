@@ -72,7 +72,23 @@ async fn sync_chapters_replaces_stale_remote_id_by_chapter_number() {
 
 async fn temp_database() -> Database {
     let path = temp_database_path();
-    Database::new(&path.to_string_lossy())
+    let database_url = if let Ok(url) = std::env::var("TEST_POSTGRES_URL") {
+        let pool = sqlx::PgPool::connect(&url)
+            .await
+            .expect("connect to PostgreSQL test service");
+        let name = format!("manga_chapters_test_{}", uuid::Uuid::now_v7().simple());
+        sqlx::query(&format!("CREATE DATABASE {name}"))
+            .execute(&pool)
+            .await
+            .expect("create isolated test database");
+        let mut url = url::Url::parse(&url).expect("valid PostgreSQL URL");
+        url.set_path(&name);
+        pool.close().await;
+        url.to_string()
+    } else {
+        path.to_string_lossy().into_owned()
+    };
+    Database::open(&database_url)
         .await
         .expect("database should initialize")
 }

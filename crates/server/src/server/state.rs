@@ -14,7 +14,6 @@ use tokio::sync::{Mutex, Notify, RwLock};
 
 #[derive(Clone)]
 pub(crate) struct AppConfig {
-    pub(crate) db_path: PathBuf,
     pub(crate) cache_disk_path: PathBuf,
     pub(crate) backend_api_key: Option<SecretString>,
 }
@@ -33,6 +32,7 @@ pub(crate) struct AppState {
     pub(crate) source_registry: RwLock<SourceRegistry>,
     pub(crate) cache: MangaCache,
     pub(crate) upscaler: backend_upscale::Upscaler,
+    pub(crate) upscale_queue: crate::jobs::UpscaleQueue,
     pub(crate) telemetry: Telemetry,
     pub(crate) download_queue_notify: Notify,
     pub(crate) active_download_cancellations:
@@ -47,6 +47,7 @@ pub(crate) struct AppStateParts {
     pub(crate) source_registry: SourceRegistry,
     pub(crate) cache: MangaCache,
     pub(crate) upscaler: backend_upscale::Upscaler,
+    pub(crate) upscale_queue: crate::jobs::UpscaleQueue,
     pub(crate) telemetry: Telemetry,
 }
 
@@ -57,6 +58,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         source_registry,
         cache,
         upscaler,
+        upscale_queue,
         telemetry,
     } = parts;
 
@@ -66,6 +68,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         source_registry: RwLock::new(source_registry),
         cache,
         upscaler,
+        upscale_queue,
         telemetry,
         download_queue_notify: Notify::new(),
         active_download_cancellations: Mutex::new(HashMap::new()),
@@ -87,7 +90,23 @@ pub(crate) async fn build_test_app_state(
     std::fs::create_dir_all(&root).expect("test root should be created");
     std::fs::create_dir_all(&download_path).expect("test download path should be created");
 
-    let db = backend_persistence::Database::new(&db_path.to_string_lossy())
+    let database_url = if let Ok(url) = std::env::var("TEST_POSTGRES_URL") {
+        let pool = sqlx::PgPool::connect(&url)
+            .await
+            .expect("connect to PostgreSQL test service");
+        let name = format!("manga_server_test_{}", uuid::Uuid::now_v7().simple());
+        sqlx::query(&format!("CREATE DATABASE {name}"))
+            .execute(&pool)
+            .await
+            .expect("create isolated test database");
+        let mut url = url::Url::parse(&url).expect("valid PostgreSQL URL");
+        url.set_path(&name);
+        pool.close().await;
+        url.to_string()
+    } else {
+        db_path.to_string_lossy().into_owned()
+    };
+    let db = backend_persistence::Database::open(&database_url)
         .await
         .expect("database should initialize");
     db.set_setting("download_path", &download_path.to_string_lossy())
@@ -101,10 +120,12 @@ pub(crate) async fn build_test_app_state(
 
     build_app_state(AppStateParts {
         config: AppConfig {
-            db_path,
             cache_disk_path: cache_path,
             backend_api_key: None,
         },
+        upscale_queue: crate::jobs::UpscaleQueue::open(&db)
+            .await
+            .expect("initialize test queue"),
         db,
         source_registry,
         cache,

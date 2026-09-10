@@ -133,16 +133,14 @@ async fn bootstrap_server(
     telemetry: Telemetry,
 ) -> anyhow::Result<ServerContext> {
     let ServerConfig {
-        db_path,
+        database_url,
         models_dir,
         upscale_device,
         server_addr,
         backend_api_key,
     } = config;
 
-    backend_fs::create_dir_all(db_path.parent().unwrap_or_else(|| Path::new("."))).await?;
-
-    let db = backend_persistence::Database::new(&db_path.to_string_lossy()).await?;
+    let db = backend_persistence::Database::open(&database_url).await?;
     db.apply_env_overrides().await?;
 
     let settings = settings::interface(&db);
@@ -176,7 +174,8 @@ async fn bootstrap_server(
         branch = %build_info.branch.as_deref().unwrap_or("unknown"),
         commit = %build_info.commit_short_hash.as_deref().unwrap_or("unknown"),
         build_target = %build_info.build_target.as_deref().unwrap_or("unknown"),
-        db_path = %db_path.display(),
+        database_url = %backend_persistence::redacted_database_url(&database_url),
+        database_backend = db.backend().as_str(),
         loaded_plugins = source_registry.sources().len(),
         disabled_plugins = disabled_plugins.len(),
         api_key_enabled = backend_api_key.is_some(),
@@ -190,9 +189,9 @@ async fn bootstrap_server(
         device: upscale_device.parse()?,
         ..Default::default()
     })?;
+    let upscale_queue = crate::jobs::UpscaleQueue::open(&db).await?;
     let state = build_app_state(AppStateParts {
         config: AppConfig {
-            db_path,
             cache_disk_path: PathBuf::from(cache_disk_path),
             backend_api_key,
         },
@@ -200,6 +199,7 @@ async fn bootstrap_server(
         cache,
         source_registry,
         upscaler,
+        upscale_queue,
         telemetry,
     });
     super::router::spawn_metrics_refresh_loop(Arc::clone(&state));

@@ -9,6 +9,8 @@ name = "backend_persistence"
 path = "src/lib.rs"
 
 [dependencies]
+toasty-driver-postgresql.workspace = true
+url.workspace = true
 backend-core = { path = "../core" }
 backend-fs = { path = "../fs" }
 anyhow.workspace = true
@@ -21,3 +23,6 @@ toasty-driver-sqlite.workspace = true
 tokio.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+sqlx.workspace = true

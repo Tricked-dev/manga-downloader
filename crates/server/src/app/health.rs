@@ -24,7 +24,10 @@ pub async fn diagnostics(state: &AppState) -> HealthResponse {
         Ok(settings) => {
             checks.push(HealthCheckResponse::ok(
                 "database",
-                "database settings query succeeded",
+                format!(
+                    "{} database settings query succeeded",
+                    state.db.backend().as_str()
+                ),
             ));
             Some(settings)
         }
@@ -60,7 +63,9 @@ pub async fn diagnostics(state: &AppState) -> HealthResponse {
     checks.push(report_download_state(state).await);
     checks.push(probe_writable_directory("temporary_storage", &std::env::temp_dir()).await);
     checks.push(probe_writable_directory("cache_storage", &state.config.cache_disk_path).await);
-    checks.push(probe_database_path(&state.config.db_path).await);
+    if state.db.backend() == backend_persistence::DatabaseBackend::Sqlite {
+        checks.push(probe_database_path(Path::new(state.db.connection_url())).await);
+    }
 
     if let Some(settings) = settings {
         let download_path = settings

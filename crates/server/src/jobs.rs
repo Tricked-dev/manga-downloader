@@ -4,6 +4,8 @@ use apalis::prelude::{
     Acknowledge, AcknowledgementExt, Attempt, Backend, BoxDynError, Parts, Task, TaskId, TaskSink,
     TaskSinkError, TaskStream, WorkerBuilder, WorkerContext,
 };
+use apalis_postgres::{Config as PgConfig, PgContext, PgPool, PgTask, PgTaskId, PostgresStorage};
+use backend_persistence::DatabaseBackend;
 use futures_util::{
     FutureExt, Stream, StreamExt,
     future::BoxFuture,
@@ -18,6 +20,33 @@ const UPSCALE_QUEUE: &str = "upscale";
 const UPSCALE_WORKER: &str = "upscale-worker";
 const DEFAULT_MAX_ATTEMPTS: i64 = 3;
 const JOB_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The application and its durable jobs always use the same database backend.
+#[derive(Clone)]
+pub(crate) enum UpscaleQueue {
+    Sqlite,
+    Postgres(PgPool),
+}
+
+impl UpscaleQueue {
+    pub(crate) async fn open(db: &backend_persistence::Database) -> anyhow::Result<Self> {
+        match db.backend() {
+            DatabaseBackend::Sqlite => Ok(Self::Sqlite),
+            DatabaseBackend::Postgres => {
+                let pool = sqlx::postgres::PgPoolOptions::new()
+                    .max_connections(5)
+                    .connect(db.connection_url())
+                    .await?;
+                PostgresStorage::setup(&pool).await?;
+                Ok(Self::Postgres(pool))
+            }
+        }
+    }
+}
+
+fn postgres_config() -> PgConfig {
+    PgConfig::new(UPSCALE_QUEUE).set_buffer_size(1)
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct UpscaleJob {
@@ -39,6 +68,18 @@ pub(crate) async fn enqueue_upscale(
     download_id: &str,
     scale: u32,
 ) -> anyhow::Result<String> {
+    if let UpscaleQueue::Postgres(pool) = &state.upscale_queue {
+        let mut storage = PostgresStorage::<UpscaleJob>::new_with_config(pool, &postgres_config());
+        let id = PgTaskId::new(ulid::Ulid::new());
+        let mut task: PgTask<UpscaleJob> = Task::new(UpscaleJob::new(download_id, scale));
+        task.parts.task_id = Some(id);
+        task.parts.ctx = PgContext::default().with_max_attempts(3);
+        storage
+            .push_task(task)
+            .await
+            .map_err(|error| anyhow::anyhow!("failed to enqueue upscale: {error}"))?;
+        return Ok(id.to_string());
+    }
     let mut storage = ToastyJobStorage::<UpscaleJob>::new(state.db.clone(), UPSCALE_QUEUE);
     storage
         .push(UpscaleJob::new(download_id, scale))
@@ -51,6 +92,30 @@ pub(crate) async fn run_upscale_worker(
     state: Arc<AppState>,
     shutdown: ShutdownGuard,
 ) -> anyhow::Result<()> {
+    if let UpscaleQueue::Postgres(pool) = &state.upscale_queue {
+        let storage = PostgresStorage::<UpscaleJob>::new_with_notify(pool, &postgres_config());
+        let worker =
+            WorkerBuilder::new(UPSCALE_WORKER)
+                .backend(storage)
+                .build(move |job: UpscaleJob| {
+                    let state = Arc::clone(&state);
+                    async move { upscaling::run(state, &job.download_id, job.scale).await }
+                });
+        let shutdown = shutdown.clone_weak();
+        tracing::info!(
+            queue = UPSCALE_QUEUE,
+            backend = "postgres",
+            "Upscale Worker Started"
+        );
+        worker
+            .run_until(async move {
+                shutdown.cancelled().await;
+                Ok::<(), apalis::prelude::WorkerError>(())
+            })
+            .await
+            .map_err(|error| anyhow::anyhow!("upscale worker failed: {error}"))?;
+        return Ok(());
+    }
     let recovered = state
         .db
         .recover_interrupted_background_jobs(UPSCALE_QUEUE)
@@ -318,3 +383,90 @@ impl fmt::Display for JobStorageError {
 }
 
 impl std::error::Error for JobStorageError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn durable_queue_drains_preexisting_and_live_jobs_then_stops() {
+        let state = crate::server::build_test_app_state("durable-jobs", "durable-jobs").await;
+        // A deleted download is a terminal no-op; it must not retry forever.
+        let first = enqueue_upscale(&state, "already-deleted", 2).await.unwrap();
+        let (stop, signal) = tokio::sync::oneshot::channel();
+        let shutdown = tokio_graceful::Shutdown::builder()
+            .with_signal(async move {
+                let _ = signal.await;
+            })
+            .build();
+        let worker_state = Arc::clone(&state);
+        let worker = shutdown.spawn_task_fn(move |guard| run_upscale_worker(worker_state, guard));
+        wait_for_done(&state, &first).await;
+        let second = enqueue_upscale(&state, "deleted-after-start", 2)
+            .await
+            .unwrap();
+        assert_ne!(first, second);
+        wait_for_done(&state, &second).await;
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), worker)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        shutdown.shutdown().await;
+        state.upscaler.shutdown().await.unwrap();
+        state.cache.close().await.unwrap();
+    }
+
+    async fn wait_for_done(state: &AppState, id: &str) {
+        tokio::time::timeout(Duration::from_secs(15), async {
+            loop {
+                let done = match &state.upscale_queue {
+                    UpscaleQueue::Postgres(pool) => {
+                        let (status, attempts): (String, i32) = sqlx::query_as(
+                            "SELECT status, attempts FROM apalis.jobs WHERE id = $1",
+                        )
+                        .bind(id)
+                        .fetch_one(pool)
+                        .await
+                        .unwrap();
+                        if status == "Done" {
+                            assert_eq!(attempts, 1);
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    UpscaleQueue::Sqlite => {
+                        let connection = backend_persistence::open_configured_sqlite_connection(
+                            state.db.connection_url(),
+                            Default::default(),
+                        )
+                        .unwrap();
+                        let (status, attempts): (String, i64) = connection
+                            .query_row(
+                                "SELECT status, attempt_count FROM background_jobs WHERE id = ?1",
+                                [id],
+                                |row| Ok((row.get(0)?, row.get(1)?)),
+                            )
+                            .unwrap();
+                        if status == "completed" {
+                            assert_eq!(attempts, 1);
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                };
+                if done {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect(
+            "job should be acknowledged once, including jobs queued before the listener starts",
+        );
+    }
+}

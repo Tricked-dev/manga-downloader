@@ -36,9 +36,9 @@ enum Command {
 
 #[derive(Args, Debug, Default, Clone)]
 struct ServerOptions {
-    /// `SQLite` database path.
+    /// SQLite path or PostgreSQL connection URL.
     #[arg(long)]
-    db_path: Option<PathBuf>,
+    database_url: Option<String>,
 
     /// Directory containing models.json and exported ONNX graphs.
     #[arg(long)]
@@ -133,7 +133,8 @@ struct DbMigrateOptions {
 
 #[derive(Serialize)]
 struct ConfigReport {
-    db_path: PathBuf,
+    database_url: String,
+    database_backend: backend_persistence::DatabaseBackend,
     models_dir: PathBuf,
     upscale_device: String,
     server_addr: String,
@@ -227,10 +228,10 @@ async fn run_db_command(command: DbCommand, inherited: ServerOptions) -> anyhow:
     match command.command {
         DbSubcommand::Migrate(options) => {
             let config = load_config(inherited.merge(options.server))?;
-            backend_persistence::migrate_database(&config.db_path.to_string_lossy()).await?;
+            backend_persistence::migrate_database(&config.database_url).await?;
             println!(
                 "Database migrations applied to {}",
-                config.db_path.display()
+                backend_persistence::redacted_database_url(&config.database_url)
             );
             Ok(())
         }
@@ -252,7 +253,8 @@ fn load_config(options: ServerOptions) -> anyhow::Result<ServerConfig> {
 }
 
 fn print_config_report(report: &ConfigReport) {
-    println!("db_path: {}", report.db_path.display());
+    println!("database_url: {}", report.database_url);
+    println!("database_backend: {}", report.database_backend.as_str());
     println!("server_addr: {}", report.server_addr);
     println!("models_dir: {}", report.models_dir.display());
     println!(
@@ -275,7 +277,7 @@ fn init_command_tracing() {
 impl ServerOptions {
     fn merge(self, overrides: Self) -> Self {
         Self {
-            db_path: overrides.db_path.or(self.db_path),
+            database_url: overrides.database_url.or(self.database_url),
             models_dir: overrides.models_dir.or(self.models_dir),
             upscale_device: overrides.upscale_device.or(self.upscale_device),
             addr: overrides.addr.or(self.addr),
@@ -287,7 +289,7 @@ impl ServerOptions {
 impl From<ServerOptions> for ServerConfigOverrides {
     fn from(options: ServerOptions) -> Self {
         Self {
-            db_path: options.db_path,
+            database_url: options.database_url,
             models_dir: options.models_dir,
             upscale_device: options.upscale_device,
             server_addr: options.addr,
@@ -299,7 +301,8 @@ impl From<ServerOptions> for ServerConfigOverrides {
 impl ConfigReport {
     fn from_config(config: &ServerConfig) -> Self {
         Self {
-            db_path: config.db_path.clone(),
+            database_url: backend_persistence::redacted_database_url(&config.database_url),
+            database_backend: backend_persistence::DatabaseBackend::from_url(&config.database_url),
             models_dir: config.models_dir.clone(),
             upscale_device: config.upscale_device.clone(),
             server_addr: config.server_addr.clone(),

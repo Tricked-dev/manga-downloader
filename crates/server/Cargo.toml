@@ -13,6 +13,7 @@ name = "manga-server"
 path = "src/main.rs"
 
 [dependencies]
+ulid.workspace = true
 tempfile.workspace = true
 backend-storage = { path = "../storage" }
 backend-api-types = { path = "../api-types" }
@@ -29,6 +30,8 @@ backend-telemetry = { path = "../telemetry" }
 backend-tls = { path = "../tls" }
 anyhow.workspace = true
 apalis.workspace = true
+apalis-postgres.workspace = true
+sqlx.workspace = true
 autometrics.workspace = true
 axum.workspace = true
 axum-client-ip.workspace = true

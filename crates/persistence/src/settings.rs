@@ -22,23 +22,19 @@ impl Database {
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
         let _write = self.write_guard().await;
         let mut db = self.executor();
-        if let Some(mut setting) = AppSetting::filter(AppSetting::fields().key().eq(key))
-            .first()
+        let sql = match self.backend() {
+            crate::DatabaseBackend::Sqlite => {
+                "INSERT INTO app_settings (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+            }
+            crate::DatabaseBackend::Postgres => {
+                "INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+            }
+        };
+        toasty::sql::statement(sql)
+            .bind(key)
+            .bind(value)
             .exec(&mut db)
-            .await?
-        {
-            setting
-                .update()
-                .value(value.to_string())
-                .exec(&mut db)
-                .await?;
-        } else {
-            AppSetting::create()
-                .key(key.to_string())
-                .value(value.to_string())
-                .exec(&mut db)
-                .await?;
-        }
+            .await?;
 
         Ok(())
     }
@@ -56,21 +52,18 @@ impl Database {
     pub(crate) async fn seed_default_settings(&self) -> Result<()> {
         let _write = self.write_guard().await;
         let mut db = self.executor();
-        let existing = AppSetting::all().exec(&mut db).await?;
-
-        let existing_keys = existing
-            .into_iter()
-            .map(|setting| setting.key)
-            .collect::<std::collections::HashSet<_>>();
-
-        for definition in SETTING_DEFINITIONS {
-            if existing_keys.contains(definition.key) {
-                continue;
+        let sql = match self.backend() {
+            crate::DatabaseBackend::Sqlite => {
+                "INSERT INTO app_settings (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO NOTHING"
             }
-
-            AppSetting::create()
-                .key(definition.key.to_string())
-                .value(definition.default.to_string())
+            crate::DatabaseBackend::Postgres => {
+                "INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING"
+            }
+        };
+        for definition in SETTING_DEFINITIONS {
+            toasty::sql::statement(sql)
+                .bind(definition.key)
+                .bind(definition.default)
                 .exec(&mut db)
                 .await?;
         }

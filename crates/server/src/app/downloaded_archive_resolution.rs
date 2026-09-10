@@ -198,6 +198,9 @@ mod tests {
 
     fn download_row(id: &str, status: &str, chapter_number: f64) -> DownloadRow {
         DownloadRow {
+            upscaled_at: None,
+            upscale_model: None,
+            upscale_scale: None,
             id: id.to_string(),
             chapter_id: format!("chapter-{id}"),
             manga_id: "manga".to_string(),

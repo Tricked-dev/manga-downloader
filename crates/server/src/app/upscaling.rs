@@ -77,6 +77,10 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
     )
     .await?;
     let after = backend_storage::inspect(archive.archive_path).await?;
+    state
+        .db
+        .mark_upscaled(download_id, &model, scale, after.file_size)
+        .await?;
     crate::downloader::update_download_storage_usage_delta(
         &state,
         &archive.download_path,
