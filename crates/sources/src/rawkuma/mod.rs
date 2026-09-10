@@ -98,7 +98,7 @@ impl Source for RawkumaSource {
             .append_pair("search_term", &query.text)
             .append_pair("orderby", order)
             .append_pair("order", if order == "title" { "asc" } else { "desc" });
-        let html = self.document(url.into(), "#search-results").await?;
+        let html = self.document(url.into(), "#search-results > *").await?;
         parse::search(&html, page)
     }
     async fn manga(&self, id: &str) -> SourceResult<Manga> {

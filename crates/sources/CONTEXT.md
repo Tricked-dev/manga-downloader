@@ -8,6 +8,8 @@ A **Source Error** carries a code, message, and retryable flag. It remains disti
 
 The **Source HTTP Client** owns concurrency limits, request coalescing, retries, clearance, and browser captures. The **Source Media Client** fetches media and applies required Comix descrambling. Media references preserve request headers and transformation metadata through the existing proxy token contract.
 
-Rawkuma document requests always use browser capture. Its current `/library/` layout uses `search_term`, `the_page`, and `orderby`; details include ComicSeries JSON-LD, chapters use `#chapter-list`, and reader pages use `[data-image-data]`. The browser serializes reader image URLs into the same JSON shape as older `ts_reader.run` payloads. CDN images use HTTP with a Rawkuma Referer. Fixtures document the live layout inspected on 2026-09-10.
+Rawkuma document requests always use browser capture. Search capture waits for children in `#search-results`, including its explicit empty state, rather than accepting the initially empty loading container. Its current `/library/` layout uses `search_term`, `the_page`, and `orderby`; details include ComicSeries JSON-LD, chapters use `#chapter-list`, and reader pages use `[data-image-data]`. The browser serializes reader image URLs into the same JSON shape as older `ts_reader.run` payloads. CDN images use HTTP with a Rawkuma Referer. Fixtures document the live layout inspected on 2026-09-10.
 
 The API retains `plugin_version` and `plugin_api_version` field names for client compatibility. There is no plugin installation, artifact history, registry download, or WASM execution runtime.
+
+Comix chapter requests are signed by the site. Browser capture preserves request URLs and advances the chapter section pagination through its buttons, collecting every response before reporting completion. A timeout fails the capture instead of publishing a partial list.

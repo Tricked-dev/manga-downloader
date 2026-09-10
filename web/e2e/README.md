@@ -37,3 +37,11 @@ selected external origin. Omit `CHROMIUM_EXECUTABLE_PATH` to use Playwright's in
 
 To test a build without embedded assets, add `--web-root "$PWD/web/build"` to the server
 command and use `cargo run --no-default-features`.
+
+## Source capture regression tests
+
+```sh
+CHROMIUM_EXECUTABLE_PATH="$(command -v chromium)" node web/e2e/source-capture.mjs
+```
+
+These local browser fixtures execute the production capture scripts. They cover delayed Rawkuma results and empty results, plus complete Comix pagination over signed fetch, XHR and client-decoded responses. They do not replace checking the live sites after a source change.
