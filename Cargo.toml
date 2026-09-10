@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "apps/rust/*", "plugins/comix", "plugins/crates/manga-plugin-kit"]
+members = ["crates/*", "plugins/comix", "plugins/crates/manga-plugin-kit"]
 exclude = ["inspo", "apps/clients/aidoku"]
 
 [workspace.package]
@@ -9,7 +9,6 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
-allocative = { version = "0.3.6" }
 anyhow = { version = "1.0.102" }
 apalis = { version = "1.0.0-rc.9", default-features = false, features = ["tracing"] }
 async-tungstenite = { version = "0.34.1", default-features = false, features = ["tokio-rustls-webpki-roots"] }
@@ -24,20 +23,16 @@ base64 = { version = "0.22.1" }
 byte-unit = { version = "5.2.0", default-features = false, features = ["byte", "serde", "std"] }
 bytecheck = { version = "0.8.2" }
 bytes = { version = "1.11.1" }
-cargo-deny = { version = "=0.19.9" }
-cargo-shear = { version = "=1.13.1", default-features = false }
 chromiumoxide = { version = "0.9.1" }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 criterion = { version = "0.8.2" }
 dashmap = { version = "6.2.1" }
 flate2 = { version = "1.1.9", default-features = false, features = ["zlib-rs"] }
-flamegraph = { version = "0.6.13" }
 foyer = { version = "0.22.3", features = ["serde"] }
 fs4 = { version = "1.1.0" }
 fusio = { version = "0.6.1", default-features = false, features = ["fs", "tokio"] }
 futures-util = { version = "0.3.32", default-features = false, features = ["std"] }
 garde = { version = "0.23.0", features = ["derive", "url"] }
-gix = { version = "0.84.0", default-features = true, features = ["blocking-network-client", "worktree-mutation"] }
 http = { version = "1.4.2" }
 image = { version = "0.25.10", default-features = false, features = ["avif", "gif", "jpeg", "png", "webp"] }
 jiff = { version = "0.2.28", features = ["serde"] }
@@ -66,8 +61,6 @@ serde = { version = "1.0.228", features = ["alloc", "derive"] }
 serde_json = { version = "1.0.150", features = ["alloc"] }
 shadow-rs = { version = "2.0.0", default-features = false }
 sha2 = { version = "0.11.0" }
-starlark = { version = "0.14.2" }
-superconsole = { version = "0.2.0" }
 tar = { version = "0.4.46", default-features = false }
 tempfile = { version = "3.27.0" }
 thiserror = { version = "2.0.18" }
@@ -86,10 +79,6 @@ tower-resilience-retry = { version = "0.10.0", features = ["metrics"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 tracing-opentelemetry = { version = "0.32.1" }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["ansi", "env-filter", "fmt", "registry"] }
-twilight-gateway = { version = "0.17.1", default-features = false, features = ["rustls-native-roots", "zstd"] }
-twilight-http = { version = "0.17.1", default-features = false, features = ["rustls-native-roots"] }
-twilight-interactions = { version = "0.17.1" }
-twilight-model = { version = "0.17.1" }
 url = { version = "2.5.8" }
 utoipa = { version = "5.5.0" }
 utoipa-axum = { version = "0.2.0" }

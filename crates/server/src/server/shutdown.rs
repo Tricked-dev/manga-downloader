@@ -128,13 +128,6 @@ fn spawn_server_tasks(
         Ok::<(), anyhow::Error>(())
     });
 
-    let discord = state.discord.as_ref().map(|_| {
-        shutdown.spawn_task_fn({
-            let state = Arc::clone(state);
-            move |guard| Box::pin(backend_discord::run_server_gateway(state, guard))
-        })
-    });
-
     let server = shutdown.spawn_task_fn({
         move |guard| async move {
             let shutdown_guard = guard;
@@ -164,7 +157,6 @@ fn spawn_server_tasks(
             database_cleanup,
             archive_index_rebuild,
             tokio_runtime_metrics,
-            discord,
         },
         server,
     }
@@ -182,7 +174,6 @@ struct BackgroundTasks {
     database_cleanup: JoinHandle<anyhow::Result<()>>,
     archive_index_rebuild: JoinHandle<anyhow::Result<()>>,
     tokio_runtime_metrics: JoinHandle<anyhow::Result<()>>,
-    discord: Option<JoinHandle<anyhow::Result<()>>>,
 }
 
 impl BackgroundTasks {
@@ -195,9 +186,6 @@ impl BackgroundTasks {
         await_task("database cleanup", self.database_cleanup).await?;
         await_task("archive index rebuild worker", self.archive_index_rebuild).await?;
         await_task("tokio runtime metrics reporter", self.tokio_runtime_metrics).await?;
-        if let Some(discord) = self.discord {
-            await_task("discord gateway", discord).await?;
-        }
         Ok(())
     }
 }

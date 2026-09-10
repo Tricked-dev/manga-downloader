@@ -1,9 +1,0 @@
-node_modules/
-dist/
-docker-compose.yml
-generated/
-grafana/dashboards/
-grafana/provisioning/
-otel-collector/
-tempo/
-*.log

@@ -52,7 +52,6 @@ const MEDIA_PROXY_STAGE_DURATION_SECONDS: &str = "manga_server_media_proxy_stage
 const SEARCH_CACHE_WARM_RUNS: &str = "manga_server_search_cache_warm_runs_total";
 const SEARCH_CACHE_WARM_DURATION_SECONDS: &str = "manga_server_search_cache_warm_duration_seconds";
 const SEARCH_CACHE_WARM_QUERIES: &str = "manga_server_search_cache_warm_queries_total";
-const DISCORD_NOTIFICATIONS: &str = "manga_server_discord_notifications_total";
 const ARCHIVE_INDEX_REQUESTS: &str = "manga_server_archive_index_requests_total";
 const ARCHIVE_INDEX_BUILDS: &str = "manga_server_archive_index_builds_total";
 const ARCHIVE_INDEX_BUILD_DURATION_SECONDS: &str =
@@ -563,10 +562,6 @@ impl Metrics {
             "Search cache warm queries by source and outcome."
         );
         describe_counter!(
-            DISCORD_NOTIFICATIONS,
-            "Discord notification attempts by kind and outcome."
-        );
-        describe_counter!(
             ARCHIVE_INDEX_REQUESTS,
             "Downloaded archive index lookups by result."
         );
@@ -929,15 +924,6 @@ impl Metrics {
         counter!(
             SEARCH_CACHE_WARM_QUERIES,
             self.labels([("source", source), ("outcome", outcome)])
-        )
-        .increment(1);
-    }
-
-    /// Records the outcome of a Discord notification attempt.
-    pub fn record_discord_notification(&self, kind: &str, outcome: &str) {
-        counter!(
-            DISCORD_NOTIFICATIONS,
-            self.labels([("kind", kind), ("outcome", outcome)])
         )
         .increment(1);
     }

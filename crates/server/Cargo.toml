@@ -17,7 +17,6 @@ backend-api-types = { path = "../api-types" }
 backend-cache = { path = "../cache" }
 backend-config = { path = "../config" }
 backend-core = { path = "../core" }
-backend-discord = { path = "../discord" }
 backend-fs = { path = "../fs" }
 backend-image = { path = "../image" }
 backend-page-extraction = { path = "../page-extraction" }

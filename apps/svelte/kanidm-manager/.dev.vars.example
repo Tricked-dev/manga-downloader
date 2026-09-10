@@ -1,6 +1,0 @@
-KANIDM_BASE_URL=https://id.example.com
-KANIDM_USERNAME=kanidm-service-account
-KANIDM_PASSWORD=replace-with-local-secret
-MANAGER_ACCESS_TOKEN=replace-with-local-manager-token
-MANGA_SERVER_BASE_URL=http://127.0.0.1:3000
-MANGA_SERVER_API_KEY=replace-with-local-secret-if-enabled

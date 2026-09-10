@@ -11,7 +11,6 @@ use anyhow::{Context as _, Result};
 use autometrics::autometrics;
 use backend_cache::{MangaCache, parse_max_memory_bytes};
 use backend_core::{parse_positive_byte_size, settings::SettingKey};
-use backend_discord::DiscordConfig;
 use backend_persistence::Database;
 use secrecy::SecretString;
 use tokio::time::Duration;
@@ -47,7 +46,6 @@ pub(crate) struct SettingsChangeSet {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SettingsChangeFamily {
     CacheRuntime,
-    DiscordConfig,
     DownloadPath,
     DownloadRuntime,
     DownloadStoragePolicy,
@@ -66,9 +64,6 @@ impl SettingsChangeSet {
         let mut changed_families = Vec::new();
         if has_key(SettingKey::CacheDiskPath) || has_key(SettingKey::CacheMaxMemoryBytes) {
             changed_families.push(SettingsChangeFamily::CacheRuntime);
-        }
-        if has_key(SettingKey::DiscordBotToken) || has_key(SettingKey::DiscordChannelId) {
-            changed_families.push(SettingsChangeFamily::DiscordConfig);
         }
         if has_key(SettingKey::DownloadPath) {
             changed_families.push(SettingsChangeFamily::DownloadPath);
@@ -163,28 +158,6 @@ impl SettingsInterface<'_> {
             .non_empty_secret(SettingKey::BackendApiKey)
             .await?
             .or(fallback_api_key))
-    }
-
-    pub(crate) async fn discord_config(
-        &self,
-        fallback_bot_token: Option<SecretString>,
-        fallback_channel_id: Option<u64>,
-    ) -> Result<DiscordConfig> {
-        let bot_token = self
-            .non_empty_secret(SettingKey::DiscordBotToken)
-            .await?
-            .or(fallback_bot_token);
-        let channel_id = self
-            .raw(SettingKey::DiscordChannelId)
-            .await?
-            .as_deref()
-            .and_then(parse_discord_channel_id)
-            .or(fallback_channel_id);
-
-        Ok(DiscordConfig {
-            bot_token,
-            channel_id,
-        })
     }
 
     pub(crate) async fn library_update_interval(&self) -> Duration {
@@ -363,26 +336,6 @@ fn source_setting_key(source: &str, setting: &str) -> String {
     format!("source.{source}.{setting}")
 }
 
-fn parse_discord_channel_id(value: &str) -> Option<u64> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    match trimmed.parse::<u64>() {
-        Ok(channel_id) if channel_id > 0 => Some(channel_id),
-        Ok(_) => None,
-        Err(error) => {
-            tracing::warn!(
-                error = %error,
-                discord_channel_id = trimmed,
-                "Discord Channel ID Setting Invalid",
-            );
-            None
-        }
-    }
-}
-
 fn update_interval_from_hours(value: &str) -> Option<Duration> {
     let interval_hours = value.parse::<f64>().ok()?;
     if !interval_hours.is_finite() || interval_hours < 0.0 {
@@ -420,7 +373,6 @@ mod tests {
                 "tracked".to_string(),
             ),
             (
-                SettingKey::DiscordBotToken.as_str().to_string(),
                 "token".to_string(),
             ),
         ]));
@@ -429,7 +381,6 @@ mod tests {
         assert!(!changes.contains_family(SettingsChangeFamily::DownloadRuntime));
         assert!(changes.contains_family(SettingsChangeFamily::DownloadStoragePolicy));
         assert!(changes.contains_family(SettingsChangeFamily::LibraryUpdatePolicy));
-        assert!(changes.contains_family(SettingsChangeFamily::DiscordConfig));
         assert!(!changes.contains_family(SettingsChangeFamily::CacheRuntime));
         assert_eq!(changes.updated_count(), 3);
     }

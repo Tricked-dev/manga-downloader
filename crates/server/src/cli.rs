@@ -134,8 +134,6 @@ struct ConfigReport {
     plugins_path: PathBuf,
     source_plugin_registry_url: Option<String>,
     backend_api_key: SecretStatus,
-    discord_bot_token: SecretStatus,
-    discord_channel_id: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -269,19 +267,7 @@ fn print_config_report(report: &ConfigReport) {
             SecretStatus::NotSet => "not set",
         }
     );
-    println!(
-        "discord_bot_token: {}",
-        match report.discord_bot_token {
-            SecretStatus::Set => "set",
-            SecretStatus::NotSet => "not set",
-        }
-    );
-    println!(
-        "discord_channel_id: {}",
-        report
-            .discord_channel_id
-            .map_or_else(|| "not set".to_string(), |id| id.to_string())
-    );
+
 }
 
 fn init_command_tracing() {
@@ -307,8 +293,6 @@ impl From<ServerOptions> for ServerConfigOverrides {
             plugins_path: options.plugins_path,
             source_plugin_registry_url: None,
             backend_api_key: options.backend_api_key,
-            discord_bot_token: None,
-            discord_channel_id: None,
         }
     }
 }
@@ -325,12 +309,6 @@ impl ConfigReport {
             } else {
                 SecretStatus::NotSet
             },
-            discord_bot_token: if config.discord_bot_token.is_some() {
-                SecretStatus::Set
-            } else {
-                SecretStatus::NotSet
-            },
-            discord_channel_id: config.discord_channel_id,
         }
     }
 }

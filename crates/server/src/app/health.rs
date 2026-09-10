@@ -15,7 +15,6 @@ pub async fn readiness(state: &AppState) -> HealthResponse {
     HealthResponse::from_checks(vec![
         process_readiness_check(&state.shutdown_drain),
         report_download_state(state).await,
-        report_discord_state(state),
     ])
 }
 
@@ -59,7 +58,6 @@ pub async fn diagnostics(state: &AppState) -> HealthResponse {
 
     checks.push(probe_cache(&state.cache).await);
     checks.push(report_download_state(state).await);
-    checks.push(report_discord_state(state));
     checks.push(probe_writable_directory("temporary_storage", &std::env::temp_dir()).await);
     checks.push(probe_writable_directory("cache_storage", &state.config.cache_disk_path).await);
     checks.push(probe_database_path(&state.config.db_path).await);
@@ -120,17 +118,7 @@ async fn report_download_state(state: &AppState) -> HealthCheckResponse {
     )
 }
 
-fn report_discord_state(state: &AppState) -> HealthCheckResponse {
-    let detail = match &state.discord {
-        Some(discord) if discord.notifications_enabled() => {
-            "discord bot configured; notifications enabled"
-        }
-        Some(_) => "discord bot configured; notifications disabled",
-        None => "discord bot not configured",
-    };
 
-    HealthCheckResponse::ok("discord", detail)
-}
 
 fn process_readiness_check(shutdown_drain: &ShutdownDrain) -> HealthCheckResponse {
     if shutdown_drain.is_draining() {

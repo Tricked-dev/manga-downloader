@@ -1,1 +1,0 @@
-import "../node_modules/tsx/dist/cli.mjs";

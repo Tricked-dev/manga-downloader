@@ -9,7 +9,6 @@ use anyhow::Context as _;
 use autometrics::autometrics;
 use backend_cache::MangaCache;
 use backend_config::ServerConfig;
-use backend_discord::{DiscordBot, register_commands};
 use backend_plugin_host::PluginManager;
 use backend_runtime::color_logs_enabled;
 use backend_telemetry::Telemetry;
@@ -139,8 +138,6 @@ async fn bootstrap_server(
         plugins_path,
         source_plugin_registry_url,
         backend_api_key,
-        discord_bot_token,
-        discord_channel_id,
     } = config;
 
     backend_fs::create_dir_all(db_path.parent().unwrap_or_else(|| Path::new("."))).await?;
@@ -178,18 +175,6 @@ async fn bootstrap_server(
     let backend_api_key = settings
         .backend_api_key(backend_api_key.map(SecretString::from))
         .await?;
-    let discord_config = settings
-        .discord_config(
-            discord_bot_token.map(SecretString::from),
-            discord_channel_id,
-        )
-        .await?;
-    let discord = DiscordBot::from_config(discord_config);
-    if let Some(discord) = &discord
-        && let Err(error) = register_commands(discord).await
-    {
-        tracing::warn!(error = %error, "Discord Application Command Registration Failed");
-    }
     let cache = MangaCache::new(&cache_disk_path, cache_max_memory_bytes).await?;
     let build_info = build_info::server_build_info();
     tracing::info!(
@@ -202,7 +187,6 @@ async fn bootstrap_server(
         loaded_plugins = plugin_manager.sources().len(),
         disabled_plugins = disabled_plugins.len(),
         api_key_enabled = backend_api_key.is_some(),
-        discord_enabled = discord.is_some(),
         cache_disk_path = %cache_disk_path,
         cache_max_memory_bytes,
         "Server Boot",
@@ -218,7 +202,6 @@ async fn bootstrap_server(
         cache,
         plugin_manager,
         telemetry,
-        discord,
     });
     crate::archive_index::spawn_startup_warm(Arc::clone(&state));
     super::router::spawn_metrics_refresh_loop(Arc::clone(&state));

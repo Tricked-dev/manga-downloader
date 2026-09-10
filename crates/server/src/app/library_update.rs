@@ -28,7 +28,6 @@ pub(crate) async fn run(state: Arc<AppState>, trigger: &'static str) -> Result<L
 /// Check all Local Library manga for new chapters, stopping early during shutdown.
 #[allow(clippy::too_many_lines)]
 // This function owns the full Library Update Run policy: fan-out, aggregation, auto-download,
-// notification, metrics, and queue wake behavior.
 #[autometrics(track_concurrency)]
 pub(crate) async fn run_with_shutdown(
     state: Arc<AppState>,
@@ -66,9 +65,6 @@ pub(crate) async fn run_with_shutdown(
                 total_new += outcome.new_chapters;
                 changed_manga += usize::from(outcome.local_library_changed);
                 enqueued_downloads += outcome.enqueued_downloads;
-                if let Some(notification) = &outcome.notification {
-                    backend_discord::notify_library_update(&state, notification).await;
-                }
                 state.telemetry.metrics.record_library_update_manga_checked(
                     trigger,
                     &manga.source,
@@ -249,23 +245,10 @@ async fn check_manga_updates(
         .enqueued;
     }
 
-    let notification = if is_library_update {
-        let chapters = state.db.get_chapters(&manga.id).await?;
-        backend_discord::build_library_update_notification(
-            manga,
-            chapters,
-            &chapter_sync.new_ids,
-            enqueued_downloads,
-        )
-    } else {
-        None
-    };
-
     Ok(MangaUpdateOutcome {
         new_chapters,
         local_library_changed,
         enqueued_downloads,
-        notification,
     })
 }
 
@@ -282,7 +265,6 @@ struct MangaUpdateOutcome {
     new_chapters: usize,
     local_library_changed: bool,
     enqueued_downloads: usize,
-    notification: Option<backend_discord::LibraryUpdateNotification>,
 }
 
 #[cfg(test)]

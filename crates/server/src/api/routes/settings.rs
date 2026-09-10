@@ -74,9 +74,6 @@ async fn update_settings(
         library_update_policy_changed = update
             .changes
             .contains_family(settings::SettingsChangeFamily::LibraryUpdatePolicy),
-        discord_config_changed = update
-            .changes
-            .contains_family(settings::SettingsChangeFamily::DiscordConfig),
         "Settings Updated",
     );
     Ok(Json(update.response))

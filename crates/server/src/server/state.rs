@@ -1,18 +1,15 @@
 use crate::{
-    app::{chapter_pages::DownloadedPageTransformCache, library_update},
+    app::chapter_pages::DownloadedPageTransformCache,
     archive_index::ArchiveIndexService,
     downloader,
 };
 use backend_cache::MangaCache;
-use backend_discord::{DiscordBot, DiscordServerState};
 use backend_page_extraction::DownloadedPageExtractionScheduler;
 use backend_plugin_host::PluginManager;
 use backend_telemetry::Telemetry;
 use secrecy::SecretString;
 use std::collections::HashMap;
-use std::future::Future;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -44,7 +41,6 @@ pub(crate) struct AppState {
     pub(crate) extraction_scheduler: Arc<DownloadedPageExtractionScheduler>,
     pub(crate) downloaded_page_transform_cache: DownloadedPageTransformCache,
     pub(crate) telemetry: Telemetry,
-    pub(crate) discord: Option<DiscordBot>,
     pub(crate) download_queue_notify: Notify,
     pub(crate) active_download_cancellations:
         Mutex<HashMap<String, Arc<downloader::DownloadCancellation>>>,
@@ -58,7 +54,6 @@ pub(crate) struct AppStateParts {
     pub(crate) plugin_manager: PluginManager,
     pub(crate) cache: MangaCache,
     pub(crate) telemetry: Telemetry,
-    pub(crate) discord: Option<DiscordBot>,
 }
 
 pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
@@ -68,7 +63,6 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         plugin_manager,
         cache,
         telemetry,
-        discord,
     } = parts;
 
     Arc::new(AppState {
@@ -80,7 +74,6 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         extraction_scheduler: Arc::new(DownloadedPageExtractionScheduler::default()),
         downloaded_page_transform_cache: DownloadedPageTransformCache::default(),
         telemetry,
-        discord,
         download_queue_notify: Notify::new(),
         active_download_cancellations: Mutex::new(HashMap::new()),
         download_storage_usage: Mutex::new(DownloadStorageUsage::default()),
@@ -126,7 +119,6 @@ pub(crate) async fn build_test_app_state(
         plugin_manager,
         cache,
         telemetry: Telemetry::for_test(telemetry_name),
-        discord: None,
     })
 }
 
@@ -145,29 +137,3 @@ impl ShutdownDrain {
     }
 }
 
-impl DiscordServerState for AppState {
-    fn discord_bot(&self) -> Option<DiscordBot> {
-        self.discord.clone()
-    }
-
-    fn db(&self) -> &backend_persistence::Database {
-        &self.db
-    }
-
-    fn plugin_manager(&self) -> &RwLock<PluginManager> {
-        &self.plugin_manager
-    }
-
-    fn record_discord_notification(&self, kind: &str, outcome: &str) {
-        self.telemetry
-            .metrics
-            .record_discord_notification(kind, outcome);
-    }
-
-    fn check_for_updates(
-        self: Arc<Self>,
-        trigger: &'static str,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<usize>> + Send>> {
-        Box::pin(async move { Ok(library_update::run(self, trigger).await?.new_chapters) })
-    }
-}

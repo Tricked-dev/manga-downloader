@@ -7,8 +7,6 @@ pub enum SettingKey {
     AuthOidcScopes,
     AuthOidcProviderId,
     BackendApiKey,
-    DiscordBotToken,
-    DiscordChannelId,
     UpdateIntervalHours,
     AutoDownloadNewChapters,
     AutoDownloadCategory,
@@ -34,8 +32,6 @@ impl SettingKey {
             Self::AuthOidcScopes => "auth_oidc_scopes",
             Self::AuthOidcProviderId => "auth_oidc_provider_id",
             Self::BackendApiKey => "backend_api_key",
-            Self::DiscordBotToken => "discord_bot_token",
-            Self::DiscordChannelId => "discord_channel_id",
             Self::UpdateIntervalHours => "update_interval_hours",
             Self::AutoDownloadNewChapters => "auto_download_new_chapters",
             Self::AutoDownloadCategory => "auto_download_category",
@@ -59,8 +55,6 @@ impl SettingKey {
             | Self::AuthOidcClientId
             | Self::AuthOidcClientSecret
             | Self::BackendApiKey
-            | Self::DiscordBotToken
-            | Self::DiscordChannelId
             | Self::AutoDownloadCategory
             | Self::MaxDownloadStorageBytes => "",
             Self::DownloadConcurrentChapters | Self::DownloadPageFetchConcurrency => "2",
@@ -86,8 +80,6 @@ impl SettingKey {
             Self::AuthOidcScopes => "OIDC_SCOPES",
             Self::AuthOidcProviderId => "OIDC_PROVIDER_ID",
             Self::BackendApiKey => "BACKEND_API_KEY",
-            Self::DiscordBotToken => "DISCORD_BOT_TOKEN",
-            Self::DiscordChannelId => "DISCORD_CHANNEL_ID",
             Self::UpdateIntervalHours => "UPDATE_INTERVAL_HOURS",
             Self::AutoDownloadNewChapters => "AUTO_DOWNLOAD_NEW_CHAPTERS",
             Self::AutoDownloadCategory => "AUTO_DOWNLOAD_CATEGORY",
@@ -139,8 +131,6 @@ pub const SETTING_DEFINITIONS: &[SettingDefinition] = &[
     SettingDefinition::new(SettingKey::AuthOidcScopes),
     SettingDefinition::new(SettingKey::AuthOidcProviderId),
     SettingDefinition::new(SettingKey::BackendApiKey),
-    SettingDefinition::new(SettingKey::DiscordBotToken),
-    SettingDefinition::new(SettingKey::DiscordChannelId),
     SettingDefinition::new(SettingKey::UpdateIntervalHours),
     SettingDefinition::new(SettingKey::AutoDownloadNewChapters),
     SettingDefinition::new(SettingKey::AutoDownloadCategory),
