@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use autometrics::autometrics;
-use backend_plugin_host::SourceInfo;
+use backend_sources::SourceInfo;
 use backend_telemetry::trace;
 use tokio_graceful::ShutdownGuard;
 use tracing::Instrument as _;
@@ -145,7 +145,7 @@ fn search_cache_warm_outcome(queries: usize, failed_queries: usize) -> &'static 
 #[autometrics]
 #[tracing::instrument(name = "background.search_cache.plan", skip_all, fields(source_count = tracing::field::Empty, query_count = tracing::field::Empty))]
 async fn warm_queries(state: &AppState) -> Vec<WarmQuery> {
-    let pm = state.plugin_manager.read().await;
+    let pm = state.source_registry.read().await;
     let queries = pm
         .sources()
         .into_iter()
@@ -195,7 +195,7 @@ async fn warm_query(
 
     let response = catalog::search_source(
         &state.db,
-        &state.plugin_manager,
+        &state.source_registry,
         &state.cache,
         &state.telemetry.metrics,
         SearchSourceInput {

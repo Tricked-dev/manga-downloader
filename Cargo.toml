@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/comix", "plugins/crates/manga-plugin-kit"]
-exclude = ["inspo", "apps/clients/aidoku"]
+members = ["crates/*"]
+exclude = ["inspo", "apps/clients/aidoku", "vendor/mangajenai-rs"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,6 +9,8 @@ edition = "2024"
 publish = false
 
 [workspace.dependencies]
+scraper = "0.24"
+async-trait = "0.1.89"
 anyhow = { version = "1.0.102" }
 apalis = { version = "1.0.0-rc.9", default-features = false, features = ["tracing"] }
 async-tungstenite = { version = "0.34.1", default-features = false, features = ["tokio-rustls-webpki-roots"] }
@@ -83,9 +85,6 @@ url = { version = "2.5.8" }
 utoipa = { version = "5.5.0" }
 utoipa-axum = { version = "0.2.0" }
 uuid = { version = "1.23.3", default-features = false, features = ["serde", "v4", "v7"] }
-wasmtime = { version = "45.0.2", default-features = false, features = ["anyhow", "async", "cache", "component-model", "cranelift", "parallel-compilation", "runtime", "std"] }
-wasmtime-wasi = { version = "45.0.2", default-features = false, features = ["p2"] }
-wit-bindgen = { version = "0.58.0" }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 zstd = { version = "0.13.3", default-features = false, features = ["zstdmt"] }
 mimalloc = "0.1.48"

@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::api::{
     dto::{
-        ApiListResponse, ChapterResponse, MangaResponse, PluginArtifactResponse, SearchResponse,
+        ApiListResponse, ChapterResponse, MangaResponse, SearchResponse,
         SourceSettingsResponse,
     },
     error::AppError,
@@ -10,10 +10,10 @@ use crate::api::{
 use autometrics::autometrics;
 use backend_cache::{CacheKey, MangaCache};
 use backend_persistence::{Database, SourceRecordInput};
-use backend_plugin_host::{
-    PluginManager, SourceInfo,
-    media::{encode_media_spec, runtime_media_ref_to_spec},
-    runtime,
+use backend_sources::{
+    SourceRegistry, SourceInfo,
+    media::{encode_media_spec, media_ref_to_spec},
+    types,
 };
 use backend_runtime::truncate_for_log;
 use backend_telemetry::{Metrics, trace};
@@ -146,10 +146,10 @@ impl<'a> SourceCatalogRead<'a> {
 #[tracing::instrument(name = "app.sources.list", skip_all, fields(outcome = tracing::field::Empty, item_count = tracing::field::Empty))]
 pub async fn list_sources(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
 ) -> Result<ApiListResponse<SourceInfo>, AppError> {
     let sources =
-        match tokio::time::timeout(SOURCE_LIST_PLUGIN_LOCK_TIMEOUT, plugin_manager.read()).await {
+        match tokio::time::timeout(SOURCE_LIST_PLUGIN_LOCK_TIMEOUT, source_registry.read()).await {
             Ok(pm) => pm.sources(),
             Err(_) => {
                 tracing::warn!(
@@ -192,10 +192,10 @@ fn source_info_from_record(source: SourceRecordInput) -> SourceInfo {
 #[tracing::instrument(name = "app.sources.settings.get", skip_all, fields(source = %name, outcome = tracing::field::Empty))]
 pub async fn get_source_settings(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     name: &str,
 ) -> Result<SourceSettingsResponse, AppError> {
-    let pm = plugin_manager.read().await;
+    let pm = source_registry.read().await;
     pm.source_base_url(name)?;
     drop(pm);
 
@@ -212,42 +212,6 @@ pub async fn get_source_settings(
         name: name.to_owned(),
         hide_nsfw,
     })
-}
-
-#[autometrics]
-#[tracing::instrument(name = "app.sources.artifacts.list", skip_all, fields(source = %name, outcome = tracing::field::Empty, item_count = tracing::field::Empty))]
-pub async fn list_source_artifacts(
-    db: &Database,
-    name: &str,
-) -> Result<ApiListResponse<PluginArtifactResponse>, AppError> {
-    let db_span = trace::db_operation_span("list_plugin_artifacts", "plugin_artifact");
-    let started_at = Instant::now();
-    let artifacts = async { db.list_plugin_artifacts(name).await }
-        .instrument(db_span.clone())
-        .await?;
-    trace::record_outcome(&db_span, "success");
-    trace::record_rows(&db_span, artifacts.len());
-    trace::record_duration(&db_span, started_at.elapsed());
-
-    let response = ApiListResponse::new(
-        artifacts
-            .into_iter()
-            .map(|artifact| PluginArtifactResponse {
-                id: artifact.id,
-                plugin_key: artifact.plugin_key,
-                plugin_version: artifact.plugin_version,
-                artifact_path: artifact.artifact_path,
-                plugin_api_version: artifact.plugin_api_version,
-                is_active: artifact.is_active,
-                installed_at: artifact.installed_at,
-                replaced_at: artifact.replaced_at,
-            })
-            .collect(),
-    );
-    let span = tracing::Span::current();
-    trace::record_outcome(&span, "success");
-    trace::record_item_count(&span, response.items.len());
-    Ok(response)
 }
 
 pub struct SearchSourceInput {
@@ -275,7 +239,7 @@ pub struct SearchSourceInput {
 )]
 pub async fn search_source(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     cache: &MangaCache,
     metrics: &Metrics,
     input: SearchSourceInput,
@@ -349,7 +313,7 @@ pub async fn search_source(
     }
     catalog_read.record_cache_miss(&cache_span);
 
-    let pm = plugin_manager.read().await;
+    let pm = source_registry.read().await;
     let source_base_url = match pm.source_base_url(&name) {
         Ok(source_base_url) => source_base_url,
         Err(error) => {
@@ -360,10 +324,7 @@ pub async fn search_source(
     };
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let result = {
-        let _entered = plugin_span.enter();
-        pm.search_manga(&name, &query, page, category.as_deref(), popular)
-    };
+    let result = pm.search_manga(&name, &query, page, category.as_deref(), popular).instrument(plugin_span.clone()).await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let result = match result {
         Ok(result) => result,
@@ -470,7 +431,7 @@ impl SourceSearchLogContext<'_> {
 #[autometrics]
 #[tracing::instrument(name = "app.source.manga_details", skip_all, fields(source = %name, remote_id = %id, outcome = tracing::field::Empty, cache_result = tracing::field::Empty, item_count = tracing::field::Empty))]
 pub async fn get_manga_details(
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     cache: &MangaCache,
     metrics: &Metrics,
     name: String,
@@ -499,7 +460,7 @@ pub async fn get_manga_details(
     }
     catalog_read.record_cache_miss(&cache_span);
 
-    let pm = plugin_manager.read().await;
+    let pm = source_registry.read().await;
     let source_base_url = match pm.source_base_url(&name) {
         Ok(source_base_url) => source_base_url,
         Err(error) => {
@@ -509,10 +470,7 @@ pub async fn get_manga_details(
     };
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let manga = {
-        let _entered = plugin_span.enter();
-        pm.get_manga_details(&name, &id)
-    };
+    let manga = pm.get_manga_details(&name, &id).instrument(plugin_span.clone()).await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let manga = match manga {
         Ok(manga) => manga,
@@ -544,7 +502,7 @@ pub async fn get_manga_details(
 #[autometrics]
 #[tracing::instrument(name = "app.source.chapter_list", skip_all, fields(source = %name, remote_id = %id, outcome = tracing::field::Empty, cache_result = tracing::field::Empty, item_count = tracing::field::Empty))]
 pub async fn get_chapter_list(
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     cache: &MangaCache,
     metrics: &Metrics,
     name: String,
@@ -577,13 +535,10 @@ pub async fn get_chapter_list(
     }
     catalog_read.record_cache_miss(&cache_span);
 
-    let pm = plugin_manager.read().await;
+    let pm = source_registry.read().await;
     let plugin_span = catalog_read.plugin_span();
     let plugin_started_at = Instant::now();
-    let chapters = {
-        let _entered = plugin_span.enter();
-        pm.get_chapter_list(&name, &id)
-    };
+    let chapters = pm.get_chapter_list(&name, &id).instrument(plugin_span.clone()).await;
     trace::record_duration(&plugin_span, plugin_started_at.elapsed());
     let chapters = match chapters {
         Ok(chapters) => chapters,
@@ -617,13 +572,13 @@ pub async fn get_chapter_list(
 }
 
 fn map_manga_response(
-    manga: runtime::manga::source::types::Manga,
+    manga: types::Manga,
     source_base_url: &str,
     source_name: &str,
 ) -> Result<MangaResponse, AppError> {
     let cover_url = manga.cover.url.clone();
     let (cover_proxy_url, cover_fetch_spec) = if manga.cover.request.is_some() {
-        let spec = runtime_media_ref_to_spec(&manga.cover)?;
+        let spec = media_ref_to_spec(&manga.cover)?;
         let encoded = encode_media_spec(&spec)?;
         let cover_proxy_url = Some(crate::app::media::media_proxy_url(source_name, &encoded));
         (cover_proxy_url, Some(encoded))

@@ -94,7 +94,7 @@ async fn proxy_image(
     match media::proxy_image(
         &state.cache,
         &state.telemetry.metrics,
-        &state.plugin_manager,
+        &state.source_registry,
         query.url,
         query.spec,
         query.source,

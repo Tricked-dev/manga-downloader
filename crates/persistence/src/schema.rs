@@ -135,23 +135,6 @@ pub(crate) struct DownloadEvent {
     pub(crate) created_at: String,
 }
 
-#[derive(Clone, Debug, toasty::Model)]
-#[table = "plugin_artifacts"]
-pub(crate) struct PluginArtifact {
-    #[key]
-    #[default(crate::new_id())]
-    pub(crate) id: String,
-    #[index]
-    pub(crate) plugin_key: String,
-    pub(crate) plugin_version: String,
-    pub(crate) artifact_path: String,
-    pub(crate) plugin_api_version: i64,
-    #[index]
-    pub(crate) is_active: bool,
-    #[default(crate::now_timestamp())]
-    pub(crate) installed_at: String,
-    pub(crate) replaced_at: Option<String>,
-}
 
 #[derive(Clone, Debug, toasty::Model)]
 #[table = "background_jobs"]

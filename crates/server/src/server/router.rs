@@ -136,7 +136,7 @@ async fn refresh_download_status_metrics(state: &Arc<AppState>) {
     };
 
     let source_names = {
-        let plugins = state.plugin_manager.read().await;
+        let plugins = state.source_registry.read().await;
         plugins
             .sources()
             .into_iter()
@@ -184,7 +184,7 @@ async fn refresh_library_metrics(state: &Arc<AppState>) {
     };
 
     let source_names = {
-        let plugins = state.plugin_manager.read().await;
+        let plugins = state.source_registry.read().await;
         plugins
             .sources()
             .into_iter()
@@ -206,7 +206,7 @@ async fn refresh_library_metrics(state: &Arc<AppState>) {
 
 #[autometrics]
 async fn refresh_source_metrics(state: &Arc<AppState>) {
-    let plugins = state.plugin_manager.read().await;
+    let plugins = state.source_registry.read().await;
     let sources = plugins.sources();
     let enabled = sources.iter().filter(|source| source.enabled).count();
     let loaded = sources.len();

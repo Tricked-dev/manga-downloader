@@ -1,15 +1,15 @@
 # Manga Downloader
 
-Manga Downloader is a self-hosted manga reading and download system. This glossary names the domain concepts used when discussing source plugins, the local library, downloads, and reader behaviour.
+Manga Downloader is a self-hosted manga reading and download system. This glossary names the domain concepts used when discussing native sources, the local library, downloads, and reader behaviour.
 
 ## Language
 
 **Chapter Page**:
-One ordered readable page within a chapter. A Chapter Page may be backed by a source plugin media reference or by a downloaded archive entry, but callers should not treat URL, image, or archive entry as the reader-facing concept.
+One ordered readable page within a chapter. A Chapter Page may be backed by a native source media reference or by a downloaded archive entry, but callers should not treat URL, image, or archive entry as the reader-facing concept.
 _Avoid_: image, page URL, media ref, archive entry
 
 **Source Chapter Page**:
-A Chapter Page whose bytes are obtained from a source plugin. A Source Chapter Page belongs to a source chapter, may require source-specific fetch behaviour, and can be used as fallback when downloaded backing is unavailable.
+A Chapter Page whose bytes are obtained from a native source. A Source Chapter Page belongs to a source chapter, may require source-specific fetch behaviour, and can be used as fallback when downloaded backing is unavailable.
 _Avoid_: remote image, proxied URL
 
 **Downloaded Chapter Page**:
@@ -17,7 +17,7 @@ A Chapter Page whose bytes are obtained from the local library's downloaded arch
 _Avoid_: archive entry, extracted image
 
 **Local Library Chapter**:
-A chapter tracked in the local library for a saved manga. A Local Library Chapter may have read progress, may be downloaded, or may still be read through source plugin pages.
+A chapter tracked in the local library for a saved manga. A Local Library Chapter may have read progress, may be downloaded, or may still be read through native source pages.
 _Avoid_: saved chapter, tracked chapter
 
 **Read Progress**:
@@ -37,7 +37,7 @@ Preparing nearby Chapter Pages so the reader can display them with less waiting.
 _Avoid_: image prefetch, cache priming, archive pre-extract
 
 **Source Catalog**:
-The installed and configured set of source plugins available for searching, browsing, and reading Source Chapter Pages. Source Catalog changes include plugin install, reload, deletion, enablement, and source-level settings that affect source visibility or behavior.
+The compiled-in and configured set of native sources available for searching, browsing, and reading Source Chapter Pages. Source Catalog changes include enablement and source-level settings that affect visibility or behavior. Adding or updating a source requires a new server build.
 _Avoid_: plugin list, source cache
 
 **Download**:
@@ -96,7 +96,7 @@ _Avoid_: download completed event
 
 Developer: "Should the reader ask for image URLs?"
 
-Domain expert: "No. The reader asks for Chapter Pages. Some Chapter Pages come from source plugins, and some come from downloaded archives."
+Domain expert: "No. The reader asks for Chapter Pages. Some Chapter Pages come from native sources, and some come from downloaded archives."
 
 Developer: "Should source reading and downloaded reading use different reader concepts?"
 

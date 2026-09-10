@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use autometrics::autometrics;
 use backend_persistence::{ChapterRow, MangaRow};
-use backend_plugin_host::{
+use backend_sources::{
     fetch::RequestProfile,
     media::{MediaRefSpec, decode_media_spec},
 };
@@ -123,7 +123,7 @@ async fn fetch_series_cover_archive_entry(
     };
 
     let media_client = {
-        let pm = state.plugin_manager.read().await;
+        let pm = state.source_registry.read().await;
         pm.media_client(&manga.source)?
     };
     let (cover_bytes, _) = tokio::select! {
@@ -379,7 +379,7 @@ async fn download_chapter(
 
         let manga = crate::app::library::refresh_manga_metadata_if_incomplete(
             &state.db,
-            &state.plugin_manager,
+            &state.source_registry,
             &download.manga_id,
         )
         .await
@@ -414,7 +414,7 @@ async fn download_chapter(
         let avif_enabled = settings::source_avif_enabled(&state.db, &manga.source).await?;
         let avif_quality = settings::source_avif_quality(&state.db, &manga.source).await?;
         let media_client = {
-            let pm = state.plugin_manager.read().await;
+            let pm = state.source_registry.read().await;
             pm.media_client(&manga.source)?
         };
         let page_fetch_concurrency = settings::download_page_fetch_concurrency(&state.db).await?;
@@ -681,7 +681,7 @@ async fn refresh_stale_chapter_source_id(
 ) -> Result<Option<ChapterRow>> {
     let Some(refreshed) = source_chapter_sync::refresh_stale_chapter_source_id(
         &state.db,
-        &state.plugin_manager,
+        &state.source_registry,
         manga,
         chapter,
     )

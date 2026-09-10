@@ -35,7 +35,7 @@ pub use download_work_state::{DownloadWorkStatus, DownloadWorkTransition};
 pub use maintenance::DatabaseCleanupResult;
 pub use models::{
     ChapterInsert, ChapterRow, DownloadMetricRow, DownloadRow, MangaInsert, MangaRow,
-    PluginArtifactRecordInput, PluginArtifactRow, SourceCountRow, SourceRecordInput,
+    SourceCountRow, SourceRecordInput,
     StatsActivityPoint, StatsCacheSummary, StatsOverview, StatsRecentChapter, StatsSourceBreakdown,
     StatsStorageSummary, StatsTotals,
 };

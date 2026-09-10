@@ -5,7 +5,7 @@ use crate::{
 };
 use backend_cache::MangaCache;
 use backend_page_extraction::DownloadedPageExtractionScheduler;
-use backend_plugin_host::PluginManager;
+use backend_sources::SourceRegistry;
 use backend_telemetry::Telemetry;
 use secrecy::SecretString;
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ pub(crate) struct DownloadStorageUsage {
 pub(crate) struct AppState {
     pub(crate) config: AppConfig,
     pub(crate) db: backend_persistence::Database,
-    pub(crate) plugin_manager: RwLock<PluginManager>,
+    pub(crate) source_registry: RwLock<SourceRegistry>,
     pub(crate) cache: MangaCache,
     pub(crate) archive_index: Arc<ArchiveIndexService>,
     pub(crate) extraction_scheduler: Arc<DownloadedPageExtractionScheduler>,
@@ -51,7 +51,7 @@ pub(crate) struct AppState {
 pub(crate) struct AppStateParts {
     pub(crate) config: AppConfig,
     pub(crate) db: backend_persistence::Database,
-    pub(crate) plugin_manager: PluginManager,
+    pub(crate) source_registry: SourceRegistry,
     pub(crate) cache: MangaCache,
     pub(crate) telemetry: Telemetry,
 }
@@ -60,7 +60,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
     let AppStateParts {
         config,
         db,
-        plugin_manager,
+        source_registry,
         cache,
         telemetry,
     } = parts;
@@ -68,7 +68,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
     Arc::new(AppState {
         config,
         db,
-        plugin_manager: RwLock::new(plugin_manager),
+        source_registry: RwLock::new(source_registry),
         cache,
         archive_index: Arc::new(ArchiveIndexService::new()),
         extraction_scheduler: Arc::new(DownloadedPageExtractionScheduler::default()),
@@ -89,7 +89,6 @@ pub(crate) async fn build_test_app_state(
     let root = crate::test_support::temp_path(label);
     let db_path = root.join("test.sqlite3");
     let cache_path = root.join("cache");
-    let plugins_path = root.join("plugins");
     let download_path = root.join("downloads");
 
     std::fs::create_dir_all(&root).expect("test root should be created");
@@ -102,8 +101,7 @@ pub(crate) async fn build_test_app_state(
         .await
         .expect("download path setting should be stored");
 
-    let plugin_manager = PluginManager::new(plugins_path)
-        .await
+    let source_registry = SourceRegistry::new()
         .expect("plugin manager should initialize");
     let cache = MangaCache::new(&cache_path.to_string_lossy(), 1024 * 1024)
         .await
@@ -116,7 +114,7 @@ pub(crate) async fn build_test_app_state(
             backend_api_key: None,
         },
         db,
-        plugin_manager,
+        source_registry,
         cache,
         telemetry: Telemetry::for_test(telemetry_name),
     })

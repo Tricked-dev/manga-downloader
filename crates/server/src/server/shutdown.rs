@@ -207,8 +207,8 @@ async fn wait_for_http_shutdown_release(http_shutdown: oneshot::Receiver<()>) {
 
 async fn wait_for_plugin_runtime_idle(state: &AppState) {
     let runtime_activity = {
-        let plugin_manager = state.plugin_manager.read().await;
-        plugin_manager.runtime_activity()
+        let source_registry = state.source_registry.read().await;
+        source_registry.runtime_activity()
     };
     runtime_activity.wait_for_idle().await;
     tracing::info!("Plugin Runtime Activity Drained");

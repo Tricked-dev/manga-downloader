@@ -12,10 +12,10 @@ use backend_page_extraction::{
     PositionedImageTarget,
 };
 use backend_persistence::Database;
-use backend_plugin_host::{
-    PluginManager, PluginMediaClient,
+use backend_sources::{
+    SourceRegistry, SourceMediaClient,
     fetch::RequestProfile,
-    media::{MediaRefSpec, MediaTransformSpec, encode_media_spec, runtime_media_ref_to_spec},
+    media::{MediaRefSpec, MediaTransformSpec, encode_media_spec, media_ref_to_spec},
 };
 use dashmap::DashMap;
 use futures_util::{StreamExt, stream};
@@ -266,17 +266,17 @@ fn validate_source_page_image(
 
 #[autometrics]
 pub async fn source_chapter_page_references(
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     cache: &MangaCache,
     source: String,
     chapter_id: String,
 ) -> Result<ApiListResponse<SourceChapterPageReference>, AppError> {
-    source_chapter_page_references_with_ttl(plugin_manager, cache, source, chapter_id, None).await
+    source_chapter_page_references_with_ttl(source_registry, cache, source, chapter_id, None).await
 }
 
 #[autometrics]
 pub async fn source_chapter_page_references_with_ttl(
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     cache: &MangaCache,
     source: String,
     chapter_id: String,
@@ -295,8 +295,8 @@ pub async fn source_chapter_page_references_with_ttl(
     }
 
     let pages = {
-        let pm = plugin_manager.read().await;
-        pm.get_page_list(&source, &chapter_id)?
+        let pm = source_registry.read().await;
+        pm.get_page_list(&source, &chapter_id).await?
     };
     let response = ApiListResponse::new(
         pages
@@ -305,7 +305,7 @@ pub async fn source_chapter_page_references_with_ttl(
             .map(|(index, page)| {
                 let media = if page.image.request.is_some() {
                     SourceChapterPageMedia::Request {
-                        spec: runtime_media_ref_to_spec(&page.image)?,
+                        spec: media_ref_to_spec(&page.image)?,
                     }
                 } else {
                     SourceChapterPageMedia::Direct {
@@ -336,7 +336,7 @@ pub async fn source_chapter_page_references_for_reader(
     options: SourceChapterPageReferenceOptions,
 ) -> Result<ApiListResponse<SourceChapterPageReference>, AppError> {
     let pages = source_chapter_page_references(
-        &state.plugin_manager,
+        &state.source_registry,
         &state.cache,
         source.clone(),
         chapter_id.clone(),
@@ -362,7 +362,7 @@ pub async fn source_chapter_page_references_for_reader(
 pub async fn warm_source_chapter_page(
     cache: &MangaCache,
     metrics: &backend_telemetry::Metrics,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     reference: &SourceChapterPageReference,
     source_base_url: Option<&str>,
     ttl: Duration,
@@ -372,7 +372,7 @@ pub async fn warm_source_chapter_page(
             crate::app::media::precache_direct_image_url(
                 cache,
                 metrics,
-                plugin_manager,
+                source_registry,
                 url,
                 &reference.source,
                 source_base_url,
@@ -384,7 +384,7 @@ pub async fn warm_source_chapter_page(
             crate::app::media::precache_media_spec(
                 cache,
                 metrics,
-                plugin_manager,
+                source_registry,
                 spec,
                 &reference.source,
                 ttl,
@@ -398,7 +398,7 @@ pub async fn warm_source_chapter_page(
 pub async fn read_source_chapter_page(
     cache: &MangaCache,
     metrics: &backend_telemetry::Metrics,
-    media_client: &PluginMediaClient,
+    media_client: &SourceMediaClient,
     reference: SourceChapterPageReference,
 ) -> anyhow::Result<SourceChapterPage> {
     for key in reference.cache_lookup_keys()? {
@@ -527,11 +527,11 @@ async fn warm_next_source_chapter_pages(
     };
 
     let source_base_url = {
-        let pm = state.plugin_manager.read().await;
+        let pm = state.source_registry.read().await;
         pm.source_base_url(source).ok().map(Arc::<str>::from)
     };
     let pages = source_chapter_page_references_with_ttl(
-        &state.plugin_manager,
+        &state.source_registry,
         &state.cache,
         source.to_string(),
         next.source_id.clone(),
@@ -566,7 +566,7 @@ async fn warm_source_chapter_pages(
     ttl: Duration,
 ) -> usize {
     let source_base_url = {
-        let pm = state.plugin_manager.read().await;
+        let pm = state.source_registry.read().await;
         pm.source_base_url(source).ok().map(Arc::<str>::from)
     };
     warm_source_chapter_pages_with_base_url(state, source_base_url, pages, ttl).await
@@ -586,7 +586,7 @@ async fn warm_source_chapter_pages_with_base_url(
             warm_source_chapter_page(
                 &state.cache,
                 &state.telemetry.metrics,
-                &state.plugin_manager,
+                &state.source_registry,
                 &page,
                 source_base_url.as_deref(),
                 ttl,
@@ -1049,7 +1049,7 @@ async fn resolve_downloaded_page_transform_metadata(
         });
     };
     let refs = match source_chapter_page_references(
-        &state.plugin_manager,
+        &state.source_registry,
         &state.cache,
         manga.source.clone(),
         chapter.source_id,
@@ -1133,12 +1133,12 @@ mod tests {
     fn request_spec() -> MediaRefSpec {
         MediaRefSpec {
             url: "https://img.example/page-1.jpg".to_string(),
-            request: Some(backend_plugin_host::media::FetchRequestSpec {
+            request: Some(backend_sources::media::FetchRequestSpec {
                 url: "https://img.example/page-1.jpg".to_string(),
                 method: "GET".to_string(),
                 headers: Vec::new(),
                 body: None,
-                purpose: backend_plugin_host::media::RequestPurposeSpec::Image,
+                purpose: backend_sources::media::RequestPurposeSpec::Image,
             }),
             transform: None,
         }
@@ -1181,7 +1181,7 @@ mod tests {
             .into_owned()
             .collect::<std::collections::HashMap<_, _>>();
         let decoded =
-            backend_plugin_host::media::decode_media_spec(pairs.get("spec").unwrap()).unwrap();
+            backend_sources::media::decode_media_spec(pairs.get("spec").unwrap()).unwrap();
 
         assert_eq!(pairs.get("source").map(String::as_str), Some("demo"));
         assert_eq!(decoded, spec);

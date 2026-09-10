@@ -39,8 +39,8 @@ pub async fn diagnostics(state: &AppState) -> HealthResponse {
     };
 
     let plugin_check = {
-        let plugin_manager = state.plugin_manager.read().await;
-        match plugin_manager.health_check() {
+        let source_registry = state.source_registry.read().await;
+        match source_registry.health_check() {
             Ok(health) => HealthCheckResponse::ok(
                 "plugins",
                 format!(

@@ -17,7 +17,7 @@ use crate::{
 };
 use autometrics::autometrics;
 use backend_persistence::{Database, DownloadRow};
-use backend_plugin_host::PluginManager;
+use backend_sources::SourceRegistry;
 use tokio::sync::RwLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,7 +90,7 @@ pub async fn enqueue_manual(
     chapter_ref: &str,
     manga_ref: &str,
 ) -> Result<EnqueueDownloadResult, AppError> {
-    let result = enqueue(&state.db, &state.plugin_manager, chapter_ref, manga_ref).await?;
+    let result = enqueue(&state.db, &state.source_registry, chapter_ref, manga_ref).await?;
     finish_download_enqueue(state, &result.manga_source, DownloadEnqueueOrigin::Manual);
     Ok(result)
 }
@@ -286,7 +286,7 @@ pub async fn retry_work_record(
 #[autometrics]
 pub async fn enqueue(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     chapter_ref: &str,
     manga_ref: &str,
 ) -> Result<EnqueueDownloadResult, AppError> {
@@ -301,7 +301,7 @@ pub async fn enqueue(
     };
 
     let chapter =
-        source_chapter_sync::ensure_local_library_chapter(db, plugin_manager, &manga, chapter_ref)
+        source_chapter_sync::ensure_local_library_chapter(db, source_registry, &manga, chapter_ref)
             .await?;
     let chapter_id = chapter.id;
 

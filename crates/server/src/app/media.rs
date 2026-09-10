@@ -3,8 +3,8 @@ use anyhow::Context;
 use autometrics::autometrics;
 use axum::body::Bytes;
 use backend_cache::{CachedImage, MangaCache};
-use backend_plugin_host::{
-    PluginManager,
+use backend_sources::{
+    SourceRegistry,
     fetch::RequestProfile,
     media::{MediaRefSpec, decode_media_spec, encode_media_spec},
 };
@@ -51,7 +51,7 @@ pub(crate) fn direct_media_proxy_url(source: &str, url: &str) -> String {
 pub async fn proxy_image(
     cache: &MangaCache,
     metrics: &Metrics,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     url: Option<String>,
     spec: Option<String>,
     source: Option<String>,
@@ -71,7 +71,7 @@ pub async fn proxy_image(
         skip_cache,
     };
 
-    proxy_image_with_ttl(cache, metrics, plugin_manager, request, None).await
+    proxy_image_with_ttl(cache, metrics, source_registry, request, None).await
 }
 
 #[autometrics]
@@ -79,7 +79,7 @@ pub async fn proxy_image(
 pub async fn precache_direct_image_url(
     cache: &MangaCache,
     metrics: &Metrics,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     page_url: &str,
     source: &str,
     source_base_url: Option<&str>,
@@ -93,7 +93,7 @@ pub async fn precache_direct_image_url(
         width: None,
         skip_cache: false,
     };
-    let _ = proxy_image_with_ttl(cache, metrics, plugin_manager, request, Some(ttl)).await?;
+    let _ = proxy_image_with_ttl(cache, metrics, source_registry, request, Some(ttl)).await?;
     trace::record_outcome(&tracing::Span::current(), "success");
     Ok(())
 }
@@ -103,7 +103,7 @@ pub async fn precache_direct_image_url(
 pub async fn precache_media_spec(
     cache: &MangaCache,
     metrics: &Metrics,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     spec: &MediaRefSpec,
     source: &str,
     ttl: Duration,
@@ -116,7 +116,7 @@ pub async fn precache_media_spec(
         width: None,
         skip_cache: false,
     };
-    let _ = proxy_image_with_ttl(cache, metrics, plugin_manager, request, Some(ttl)).await?;
+    let _ = proxy_image_with_ttl(cache, metrics, source_registry, request, Some(ttl)).await?;
     trace::record_outcome(&tracing::Span::current(), "success");
     Ok(())
 }
@@ -126,7 +126,7 @@ pub async fn precache_media_spec(
 async fn proxy_image_with_ttl(
     cache: &MangaCache,
     metrics: &Metrics,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     request: ImageProxyRequest,
     ttl: Option<Duration>,
 ) -> Result<MediaProxyResult, AppError> {
@@ -208,7 +208,7 @@ async fn proxy_image_with_ttl(
     let media = media_ref_from_query(url.as_deref(), spec.as_deref())?;
     let fallback_url = media.url.clone();
     let fetcher = {
-        let pm = plugin_manager.read().await;
+        let pm = source_registry.read().await;
         if let Some(source) = source.as_deref() {
             pm.media_client(source)?
         } else {

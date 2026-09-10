@@ -89,13 +89,7 @@ pub(crate) fn downloaded_archives_bulk_reencoded(state: &AppState) {
     );
 }
 
-pub(crate) fn source_plugin_uploaded(state: &AppState, _source: &str) {
-    invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
-}
 
-pub(crate) fn source_plugins_reloaded(state: &AppState) {
-    invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
-}
 
 pub(crate) fn source_enabled_changed(state: &AppState, _source: &str, _enabled: bool) {
     invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
@@ -105,9 +99,6 @@ pub(crate) fn source_settings_changed(state: &AppState, _source: &str) {
     invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
 }
 
-pub(crate) fn source_plugin_deleted(state: &AppState, _source: &str) {
-    invalidate_route_snapshots(state, source_catalog_route_snapshot_names());
-}
 
 pub(crate) fn local_library_changed(state: &AppState) {
     invalidate_route_snapshots(state, local_library_route_snapshot_names());
@@ -246,27 +237,12 @@ mod tests {
                 &["settings:archive-index", "stats:overview"],
             ),
             (
-                "source_plugin_uploaded",
-                source_catalog_route_snapshot_names(),
-                &["library:list", "sources:list", "stats:overview"],
-            ),
-            (
-                "source_plugins_reloaded",
-                source_catalog_route_snapshot_names(),
-                &["library:list", "sources:list", "stats:overview"],
-            ),
-            (
                 "source_enabled_changed",
                 source_catalog_route_snapshot_names(),
                 &["library:list", "sources:list", "stats:overview"],
             ),
             (
                 "source_settings_changed",
-                source_catalog_route_snapshot_names(),
-                &["library:list", "sources:list", "stats:overview"],
-            ),
-            (
-                "source_plugin_deleted",
                 source_catalog_route_snapshot_names(),
                 &["library:list", "sources:list", "stats:overview"],
             ),

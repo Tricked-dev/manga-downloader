@@ -118,24 +118,7 @@ pub struct LibraryUpdateResponse {
     pub new_chapters: usize,
 }
 
-#[derive(Serialize, ToSchema)]
-pub struct UploadPluginResponse {
-    pub filename: String,
-    pub source: String,
-    pub replaced_existing: bool,
-}
 
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
-pub struct PluginArtifactResponse {
-    pub id: String,
-    pub plugin_key: String,
-    pub plugin_version: String,
-    pub artifact_path: String,
-    pub plugin_api_version: u32,
-    pub is_active: bool,
-    pub installed_at: String,
-    pub replaced_at: Option<String>,
-}
 
 #[derive(Serialize, ToSchema)]
 pub struct SetSourceEnabledResponse {

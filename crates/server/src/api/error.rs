@@ -1,5 +1,5 @@
 use axum::{Json, http::StatusCode, response::IntoResponse};
-use backend_plugin_host::{PluginManagerError, PluginRuntimeError};
+use backend_sources::{SourceRegistryError, SourceError};
 use backend_telemetry::{record_request_error, trace};
 use serde::Serialize;
 
@@ -179,16 +179,16 @@ impl IntoResponse for AppError {
 
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
-        if plugin_runtime_error(&err).is_some_and(PluginRuntimeError::is_upstream_blocked) {
+        if plugin_runtime_error(&err).is_some_and(SourceError::is_upstream_blocked) {
             return Self::upstream_blocked(err);
         }
 
         let plugin_status = err
-            .downcast_ref::<PluginManagerError>()
+            .downcast_ref::<SourceRegistryError>()
             .map(|plugin_error| match plugin_error {
-                PluginManagerError::NotFound { .. } => StatusCode::NOT_FOUND,
-                PluginManagerError::Disabled { .. }
-                | PluginManagerError::UnsupportedCapability { .. } => StatusCode::CONFLICT,
+                SourceRegistryError::NotFound { .. } => StatusCode::NOT_FOUND,
+                SourceRegistryError::Disabled { .. }
+                | SourceRegistryError::UnsupportedCapability { .. } => StatusCode::CONFLICT,
             });
 
         if let Some(status) = plugin_status {
@@ -212,10 +212,10 @@ impl From<http::Error> for AppError {
     }
 }
 
-fn plugin_runtime_error(error: &anyhow::Error) -> Option<&PluginRuntimeError> {
+fn plugin_runtime_error(error: &anyhow::Error) -> Option<&SourceError> {
     error
         .chain()
-        .find_map(|cause| cause.downcast_ref::<PluginRuntimeError>())
+        .find_map(|cause| cause.downcast_ref::<SourceError>())
 }
 
 fn plugin_error_details(error: &anyhow::Error) -> Option<serde_json::Value> {
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn maps_cloudflare_plugin_block_to_upstream_blocked() {
-        let error = anyhow::Error::new(PluginRuntimeError {
+        let error = anyhow::Error::new(SourceError {
             code: "search_failed".to_string(),
             message: "fetch_failed: Cloudflare blocked access while solving challenge for https://comix.to/api/v1/manga?page=1&limit=28".to_string(),
             retryable: true,
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn leaves_non_blocked_plugin_errors_internal() {
-        let error = anyhow::Error::new(PluginRuntimeError {
+        let error = anyhow::Error::new(SourceError {
             code: "parse_search_response".to_string(),
             message: "Failed to parse Comix search response".to_string(),
             retryable: false,

@@ -1,7 +1,7 @@
 #![allow(clippy::missing_errors_doc)]
 
 use schematic::ConfigLoader;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, schematic::Config)]
 #[config(rename_all = "snake_case")]
@@ -12,11 +12,7 @@ pub struct ServerConfig {
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
-    #[setting(default = default_plugins_path(), env = "PLUGINS_PATH", parse_env = schematic::env::ignore_empty)]
-    pub plugins_path: PathBuf,
 
-    #[setting(env = "SOURCE_PLUGIN_REGISTRY_URL", parse_env = schematic::env::ignore_empty)]
-    pub source_plugin_registry_url: Option<String>,
 
     #[setting(env = "BACKEND_API_KEY", parse_env = schematic::env::ignore_empty)]
     pub backend_api_key: Option<String>,
@@ -28,8 +24,6 @@ pub struct ServerConfig {
 pub struct ServerConfigOverrides {
     pub db_path: Option<PathBuf>,
     pub server_addr: Option<String>,
-    pub plugins_path: Option<PathBuf>,
-    pub source_plugin_registry_url: Option<String>,
     pub backend_api_key: Option<String>,
 }
 
@@ -53,28 +47,8 @@ impl ServerConfig {
         if let Some(server_addr) = overrides.server_addr {
             self.server_addr = server_addr;
         }
-        if let Some(plugins_path) = overrides.plugins_path {
-            self.plugins_path = plugins_path;
-        }
-        if let Some(source_plugin_registry_url) = overrides.source_plugin_registry_url {
-            self.source_plugin_registry_url = Some(source_plugin_registry_url);
-        }
         if let Some(backend_api_key) = overrides.backend_api_key {
             self.backend_api_key = Some(backend_api_key);
         }
     }
-}
-
-fn default_plugins_path() -> PathBuf {
-    for candidate in [
-        Path::new("./plugins"),
-        Path::new("../plugins"),
-        Path::new("../../plugins"),
-    ] {
-        if backend_fs::path_exists(candidate) {
-            return candidate.to_path_buf();
-        }
-    }
-
-    PathBuf::from("./plugins")
 }

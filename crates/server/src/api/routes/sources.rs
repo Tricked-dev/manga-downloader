@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Multipart, Path, Query, State},
-    http::StatusCode,
+    extract::{Path, Query, State},
     response::IntoResponse,
 };
-use backend_plugin_host::SourceInfo;
+use backend_sources::SourceInfo;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -16,8 +15,8 @@ use crate::{
     api::{
         dto::{
             ApiListResponse, ChapterResponse, ErrorEnvelopeResponse, MangaResponse,
-            OperationStatusResponse, PluginArtifactResponse, SearchResponse,
-            SetSourceEnabledResponse, SourceSettingsResponse, UploadPluginResponse,
+            SearchResponse,
+            SetSourceEnabledResponse, SourceSettingsResponse,
         },
         error::AppError,
         response_cache, validation,
@@ -28,11 +27,7 @@ use crate::{
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(list_sources))
-        .routes(routes!(reload_sources))
-        .routes(routes!(upload_plugin))
-        .routes(routes!(delete_source))
         .routes(routes!(set_source_enabled))
-        .routes(routes!(list_source_artifacts))
         .routes(routes!(get_source_settings, update_source_settings))
         .routes(routes!(search_source))
         .routes(routes!(get_manga_details))
@@ -52,7 +47,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
 #[tracing::instrument(name = "api.sources.list", skip_all)]
 async fn list_sources(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
     response_cache::cached_json(&state.cache, "sources:list", || async {
-        catalog::list_sources(&state.db, &state.plugin_manager).await
+        catalog::list_sources(&state.db, &state.source_registry).await
     })
     .await
 }
@@ -89,75 +84,6 @@ async fn set_source_enabled(
     Ok(Json(response))
 }
 
-#[derive(ToSchema)]
-#[allow(dead_code)]
-struct UploadPluginRequest {
-    #[schema(value_type = String, format = Binary)]
-    file: String,
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/sources/upload",
-    tag = "sources",
-    request_body(content = UploadPluginRequest, content_type = "multipart/form-data"),
-    responses(
-        (status = CREATED, body = UploadPluginResponse),
-        (status = BAD_REQUEST, body = ErrorEnvelopeResponse),
-        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
-    )
-)]
-#[tracing::instrument(name = "api.sources.plugin.upload", skip_all)]
-async fn upload_plugin(
-    State(state): State<Arc<AppState>>,
-    mut multipart: Multipart,
-) -> Result<impl IntoResponse, AppError> {
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        AppError::bad_request(anyhow::anyhow!("Failed to read multipart field: {e}"))
-    })? {
-        let file_name = field.file_name().unwrap_or("unknown").to_string();
-
-        if std::path::Path::new(&file_name)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("wasm"))
-        {
-            let data = field.bytes().await.map_err(|e| {
-                AppError::bad_request(anyhow::anyhow!("Failed to read multipart data: {e}"))
-            })?;
-
-            let response = source_catalog_changes::upload_plugin(&state, &file_name, &data).await?;
-
-            tracing::info!(
-                file_name = %response.filename,
-                source = %response.source,
-                replaced_existing = response.replaced_existing,
-                "Source Plugin Uploaded",
-            );
-
-            return Ok((StatusCode::CREATED, Json(response)));
-        }
-    }
-    Err(AppError::bad_request(anyhow::anyhow!(
-        "No .wasm file found in payload"
-    )))
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/sources/reload",
-    tag = "sources",
-    responses(
-        (status = OK, body = OperationStatusResponse),
-        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
-    )
-)]
-#[tracing::instrument(name = "api.sources.plugin.reload", skip_all)]
-async fn reload_sources(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
-    let response = source_catalog_changes::reload_sources(&state).await?;
-    tracing::info!("Source Plugins Reloaded");
-    Ok(Json(response))
-}
-
 #[derive(Deserialize, ToSchema, garde::Validate)]
 #[garde(allow_unvalidated)]
 struct UpdateSourceSettingsRequest {
@@ -181,27 +107,7 @@ async fn get_source_settings(
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     Ok(Json(
-        catalog::get_source_settings(&state.db, &state.plugin_manager, &name).await?,
-    ))
-}
-
-#[utoipa::path(
-    get,
-    path = "/v1/sources/{name}/artifacts",
-    tag = "sources",
-    params(("name" = String, Path, description = "Source plugin name")),
-    responses(
-        (status = OK, body = ApiListResponse<PluginArtifactResponse>),
-        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
-    )
-)]
-#[tracing::instrument(name = "api.sources.artifacts.list", skip_all, fields(source = %name))]
-async fn list_source_artifacts(
-    State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    Ok(Json(
-        catalog::list_source_artifacts(&state.db, &name).await?,
+        catalog::get_source_settings(&state.db, &state.source_registry, &name).await?,
     ))
 }
 
@@ -232,28 +138,6 @@ async fn update_source_settings(
         "Source Settings Updated",
     );
     Ok(Json(response))
-}
-
-#[utoipa::path(
-    delete,
-    path = "/v1/sources/{name}",
-    tag = "sources",
-    params(("name" = String, Path, description = "Source plugin name")),
-    responses(
-        (status = NO_CONTENT),
-        (status = CONFLICT, body = ErrorEnvelopeResponse),
-        (status = NOT_FOUND, body = ErrorEnvelopeResponse),
-        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
-    )
-)]
-#[tracing::instrument(name = "api.sources.plugin.delete", skip_all, fields(source = %name))]
-async fn delete_source(
-    State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    source_catalog_changes::delete_source(&state, &name).await?;
-    tracing::info!(source = %name, "Source Deleted");
-    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize, IntoParams, garde::Validate)]
@@ -303,7 +187,7 @@ async fn search_source(
     Ok(Json(
         catalog::search_source(
             &state.db,
-            &state.plugin_manager,
+            &state.source_registry,
             &state.cache,
             &state.telemetry.metrics,
             catalog::SearchSourceInput {
@@ -339,7 +223,7 @@ async fn get_manga_details(
 ) -> Result<impl IntoResponse, AppError> {
     Ok(Json(
         catalog::get_manga_details(
-            &state.plugin_manager,
+            &state.source_registry,
             &state.cache,
             &state.telemetry.metrics,
             name,
@@ -370,7 +254,7 @@ async fn get_chapter_list(
 ) -> Result<impl IntoResponse, AppError> {
     Ok(Json(
         catalog::get_chapter_list(
-            &state.plugin_manager,
+            &state.source_registry,
             &state.cache,
             &state.telemetry.metrics,
             name,
@@ -421,7 +305,7 @@ async fn get_page_list(
     )
     .await?;
     let source_base_url = if query.proxy {
-        let pm = state.plugin_manager.read().await;
+        let pm = state.source_registry.read().await;
         Some(pm.source_base_url(&name)?)
     } else {
         None

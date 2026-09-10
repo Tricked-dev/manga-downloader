@@ -1,7 +1,7 @@
 use crate::api::{dto::ApiListResponse, error::AppError};
 use autometrics::autometrics;
 use backend_persistence::{ChapterInsert, ChapterRow, Database, MangaRow};
-use backend_plugin_host::PluginManager;
+use backend_sources::SourceRegistry;
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
@@ -31,10 +31,10 @@ impl SourceChapterSyncOutcome {
 #[autometrics(track_concurrency)]
 pub(crate) async fn sync_local_library_chapters(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     manga: &MangaRow,
 ) -> Result<SourceChapterSyncOutcome, AppError> {
-    let chapter_inserts = source_chapter_inserts(plugin_manager, manga).await?;
+    let chapter_inserts = source_chapter_inserts(source_registry, manga).await?;
     let new_ids = db.sync_chapters(&manga.id, chapter_inserts).await?;
     let is_initial_sync = !manga.chapters_initialized;
 
@@ -52,10 +52,10 @@ pub(crate) async fn sync_local_library_chapters(
 #[autometrics(track_concurrency)]
 pub(crate) async fn refresh_local_library_chapters(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     manga: &MangaRow,
 ) -> Result<ApiListResponse<ChapterRow>, AppError> {
-    sync_local_library_chapters(db, plugin_manager, manga).await?;
+    sync_local_library_chapters(db, source_registry, manga).await?;
     let chapters = db.get_chapters(&manga.id).await?;
     Ok(ApiListResponse::new(chapters))
 }
@@ -63,7 +63,7 @@ pub(crate) async fn refresh_local_library_chapters(
 #[autometrics(track_concurrency)]
 pub(crate) async fn ensure_local_library_chapter(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     manga: &MangaRow,
     chapter_ref: &str,
 ) -> Result<ChapterRow, AppError> {
@@ -84,7 +84,7 @@ pub(crate) async fn ensure_local_library_chapter(
         )));
     }
 
-    sync_local_library_chapters(db, plugin_manager, manga).await?;
+    sync_local_library_chapters(db, source_registry, manga).await?;
 
     db.get_chapter_by_manga_and_source_id(&manga.id, chapter_ref)
         .await?
@@ -94,11 +94,11 @@ pub(crate) async fn ensure_local_library_chapter(
 #[autometrics(track_concurrency)]
 pub(crate) async fn refresh_stale_chapter_source_id(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     manga: &MangaRow,
     chapter: &ChapterRow,
 ) -> Result<Option<ChapterRow>, AppError> {
-    sync_local_library_chapters(db, plugin_manager, manga).await?;
+    sync_local_library_chapters(db, source_registry, manga).await?;
     let refreshed = db
         .get_chapter_by_id(&chapter.id)
         .await?
@@ -112,12 +112,12 @@ pub(crate) async fn refresh_stale_chapter_source_id(
 }
 
 async fn source_chapter_inserts(
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     manga: &MangaRow,
 ) -> Result<Vec<ChapterInsert>, AppError> {
     let source_chapters = {
-        let plugins = plugin_manager.read().await;
-        plugins.get_chapter_list(&manga.source, &manga.source_id)?
+        let plugins = source_registry.read().await;
+        plugins.get_chapter_list(&manga.source, &manga.source_id).await?
     };
 
     Ok(source_chapters

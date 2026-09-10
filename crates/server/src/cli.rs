@@ -1,6 +1,6 @@
 use crate::server;
 use backend_config::{ServerConfig, ServerConfigOverrides};
-use backend_plugin_host::PluginManager;
+use backend_sources::SourceRegistry;
 use backend_runtime::{color_logs_enabled, init_tracing};
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
@@ -28,8 +28,8 @@ enum Command {
     Openapi(OpenapiCommand),
     /// Configuration commands.
     Config(ConfigCommand),
-    /// Plugin inspection commands.
-    Plugins(PluginsCommand),
+    /// Source inspection commands.
+    Sources(SourcesCommand),
     /// Database maintenance commands.
     Db(DbCommand),
 }
@@ -43,10 +43,6 @@ struct ServerOptions {
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
     addr: Option<String>,
-
-    /// Plugin directory path.
-    #[arg(long)]
-    plugins_path: Option<PathBuf>,
 
     /// Backend bearer token. Prefer `BACKEND_API_KEY` for shared environments.
     #[arg(long, alias = "api-key")]
@@ -88,19 +84,19 @@ struct ConfigPrintOptions {
 }
 
 #[derive(Args, Debug)]
-struct PluginsCommand {
+struct SourcesCommand {
     #[command(subcommand)]
-    command: PluginsSubcommand,
+    command: SourcesSubcommand,
 }
 
 #[derive(Subcommand, Debug)]
-enum PluginsSubcommand {
-    /// List plugins found in the configured plugin directory.
-    List(PluginsListOptions),
+enum SourcesSubcommand {
+    /// List compiled-in sources.
+    List(SourcesListOptions),
 }
 
 #[derive(Args, Debug)]
-struct PluginsListOptions {
+struct SourcesListOptions {
     #[command(flatten)]
     server: ServerOptions,
 
@@ -131,8 +127,6 @@ struct DbMigrateOptions {
 struct ConfigReport {
     db_path: PathBuf,
     server_addr: String,
-    plugins_path: PathBuf,
-    source_plugin_registry_url: Option<String>,
     backend_api_key: SecretStatus,
 }
 
@@ -156,7 +150,7 @@ pub(crate) async fn run() -> anyhow::Result<()> {
         }
         Command::Openapi(command) => run_openapi_command(command),
         Command::Config(command) => run_config_command(command, cli.server),
-        Command::Plugins(command) => run_plugins_command(command, cli.server).await,
+        Command::Sources(command) => run_sources_command(command, cli.server).await,
         Command::Db(command) => run_db_command(command, cli.server).await,
     }
 }
@@ -183,21 +177,19 @@ fn run_config_command(command: ConfigCommand, inherited: ServerOptions) -> anyho
     }
 }
 
-async fn run_plugins_command(
-    command: PluginsCommand,
+async fn run_sources_command(
+    command: SourcesCommand,
     inherited: ServerOptions,
 ) -> anyhow::Result<()> {
     init_command_tracing();
 
     match command.command {
-        PluginsSubcommand::List(options) => {
-            let config = load_config(inherited.merge(options.server))?;
-            let plugin_manager = PluginManager::new(&config.plugins_path).await?;
-            let sources = plugin_manager.sources();
+        SourcesSubcommand::List(options) => {
+            let _config = load_config(inherited.merge(options.server))?;
+            let source_registry = SourceRegistry::new()?;
+            let sources = source_registry.sources();
             if options.json {
                 write_json(&sources)?;
-            } else if sources.is_empty() {
-                println!("No plugins found in {}", config.plugins_path.display());
             } else {
                 for source in sources {
                     println!(
@@ -252,14 +244,6 @@ fn load_config(options: ServerOptions) -> anyhow::Result<ServerConfig> {
 fn print_config_report(report: &ConfigReport) {
     println!("db_path: {}", report.db_path.display());
     println!("server_addr: {}", report.server_addr);
-    println!("plugins_path: {}", report.plugins_path.display());
-    println!(
-        "source_plugin_registry_url: {}",
-        report
-            .source_plugin_registry_url
-            .as_deref()
-            .unwrap_or("not set")
-    );
     println!(
         "backend_api_key: {}",
         match report.backend_api_key {
@@ -279,7 +263,6 @@ impl ServerOptions {
         Self {
             db_path: overrides.db_path.or(self.db_path),
             addr: overrides.addr.or(self.addr),
-            plugins_path: overrides.plugins_path.or(self.plugins_path),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
     }
@@ -290,8 +273,6 @@ impl From<ServerOptions> for ServerConfigOverrides {
         Self {
             db_path: options.db_path,
             server_addr: options.addr,
-            plugins_path: options.plugins_path,
-            source_plugin_registry_url: None,
             backend_api_key: options.backend_api_key,
         }
     }
@@ -302,8 +283,6 @@ impl ConfigReport {
         Self {
             db_path: config.db_path.clone(),
             server_addr: config.server_addr.clone(),
-            plugins_path: config.plugins_path.clone(),
-            source_plugin_registry_url: config.source_plugin_registry_url.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set
             } else {

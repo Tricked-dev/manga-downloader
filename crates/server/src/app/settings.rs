@@ -372,9 +372,6 @@ mod tests {
                 SettingKey::AutoDownloadCategory.as_str().to_string(),
                 "tracked".to_string(),
             ),
-            (
-                "token".to_string(),
-            ),
         ]));
 
         assert!(changes.download_path_changed());
@@ -382,7 +379,7 @@ mod tests {
         assert!(changes.contains_family(SettingsChangeFamily::DownloadStoragePolicy));
         assert!(changes.contains_family(SettingsChangeFamily::LibraryUpdatePolicy));
         assert!(!changes.contains_family(SettingsChangeFamily::CacheRuntime));
-        assert_eq!(changes.updated_count(), 3);
+        assert_eq!(changes.updated_count(), 2);
     }
 
     #[test]

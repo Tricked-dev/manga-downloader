@@ -1,8 +1,8 @@
 use anyhow::{Result, anyhow};
 
-use crate::schema::{LibrarySeries, PluginArtifact, Source};
+use crate::schema::{Source};
 use crate::{
-    Database, PluginArtifactRecordInput, PluginArtifactRow, SourceRecordInput, now_timestamp,
+    Database, SourceRecordInput,
 };
 
 impl Database {
@@ -83,44 +83,6 @@ impl Database {
         Ok(())
     }
 
-    /// Records an installed plugin artifact and marks older artifacts inactive.
-    pub async fn record_plugin_artifact(&self, artifact: &PluginArtifactRecordInput) -> Result<()> {
-        self.ensure_source_stub(&artifact.key, None).await?;
-
-        let _write = self.write_guard().await;
-        let mut db = self.executor();
-        let active = PluginArtifact::filter(
-            PluginArtifact::fields()
-                .plugin_key()
-                .eq(artifact.key.as_str())
-                .and(PluginArtifact::fields().is_active().eq(true)),
-        )
-        .exec(&mut db)
-        .await?;
-
-        let replaced_at = now_timestamp();
-        for mut existing in active {
-            existing
-                .update()
-                .is_active(false)
-                .replaced_at(Some(replaced_at.clone()))
-                .exec(&mut db)
-                .await?;
-        }
-
-        PluginArtifact::create()
-            .plugin_key(artifact.key.clone())
-            .plugin_version(artifact.plugin_version.clone())
-            .artifact_path(artifact.artifact_path.clone())
-            .plugin_api_version(i64::from(artifact.plugin_api_version))
-            .is_active(true)
-            .replaced_at(None::<String>)
-            .exec(&mut db)
-            .await?;
-
-        Ok(())
-    }
-
     pub(crate) async fn ensure_source_stub(
         &self,
         key: &str,
@@ -145,59 +107,6 @@ impl Database {
             .await?;
 
         Ok(key.to_string())
-    }
-
-    /// Lists plugin artifacts for a source with newest installs first.
-    pub async fn list_plugin_artifacts(&self, key: &str) -> Result<Vec<PluginArtifactRow>> {
-        let mut db = self.executor();
-        let mut rows = PluginArtifact::filter(PluginArtifact::fields().plugin_key().eq(key))
-            .exec(&mut db)
-            .await?;
-        rows.sort_by(|left, right| right.installed_at.cmp(&left.installed_at));
-        rows.into_iter()
-            .map(|row| {
-                Ok(PluginArtifactRow {
-                    id: row.id,
-                    plugin_key: row.plugin_key,
-                    plugin_version: row.plugin_version,
-                    artifact_path: row.artifact_path,
-                    plugin_api_version: u32::try_from(row.plugin_api_version)?,
-                    is_active: row.is_active,
-                    installed_at: row.installed_at,
-                    replaced_at: row.replaced_at,
-                })
-            })
-            .collect()
-    }
-
-    /// Counts library series that still reference a source.
-    pub async fn source_library_dependency_count(&self, key: &str) -> Result<usize> {
-        let mut db = self.executor();
-        let count = LibrarySeries::filter(LibrarySeries::fields().source_key().eq(key))
-            .count()
-            .exec(&mut db)
-            .await?;
-        usize::try_from(count).map_err(Into::into)
-    }
-
-    /// Deletes a source row and its plugin artifact records.
-    pub async fn delete_source_and_artifacts(&self, key: &str) -> Result<()> {
-        let _write = self.write_guard().await;
-        let mut db = self.executor();
-        let mut tx = db.transaction().await?;
-
-        PluginArtifact::filter(PluginArtifact::fields().plugin_key().eq(key))
-            .delete()
-            .exec(&mut tx)
-            .await?;
-
-        Source::filter(Source::fields().key().eq(key))
-            .delete()
-            .exec(&mut tx)
-            .await?;
-
-        tx.commit().await?;
-        Ok(())
     }
 
     async fn upsert_source(&self, source: &SourceRecordInput) -> Result<()> {

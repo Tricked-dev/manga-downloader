@@ -11,8 +11,8 @@ use crate::{
 };
 use autometrics::autometrics;
 use backend_persistence::{Database, MangaInsert, MangaRow};
-use backend_plugin_host::PluginManager;
-use backend_plugin_host::media::{encode_media_spec, runtime_media_ref_to_spec};
+use backend_sources::SourceRegistry;
+use backend_sources::media::{encode_media_spec, media_ref_to_spec};
 use std::{collections::HashMap, sync::Arc};
 use tokio::{sync::RwLock, task::JoinSet};
 
@@ -69,7 +69,7 @@ pub async fn refresh_local_library_chapters(
     id: &str,
 ) -> Result<ApiListResponse<backend_persistence::ChapterRow>, AppError> {
     let manga = require_library_manga(&state.db, id).await?;
-    let chapters = refresh_chapters(&state.db, &state.plugin_manager, id).await?;
+    let chapters = refresh_chapters(&state.db, &state.source_registry, id).await?;
     route_snapshot_invalidation::local_library_changed(state);
 
     tracing::info!(
@@ -185,12 +185,12 @@ pub async fn all_chapters(
 #[autometrics(track_concurrency)]
 pub async fn refresh_chapters(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     id: &str,
 ) -> Result<ApiListResponse<backend_persistence::ChapterRow>, AppError> {
-    let manga = refresh_manga_metadata(db, plugin_manager, id).await?;
+    let manga = refresh_manga_metadata(db, source_registry, id).await?;
 
-    source_chapter_sync::refresh_local_library_chapters(db, plugin_manager, &manga).await
+    source_chapter_sync::refresh_local_library_chapters(db, source_registry, &manga).await
 }
 
 #[autometrics]
@@ -216,7 +216,7 @@ pub async fn refresh_downloaded_comicinfo(
     state: &Arc<AppState>,
     id: &str,
 ) -> Result<usize, AppError> {
-    let manga = refresh_manga_metadata_strict(&state.db, &state.plugin_manager, id).await?;
+    let manga = refresh_manga_metadata_strict(&state.db, &state.source_registry, id).await?;
     let chapter_by_id = state
         .db
         .get_chapters(&manga.id)
@@ -310,14 +310,14 @@ pub async fn refresh_downloaded_comicinfo(
 #[autometrics(track_concurrency)]
 pub async fn refresh_manga_metadata(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     id: &str,
 ) -> Result<MangaRow, AppError> {
     let manga = require_library_manga(db, id).await?;
 
     let source_manga = {
-        let pm = plugin_manager.read().await;
-        match pm.get_manga_details(&manga.source, &manga.source_id) {
+        let pm = source_registry.read().await;
+        match pm.get_manga_details(&manga.source, &manga.source_id).await {
             Ok(source_manga) => source_manga,
             Err(error) => {
                 tracing::warn!(
@@ -336,14 +336,14 @@ pub async fn refresh_manga_metadata(
 
 async fn refresh_manga_metadata_strict(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     id: &str,
 ) -> Result<MangaRow, AppError> {
     let manga = require_library_manga(db, id).await?;
 
     let source_manga = {
-        let pm = plugin_manager.read().await;
-        pm.get_manga_details(&manga.source, &manga.source_id)
+        let pm = source_registry.read().await;
+        pm.get_manga_details(&manga.source, &manga.source_id).await
             .map_err(AppError::internal)?
     };
 
@@ -354,10 +354,10 @@ async fn update_manga_metadata_from_source(
     db: &Database,
     id: &str,
     manga: &MangaRow,
-    source_manga: backend_plugin_host::runtime::manga::source::types::Manga,
+    source_manga: backend_sources::types::Manga,
 ) -> Result<MangaRow, AppError> {
     let (cover_url, cover_fetch_spec) = if source_manga.cover.request.is_some() {
-        let spec = runtime_media_ref_to_spec(&source_manga.cover)?;
+        let spec = media_ref_to_spec(&source_manga.cover)?;
         (
             source_manga.cover.url.clone(),
             Some(encode_media_spec(&spec)?),
@@ -392,7 +392,7 @@ async fn update_manga_metadata_from_source(
 #[autometrics]
 pub async fn refresh_manga_metadata_if_incomplete(
     db: &Database,
-    plugin_manager: &RwLock<PluginManager>,
+    source_registry: &RwLock<SourceRegistry>,
     id: &str,
 ) -> Result<MangaRow, AppError> {
     let manga = require_library_manga(db, id).await?;
@@ -401,7 +401,7 @@ pub async fn refresh_manga_metadata_if_incomplete(
         return Ok(manga);
     }
 
-    refresh_manga_metadata(db, plugin_manager, id).await
+    refresh_manga_metadata(db, source_registry, id).await
 }
 
 async fn require_library_manga(db: &Database, id: &str) -> Result<MangaRow, AppError> {

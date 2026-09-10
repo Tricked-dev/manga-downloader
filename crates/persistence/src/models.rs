@@ -170,23 +170,3 @@ pub struct SourceRecordInput {
     pub capabilities: Vec<String>,
     pub enabled: bool,
 }
-
-#[derive(Debug, Clone)]
-pub struct PluginArtifactRecordInput {
-    pub key: String,
-    pub artifact_path: String,
-    pub plugin_version: String,
-    pub plugin_api_version: u32,
-}
-
-#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
-pub struct PluginArtifactRow {
-    pub id: String,
-    pub plugin_key: String,
-    pub plugin_version: String,
-    pub artifact_path: String,
-    pub plugin_api_version: u32,
-    pub is_active: bool,
-    pub installed_at: String,
-    pub replaced_at: Option<String>,
-}

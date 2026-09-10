@@ -227,7 +227,7 @@ async fn check_manga_updates(
     auto_download_policy: &AutoDownloadPolicy,
 ) -> Result<MangaUpdateOutcome> {
     let chapter_sync =
-        source_chapter_sync::sync_local_library_chapters(&state.db, &state.plugin_manager, manga)
+        source_chapter_sync::sync_local_library_chapters(&state.db, &state.source_registry, manga)
             .await?;
     let new_chapters = chapter_sync.new_chapter_count();
     let is_library_update = chapter_sync.is_library_update();

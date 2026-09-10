@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use autometrics::autometrics;
 use axum::body::Bytes;
-use backend_plugin_host::PluginMediaClient;
+use backend_sources::SourceMediaClient;
 use backon::{ExponentialBuilder, Retryable};
 use futures_util::{StreamExt, stream};
 
@@ -83,7 +83,7 @@ pub(super) async fn fetch_chapter_pages(
     state: &Arc<AppState>,
     download: &backend_persistence::DownloadRow,
     page_refs: &[SourceChapterPageReference],
-    media_client: &PluginMediaClient,
+    media_client: &SourceMediaClient,
     cancel_flag: &DownloadCancellation,
     started_at: Instant,
     staging_dir: &Path,
@@ -175,7 +175,7 @@ pub(super) async fn fetch_chapter_pages(
 #[autometrics(track_concurrency)]
 async fn fetch_page(
     state: Arc<AppState>,
-    media_client: PluginMediaClient,
+    media_client: SourceMediaClient,
     source: &str,
     index: usize,
     reference: SourceChapterPageReference,
@@ -360,7 +360,7 @@ async fn resolve_page_refs_attempt(
 ) -> std::result::Result<(Vec<SourceChapterPageReference>, usize), PageRefsAttemptError> {
     ensure_not_cancelled(&cancel_flag).map_err(|error| PageRefsAttemptError { attempt, error })?;
     let result = chapter_pages::source_chapter_page_references(
-        &state.plugin_manager,
+        &state.source_registry,
         &state.cache,
         source.clone(),
         chapter_source_id.clone(),

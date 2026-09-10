@@ -9,7 +9,7 @@ use anyhow::Context as _;
 use autometrics::autometrics;
 use backend_cache::MangaCache;
 use backend_config::ServerConfig;
-use backend_plugin_host::PluginManager;
+use backend_sources::SourceRegistry;
 use backend_runtime::color_logs_enabled;
 use backend_telemetry::Telemetry;
 use secrecy::SecretString;
@@ -135,8 +135,6 @@ async fn bootstrap_server(
     let ServerConfig {
         db_path,
         server_addr,
-        plugins_path,
-        source_plugin_registry_url,
         backend_api_key,
     } = config;
 
@@ -154,16 +152,10 @@ async fn bootstrap_server(
     backend_fs::create_dir_all(Path::new(&cache_disk_path)).await?;
     backend_fs::create_dir_all(&std::env::temp_dir()).await?;
 
-    let mut plugin_manager = PluginManager::new(&plugins_path).await?;
-    source_catalog_changes::install_configured_registry_plugins(
-        &mut plugin_manager,
-        &db,
-        source_plugin_registry_url.as_deref(),
-    )
-    .await?;
-    source_catalog_changes::sync_startup_source_catalog(&plugin_manager, &db).await?;
+    let mut source_registry = SourceRegistry::new()?;
     let disabled_plugins = db.get_disabled_source_keys().await?;
-    plugin_manager.set_disabled_plugins(&disabled_plugins);
+    source_registry.set_disabled_sources(&disabled_plugins);
+    source_catalog_changes::sync_startup_source_catalog(&source_registry, &db).await?;
     let recovered_downloads = db.recover_interrupted_downloads().await?;
     if recovered_downloads > 0 {
         tracing::warn!(
@@ -183,8 +175,7 @@ async fn bootstrap_server(
         commit = %build_info.commit_short_hash.as_deref().unwrap_or("unknown"),
         build_target = %build_info.build_target.as_deref().unwrap_or("unknown"),
         db_path = %db_path.display(),
-        plugins_dir = %plugins_path.display(),
-        loaded_plugins = plugin_manager.sources().len(),
+        loaded_plugins = source_registry.sources().len(),
         disabled_plugins = disabled_plugins.len(),
         api_key_enabled = backend_api_key.is_some(),
         cache_disk_path = %cache_disk_path,
@@ -200,7 +191,7 @@ async fn bootstrap_server(
         },
         db,
         cache,
-        plugin_manager,
+        source_registry,
         telemetry,
     });
     crate::archive_index::spawn_startup_warm(Arc::clone(&state));
