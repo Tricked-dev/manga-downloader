@@ -1,0 +1,12 @@
+inputs:
+  nixpkgs:
+    url: github:NixOS/nixpkgs/d6524aaca2ff07876657ae2b323f24be4874944b
+  crane:
+    url: github:ipetkov/crane/eb35abda9f232cc6610b1d1e3200d15c49b7ac54
+  rust-overlay:
+    url: github:oxalica/rust-overlay/5280ed136f4359ce3f977b0c4c4dab6a34254201
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+allowUnfree: true
+strict_ports: true
