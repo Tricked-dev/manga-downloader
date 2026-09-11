@@ -1,13 +1,12 @@
 [
 	{
 		"type": "group",
-		"title": "Server",
-		"footer": "Use an address reachable from the device running Aidoku. Search queries every enabled source that supports it.",
+		"title": "Server URL",
+		"footer": "The base URL of the server to connect to. It has to be reachable from this device.",
 		"items": [
 			{
 				"type": "text",
 				"key": "serverBaseUrl",
-				"title": "Server URL",
 				"placeholder": "https://manga.example.com",
 				"keyboardType": 3,
 				"returnKeyType": 9,
@@ -21,7 +20,7 @@
 	{
 		"type": "group",
 		"title": "Account",
-		"footer": "Signing in creates a token for this device, which you can revoke from the server's settings page at any time. The API key is only needed if you would rather paste one in yourself.",
+		"footer": "Signing in creates a token for this device. You can revoke it from the server's settings page at any time.",
 		"items": [
 			{
 				"type": "login",
@@ -33,11 +32,17 @@
 				"logoutTitle": "Sign Out",
 				"clearCookiesOnLogOut": true,
 				"refreshes": ["content"]
-			},
+			}
+		]
+	},
+	{
+		"type": "group",
+		"title": "API Key",
+		"footer": "Only needed if you would rather paste a key in yourself instead of signing in. Search queries every enabled source that supports it.",
+		"items": [
 			{
 				"type": "text",
 				"key": "backendApiKey",
-				"title": "API Key",
 				"placeholder": "Optional",
 				"returnKeyType": 9,
 				"autocorrectionDisabled": true,
