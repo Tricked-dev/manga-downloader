@@ -323,7 +323,7 @@ impl ApiClient {
             .library_chapters(manga_id)?
             .into_iter()
             .filter(|chapter| chapter.downloaded)
-            .map(|chapter| chapter.into_chapter(&self.base_url))
+            .map(|chapter| chapter.into_chapter(&self.base_url, manga_id))
             .collect())
     }
 

@@ -218,13 +218,13 @@ pub struct LibraryChapterDto {
 }
 
 impl LibraryChapterDto {
-    pub fn into_chapter(self, base_url: &str) -> Chapter {
+    pub fn into_chapter(self, base_url: &str, manga_id: &str) -> Chapter {
         Chapter {
             key: local_chapter_key(&self.id),
             title: non_empty_string(self.title),
             chapter_number: Some(self.chapter_number),
             date_uploaded: parse_timestamp(&self.date_uploaded),
-            url: Some(local_chapter_pages_url(base_url, &self.id)),
+            url: Some(local_chapter_pages_url(base_url, manga_id)),
             ..Default::default()
         }
     }
@@ -327,19 +327,14 @@ pub struct RemoteChapterDto {
 }
 
 impl RemoteChapterDto {
-    pub fn into_chapter(self, base_url: &str, source_name: &str, manga_id: &str) -> Chapter {
+    pub fn into_chapter(self, base_url: &str, source_name: &str, _manga_id: &str) -> Chapter {
         let id = self.id;
         Chapter {
             key: remote_chapter_key(source_name, &id),
             title: non_empty_string(self.title),
             chapter_number: Some(self.chapter_number),
             date_uploaded: parse_timestamp(&self.date_uploaded),
-            url: Some(remote_chapter_pages_url(
-                base_url,
-                source_name,
-                &id,
-                manga_id,
-            )),
+            url: Some(remote_chapter_pages_url(base_url, source_name, &id)),
             ..Default::default()
         }
     }
@@ -444,36 +439,30 @@ pub fn absolute_url(base_url: &str, url: &str) -> String {
     }
 }
 
+// These populate the `url` Aidoku opens in a browser, so they address the web UI. The
+// API paths they used to point at rendered as raw JSON.
 pub fn local_manga_details_url(base_url: &str, manga_id: &str) -> String {
-    format!("{base_url}/v1/library/{}", encode_uri_component(manga_id))
+    format!("{base_url}/library/{}", encode_uri_component(manga_id))
 }
 
-pub fn local_chapter_pages_url(base_url: &str, chapter_id: &str) -> String {
-    format!(
-        "{base_url}/v1/library/chapters/{}/pages",
-        encode_uri_component(chapter_id)
-    )
+/// A downloaded chapter opens its series page, which is the page that can read it.
+pub fn local_chapter_pages_url(base_url: &str, manga_id: &str) -> String {
+    format!("{base_url}/library/{}", encode_uri_component(manga_id))
 }
 
 pub fn remote_manga_details_url(base_url: &str, source_name: &str, manga_id: &str) -> String {
     format!(
-        "{base_url}/v1/sources/{}/manga/{}",
+        "{base_url}/manga/{}/{}",
         encode_uri_component(source_name),
         encode_uri_component(manga_id)
     )
 }
 
-pub fn remote_chapter_pages_url(
-    base_url: &str,
-    source_name: &str,
-    chapter_id: &str,
-    manga_id: &str,
-) -> String {
+pub fn remote_chapter_pages_url(base_url: &str, source_name: &str, chapter_id: &str) -> String {
     format!(
-        "{base_url}/v1/sources/{}/chapters/{}/pages?manga={}",
+        "{base_url}/read/{}/{}",
         encode_uri_component(source_name),
-        encode_uri_component(chapter_id),
-        encode_uri_component(manga_id)
+        encode_uri_component(chapter_id)
     )
 }
 
