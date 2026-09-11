@@ -622,6 +622,14 @@ impl Database {
         db: &mut dyn toasty::Executor,
         id: &str,
     ) -> Result<()> {
+        crate::schema::UpscaleProgress::filter(
+            crate::schema::UpscaleProgress::fields()
+                .download_id()
+                .eq(id),
+        )
+        .delete()
+        .exec(db)
+        .await?;
         DownloadEvent::filter(DownloadEvent::fields().download_id().eq(id))
             .delete()
             .exec(db)

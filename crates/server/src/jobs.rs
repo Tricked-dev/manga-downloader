@@ -68,6 +68,25 @@ pub(crate) async fn enqueue_upscale(
     download_id: &str,
     scale: u32,
 ) -> anyhow::Result<String> {
+    state
+        .db
+        .set_upscale_progress(download_id, "queued", 0, 0, "Waiting for upscale worker")
+        .await?;
+    let result = enqueue_upscale_job(state, download_id, scale).await;
+    if let Err(error) = &result {
+        state
+            .db
+            .set_upscale_progress(download_id, "failed", 0, 0, &error.to_string())
+            .await?;
+    }
+    result
+}
+
+async fn enqueue_upscale_job(
+    state: &Arc<AppState>,
+    download_id: &str,
+    scale: u32,
+) -> anyhow::Result<String> {
     if let UpscaleQueue::Postgres(pool) = &state.upscale_queue {
         let mut storage = PostgresStorage::<UpscaleJob>::new_with_config(pool, &postgres_config());
         let id = PgTaskId::new(ulid::Ulid::new());

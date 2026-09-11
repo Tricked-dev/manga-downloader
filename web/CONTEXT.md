@@ -13,7 +13,7 @@ does not record read progress for a guest.
 A completed download always has its original pages. An upscale badge describes a successfully
 appended variant; absence of that badge does not make the chapter unreadable. The reader defaults
 to the best available stored variant and can request the original explicitly. Neither choice
-implies resizing. Automatic upscaling has a global switch and separate source switches.
+implies resizing. Automatic upscaling has global and source defaults plus a per-series override. Explicit series on/off takes precedence over both defaults. The series page polls durable upscale job status and page progress independently of download progress.
 
 `bun run generate:api` exports the server's OpenAPI and runs Orval. Generated code is ignored and
 must be produced before a clean frontend build. `bun run build:web` writes `web/build`; the

@@ -5,7 +5,19 @@ use backend_storage::{PageVariant, UpscaledChapter};
 use backend_upscale::UpscaleOutcome;
 use std::sync::Arc;
 
-pub(crate) async fn automatic_enabled(state: &AppState, source: &str) -> Result<bool> {
+pub(crate) async fn automatic_enabled(
+    state: &AppState,
+    source: &str,
+    manga_id: &str,
+) -> Result<bool> {
+    if let Some(value) = state
+        .db
+        .get_setting(&format!("series.{manga_id}.auto_upscale"))
+        .await?
+        && value != "inherit"
+    {
+        return Ok(value == "true");
+    }
     let global = state
         .db
         .get_setting("auto_upscale")
@@ -16,11 +28,54 @@ pub(crate) async fn automatic_enabled(state: &AppState, source: &str) -> Result<
 }
 
 pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> Result<()> {
+    state
+        .db
+        .set_upscale_progress(download_id, "running", 0, 0, "Inspecting originals")
+        .await?;
+    let result = run_inner(Arc::clone(&state), download_id, scale).await;
+    if let Err(error) = &result {
+        let previous = state.db.get_upscale_progress(download_id).await?;
+        state
+            .db
+            .set_upscale_progress(
+                download_id,
+                "failed",
+                previous.as_ref().map_or(0, |p| p.completed_pages as usize),
+                previous.as_ref().map_or(0, |p| p.total_pages as usize),
+                &error.to_string(),
+            )
+            .await?;
+    }
+    result
+}
+
+async fn run_inner(state: Arc<AppState>, download_id: &str, scale: u32) -> Result<()> {
     ensure!(matches!(scale, 2 | 4), "upscale scale must be 2 or 4");
     let Some(download) = state.db.get_download_by_id(download_id).await? else {
+        state
+            .db
+            .set_upscale_progress(download_id, "skipped", 0, 0, "Download no longer exists")
+            .await?;
         return Ok(());
     };
     if download.status != "completed" {
+        state
+            .db
+            .set_upscale_progress(download_id, "skipped", 0, 0, "Download is not completed")
+            .await?;
+        return Ok(());
+    }
+    if download.upscaled_at.is_some() {
+        state
+            .db
+            .set_upscale_progress(
+                download_id,
+                "completed",
+                0,
+                0,
+                "Upscaled pages already available",
+            )
+            .await?;
         return Ok(());
     }
     let archive = super::downloaded_archive_resolution::require_existing_completed_archive(
@@ -31,6 +86,16 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
     let before = backend_storage::inspect(archive.archive_path.clone()).await?;
     let source_width = median_original_width(&archive.archive_path, before.page_count).await?;
     if source_width >= 2000 {
+        state
+            .db
+            .set_upscale_progress(
+                download_id,
+                "skipped",
+                0,
+                before.page_count,
+                "Originals are already at least 2000 pixels wide",
+            )
+            .await?;
         tracing::info!(
             download_id,
             source_width,
@@ -42,11 +107,31 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
     let mut pages = Vec::with_capacity(before.page_count);
     let mut models = std::collections::BTreeSet::new();
     let mut tile_size = 0;
+    state
+        .db
+        .set_upscale_progress(
+            download_id,
+            "running",
+            0,
+            before.page_count,
+            "Upscaling pages",
+        )
+        .await?;
     for index in 0..before.page_count {
         if state.shutdown_drain.is_draining() {
             anyhow::bail!("shutdown interrupted chapter upscaling");
         }
         if state.db.get_download_by_id(download_id).await?.is_none() {
+            state
+                .db
+                .set_upscale_progress(
+                    download_id,
+                    "skipped",
+                    index,
+                    before.page_count,
+                    "Download removed",
+                )
+                .await?;
             return Ok(());
         }
         let original = backend_storage::read_page(
@@ -62,6 +147,10 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
             UpscaleOutcome::Complete(page) => page,
             UpscaleOutcome::MissingModels { reason } => {
                 tracing::warn!(download_id, reason, "Upscale skipped: no usable models");
+                state
+                    .db
+                    .set_upscale_progress(download_id, "skipped", index, before.page_count, &reason)
+                    .await?;
                 return Ok(());
             }
         };
@@ -70,9 +159,29 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
         let path = staging.path().join(format!("{index:06}.avif"));
         tokio::fs::write(&path, &page.bytes).await?;
         pages.push(path);
+        state
+            .db
+            .set_upscale_progress(
+                download_id,
+                "running",
+                index + 1,
+                before.page_count,
+                "Upscaling pages",
+            )
+            .await?;
     }
     let model = models.into_iter().collect::<Vec<_>>().join(",");
     let cancel_state = Arc::clone(&state);
+    state
+        .db
+        .set_upscale_progress(
+            download_id,
+            "running",
+            before.page_count,
+            before.page_count,
+            "Saving upscaled pages",
+        )
+        .await?;
     backend_storage::append_upscaled(
         archive.archive_path.clone(),
         UpscaledChapter {
@@ -101,6 +210,16 @@ pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> 
         download_id,
         &archive.download.chapter_id,
     );
+    state
+        .db
+        .set_upscale_progress(
+            download_id,
+            "completed",
+            before.page_count,
+            before.page_count,
+            "Upscaled pages ready",
+        )
+        .await?;
     tracing::info!(
         download_id,
         model,
@@ -168,5 +287,89 @@ mod tests {
             );
             assert_eq!(tokio::fs::read(archive).await.unwrap(), before);
         }
+    }
+}
+
+#[cfg(test)]
+mod series_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn series_override_takes_precedence_and_progress_survives_reads() {
+        let state = crate::server::build_test_app_state("series-upscale", "series-upscale").await;
+        state.db.set_setting("auto_upscale", "false").await.unwrap();
+        state
+            .db
+            .set_setting("source.rawkuma.auto_upscale", "false")
+            .await
+            .unwrap();
+        assert!(
+            !automatic_enabled(&state, "rawkuma", "chosen")
+                .await
+                .unwrap()
+        );
+        state
+            .db
+            .set_setting("series.chosen.auto_upscale", "true")
+            .await
+            .unwrap();
+        assert!(
+            automatic_enabled(&state, "rawkuma", "chosen")
+                .await
+                .unwrap()
+        );
+        assert!(!automatic_enabled(&state, "rawkuma", "other").await.unwrap());
+        state.db.set_setting("auto_upscale", "true").await.unwrap();
+        state
+            .db
+            .set_setting("source.rawkuma.auto_upscale", "true")
+            .await
+            .unwrap();
+        state
+            .db
+            .set_setting("series.chosen.auto_upscale", "false")
+            .await
+            .unwrap();
+        assert!(
+            !automatic_enabled(&state, "rawkuma", "chosen")
+                .await
+                .unwrap()
+        );
+        state
+            .db
+            .set_setting("series.chosen.auto_upscale", "inherit")
+            .await
+            .unwrap();
+        assert!(
+            automatic_enabled(&state, "rawkuma", "chosen")
+                .await
+                .unwrap()
+        );
+        state
+            .db
+            .set_upscale_progress("download", "running", 3, 12, "Upscaling pages")
+            .await
+            .unwrap();
+        let progress = state
+            .db
+            .get_upscale_progress("download")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((progress.completed_pages, progress.total_pages), (3, 12));
+        state
+            .db
+            .set_upscale_progress("download", "failed", 3, 12, "Inference failed")
+            .await
+            .unwrap();
+        let progress = state
+            .db
+            .get_upscale_progress("download")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(progress.status, "failed");
+        assert_eq!(progress.message, "Inference failed");
+        state.upscaler.shutdown().await.unwrap();
     }
 }

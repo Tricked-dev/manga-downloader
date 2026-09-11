@@ -5,14 +5,37 @@ use backend_persistence::{
 
 #[test]
 fn committed_schemas_match_models() {
-    assert_eq!(
-        generate_schema(DatabaseBackend::Sqlite).unwrap(),
-        include_str!("../migrations/sqlite/0001_initial.sql")
-    );
-    assert_eq!(
-        generate_schema(DatabaseBackend::Postgres).unwrap(),
-        include_str!("../migrations/postgres/0001_initial.sql")
-    );
+    fn statements(sql: &str) -> Vec<String> {
+        let sql = sql
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("--"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut result = sql
+            .split(';')
+            .map(|statement| statement.split_whitespace().collect::<Vec<_>>().join(" "))
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+        result.sort();
+        result
+    }
+    for (backend, initial, progress) in [
+        (
+            DatabaseBackend::Sqlite,
+            include_str!("../migrations/sqlite/0001_initial.sql"),
+            include_str!("../migrations/sqlite/0002_upscale_progress.sql"),
+        ),
+        (
+            DatabaseBackend::Postgres,
+            include_str!("../migrations/postgres/0001_initial.sql"),
+            include_str!("../migrations/postgres/0002_upscale_progress.sql"),
+        ),
+    ] {
+        assert_eq!(
+            statements(&generate_schema(backend).unwrap()),
+            statements(&format!("{initial}\n{progress}"))
+        );
+    }
 }
 
 #[test]

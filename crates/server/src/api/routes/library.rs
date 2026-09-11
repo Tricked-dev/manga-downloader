@@ -46,6 +46,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
         .routes(routes!(update_library_manga_category))
         .routes(routes!(trigger_library_update))
         .routes(routes!(get_library_updates))
+        .routes(routes!(get_series_upscaling, update_series_upscaling))
 }
 
 #[utoipa::path(
@@ -464,4 +465,62 @@ async fn get_library_updates(State(state): State<Arc<AppState>>) -> Result<Respo
         library::updates(&state.db).await
     })
     .await
+}
+
+#[derive(Deserialize, ToSchema)]
+struct SeriesUpscalingRequest {
+    /// true/false overrides global and source preferences; null inherits them.
+    automatic: Option<bool>,
+}
+
+#[utoipa::path(get, path = "/v1/library/{id}/upscaling", tag = "library",
+    params(("id" = String, Path, description = "Library manga id")),
+    responses((status = OK, body = serde_json::Value), (status = NOT_FOUND, body = ErrorEnvelopeResponse)))]
+async fn get_series_upscaling(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let manga = library::get(&state.db, &id).await?;
+    let preference = state
+        .db
+        .get_setting(&format!("series.{id}.auto_upscale"))
+        .await?;
+    let automatic = match preference.as_deref() {
+        Some("true") => Some(true),
+        Some("false") => Some(false),
+        _ => None,
+    };
+    let enabled = crate::app::upscaling::automatic_enabled(&state, &manga.source, &id).await?;
+    let mut chapters = Vec::new();
+    for download in state.db.get_downloads_for_manga(&id).await? {
+        let progress = state.db.get_upscale_progress(&download.id).await?;
+        if progress.is_some() || download.upscaled_at.is_some() {
+            chapters.push(serde_json::json!({"download_id": download.id, "chapter_number": download.chapter_number,
+                "progress": progress, "upscaled_at": download.upscaled_at}));
+        }
+    }
+    Ok(Json(
+        serde_json::json!({"automatic": automatic, "enabled": enabled, "chapters": chapters}),
+    ))
+}
+
+#[utoipa::path(put, path = "/v1/library/{id}/upscaling", tag = "library",
+    params(("id" = String, Path, description = "Library manga id")), request_body = SeriesUpscalingRequest,
+    responses((status = NO_CONTENT), (status = NOT_FOUND, body = ErrorEnvelopeResponse)))]
+async fn update_series_upscaling(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(req): Json<SeriesUpscalingRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    library::get(&state.db, &id).await?;
+    let value = match req.automatic {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "inherit",
+    };
+    state
+        .db
+        .set_setting(&format!("series.{id}.auto_upscale"), value)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
 }

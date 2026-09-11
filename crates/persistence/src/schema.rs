@@ -203,3 +203,15 @@ pub(crate) struct PublicShare {
     #[default(crate::now_timestamp())]
     pub(crate) created_at: String,
 }
+
+#[derive(Clone, Debug, toasty::Model)]
+#[table = "upscale_progress"]
+pub(crate) struct UpscaleProgress {
+    #[key]
+    pub(crate) download_id: String,
+    pub(crate) status: String,
+    pub(crate) completed_pages: i64,
+    pub(crate) total_pages: i64,
+    pub(crate) message: String,
+    pub(crate) updated_at: String,
+}

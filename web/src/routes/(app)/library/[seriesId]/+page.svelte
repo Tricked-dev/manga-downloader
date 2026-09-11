@@ -3,6 +3,7 @@
   import { Card, CardContent } from "$lib/ui/card";
   import { untrack } from "svelte";
   import LibraryDetailChaptersCard from "$components/features/library/LibraryDetailChaptersCard.svelte";
+  import SeriesUpscalingCard from "$components/features/library/SeriesUpscalingCard.svelte";
   import LibraryDetailHero from "$components/features/library/LibraryDetailHero.svelte";
   import LoadingState from "$components/common/LoadingState.svelte";
   import { isPublicShareViewActive } from "$lib/public-share";
@@ -57,6 +58,10 @@
       onSaveCategory={state.saveCategory}
       onSelectCategory={state.updateSelectedCategory}
     />
+
+    {#if !publicView}
+      {#key state.manga.id}<SeriesUpscalingCard seriesId={state.manga.id} />{/key}
+    {/if}
 
     <LibraryDetailChaptersCard
       chapterActionMessage={state.chapterActionMessage}

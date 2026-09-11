@@ -66,7 +66,9 @@ pub(crate) async fn downloaded_archive_created(
         &created.chapter_id,
     );
     refresh_storage(state, archive_resolver.download_path()).await;
-    match super::upscaling::automatic_enabled(state, &download.manga_source).await {
+    match super::upscaling::automatic_enabled(state, &download.manga_source, &download.manga_id)
+        .await
+    {
         Ok(true) => {
             if let Err(error) = crate::jobs::enqueue_upscale(state, download_id, 2).await {
                 tracing::error!(download_id, error = %error, "Failed to queue automatic upscale");

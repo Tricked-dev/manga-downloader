@@ -188,10 +188,7 @@ pub(super) async fn try_fetch_google_drive_pages(
     Ok(Some(pages))
 }
 
-fn extract_external_pages(
-    body: &[u8],
-    source_url: &str,
-) -> Result<Option<Vec<ExternalPage>>> {
+fn extract_external_pages(body: &[u8], source_url: &str) -> Result<Option<Vec<ExternalPage>>> {
     if let Ok(extension) = backend_image::detect_supported_image_format(body) {
         return Ok(Some(vec![ExternalPage {
             source_name: source_url.to_string(),
@@ -243,14 +240,18 @@ fn google_drive_download_url(value: &str) -> String {
         return value.to_owned();
     }
 
-    let segments = url.path_segments().into_iter().flatten().collect::<Vec<_>>();
+    let segments = url
+        .path_segments()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     let file_id = segments
         .windows(2)
         .find(|pair| pair[0] == "d")
-        .map(|pair| pair[1])
+        .map(|pair| pair[1].to_owned())
         .or_else(|| {
             url.query_pairs()
-                .find_map(|(key, value)| (key == "id").then_some(value))
+                .find_map(|(key, value)| (key == "id").then_some(value.into_owned()))
         })
         .filter(|id| !id.is_empty());
     let Some(file_id) = file_id else {
@@ -477,64 +478,6 @@ fn is_retriable_page_fetch_error(error: &anyhow::Error) -> bool {
         .any(|status| message.contains(status))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use image::{ImageFormat, RgbImage};
-    use std::io::Write;
-    use zip::{ZipWriter, write::SimpleFileOptions};
-
-    fn image_bytes() -> Vec<u8> {
-        let image = RgbImage::new(1, 1);
-        let mut bytes = Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgb8(image)
-            .write_to(&mut bytes, ImageFormat::Png)
-            .unwrap();
-        bytes.into_inner()
-    }
-
-    #[test]
-    fn google_drive_archive_extracts_supported_pages_in_natural_order() {
-        let mut archive = ZipWriter::new(Cursor::new(Vec::new()));
-        for name in ["10.png", "cover.txt", "2.png"] {
-            archive
-                .start_file(name, SimpleFileOptions::default())
-                .unwrap();
-            if name.ends_with(".png") {
-                archive.write_all(&image_bytes()).unwrap();
-            } else {
-                archive.write_all(b"metadata").unwrap();
-            }
-        }
-        let bytes = archive.finish().unwrap().into_inner();
-
-        let pages =
-            extract_external_pages(&bytes, "application/zip", "https://drive.google.com/file")
-                .unwrap()
-                .expect("archive should contain supported pages");
-        assert_eq!(
-            pages
-                .iter()
-                .map(|page| page.source_name.as_str())
-                .collect::<Vec<_>>(),
-            ["2.png", "10.png"]
-        );
-    }
-
-    #[test]
-    fn unusable_google_drive_payload_requests_reader_fallback() {
-        assert!(
-            extract_external_pages(
-                b"Google Drive file is unavailable",
-                "text/html",
-                "https://drive.google.com/file"
-            )
-            .unwrap()
-            .is_none()
-        );
-    }
-}
-
 pub(super) async fn get_page_refs_with_retry(
     state: &Arc<AppState>,
     source: &str,
@@ -644,5 +587,73 @@ async fn resolve_page_refs_attempt(
                 error: error.into(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageFormat, RgbImage};
+    use std::io::Write;
+    use zip::{ZipWriter, write::SimpleFileOptions};
+
+    fn image_bytes() -> Vec<u8> {
+        let image = RgbImage::new(1, 1);
+        let mut bytes = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image)
+            .write_to(&mut bytes, ImageFormat::Png)
+            .unwrap();
+        bytes.into_inner()
+    }
+
+    #[test]
+    fn google_drive_archive_extracts_supported_pages_in_natural_order() {
+        let mut archive = ZipWriter::new(Cursor::new(Vec::new()));
+        for name in ["10.png", "cover.txt", "2.png"] {
+            archive
+                .start_file(name, SimpleFileOptions::default())
+                .unwrap();
+            if name.ends_with(".png") {
+                archive.write_all(&image_bytes()).unwrap();
+            } else {
+                archive.write_all(b"metadata").unwrap();
+            }
+        }
+        let bytes = archive.finish().unwrap().into_inner();
+
+        let pages = extract_external_pages(&bytes, "https://drive.google.com/file")
+            .unwrap()
+            .expect("archive should contain supported pages");
+        assert_eq!(
+            pages
+                .iter()
+                .map(|page| page.source_name.as_str())
+                .collect::<Vec<_>>(),
+            ["2.png", "10.png"]
+        );
+    }
+
+    #[test]
+    fn unusable_google_drive_payload_requests_reader_fallback() {
+        assert!(
+            extract_external_pages(
+                b"Google Drive file is unavailable",
+                "https://drive.google.com/file"
+            )
+            .unwrap()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn google_drive_file_links_are_resolved_to_binary_downloads() {
+        assert_eq!(
+            google_drive_download_url("https://drive.google.com/file/d/abc123/view?usp=sharing"),
+            "https://drive.google.com/uc?export=download&id=abc123"
+        );
+        assert_eq!(
+            google_drive_download_url("https://drive.google.com/uc?id=abc123&export=download"),
+            "https://drive.google.com/uc?export=download&id=abc123"
+        );
     }
 }

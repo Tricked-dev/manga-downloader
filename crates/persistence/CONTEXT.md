@@ -17,3 +17,5 @@ public-share records identify a specific library series.
 Database tests create isolated SQLite files by default. `TEST_POSTGRES_URL` selects an
 isolated PostgreSQL database for each server fixture. Both schema generation and PostgreSQL
 connections initialize the application's Rustls provider before connecting.
+
+Schema changes use numbered migrations without modifying applied migrations. The schema generator writes schema.sql snapshots for comparison. Upscale page progress is stored separately from download work state.

@@ -6,7 +6,7 @@ fn main() -> anyhow::Result<()> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("migrations")
             .join(directory)
-            .join("0001_initial.sql");
+            .join("schema.sql");
         std::fs::write(path, backend_persistence::generate_schema(backend)?)?;
     }
     Ok(())

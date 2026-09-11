@@ -11,6 +11,8 @@ mod migrations;
 mod models;
 mod schema;
 mod settings;
+mod upscale_progress;
+pub use upscale_progress::UpscaleProgressRow;
 mod setup;
 mod sources;
 mod stats;
