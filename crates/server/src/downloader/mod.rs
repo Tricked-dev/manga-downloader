@@ -486,7 +486,21 @@ async fn download_chapter(
                 credits: comicinfo_credits.as_borrowed(),
             },
         );
-        let cover_entry = fetch_series_cover_archive_entry(state, &manga, cancel_flag).await?;
+        // The cover is decoration inside the archive. A source that has moved or
+        // hotlink-protected it must not cost the chapter, so only cancellation is fatal.
+        let cover_entry = match fetch_series_cover_archive_entry(state, &manga, cancel_flag).await {
+            Ok(entry) => entry,
+            Err(error) => {
+                ensure_not_cancelled(cancel_flag)?;
+                tracing::warn!(
+                    %error,
+                    manga_id = %manga.id,
+                    manga_title = %manga.title,
+                    "Series Cover Unavailable",
+                );
+                None
+            }
+        };
         let cover = if let Some((name, bytes)) = cover_entry {
             Some(stage_page_bytes(&staging_dir, &name, &bytes).await?)
         } else {
