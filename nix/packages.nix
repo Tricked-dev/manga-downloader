@@ -60,7 +60,7 @@ let
     ];
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
-    outputHash = "sha256-ct3xNjaDqWF+g8XMFg0FT3vLbPJPrITaviFDQf9AxqI=";
+    outputHash = "sha256-PHTIMVBE7MOE8U0OEwd5kffFxGyP4NrWWE7kh2c7Vm8=";
     dontConfigure = true;
     dontFixup = true;
     SOURCE_DATE_EPOCH = "1";
