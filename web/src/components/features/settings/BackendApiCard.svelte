@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, Copy, Eye, EyeOff } from "@lucide/svelte";
+  import { Check, Copy, Eye, EyeOff, Loader2, RefreshCw } from "@lucide/svelte";
   import { Button } from "$lib/ui/button";
   import { Input } from "$lib/ui/input";
   import SettingField from "./SettingField.svelte";
@@ -15,18 +15,53 @@
 
   let revealed = $state(false);
   let copied = $state(false);
-  let copyFailed = $state(false);
+  let confirmingRotate = $state(false);
+  let rotating = $state(false);
+  let errorMessage = $state("");
+
+  let confirmTimer: ReturnType<typeof window.setTimeout> | undefined;
 
   async function copyApiKey() {
+    errorMessage = "";
     try {
       await navigator.clipboard.writeText(apiKey);
-      copyFailed = false;
       copied = true;
       window.setTimeout(() => {
         copied = false;
       }, 1800);
     } catch {
-      copyFailed = true;
+      errorMessage = $t("app.settings.apiKeyCopyFailed");
+    }
+  }
+
+  // Rotation silently breaks every reader still holding the old key, so it takes a
+  // second deliberate click rather than firing on the first one.
+  function requestRotate() {
+    errorMessage = "";
+    confirmingRotate = true;
+    window.clearTimeout(confirmTimer);
+    confirmTimer = window.setTimeout(() => {
+      confirmingRotate = false;
+    }, 5000);
+  }
+
+  async function rotateApiKey() {
+    window.clearTimeout(confirmTimer);
+    confirmingRotate = false;
+    rotating = true;
+    errorMessage = "";
+    try {
+      const response = await fetch("/v1/settings/api-key", { method: "POST" });
+      if (!response.ok) {
+        throw new Error($t("app.settings.apiKeyCreateFailed"));
+      }
+      const { backend_api_key: created } = await response.json();
+      settings.backend_api_key = created;
+      revealed = true;
+    } catch (caught) {
+      errorMessage = caught instanceof Error ? caught.message : $t("app.settings.apiKeyCreateFailed");
+    } finally {
+      rotating = false;
     }
   }
 </script>
@@ -37,11 +72,11 @@
     label={$t("app.settings.apiKey")}
     hint={$t("app.settings.apiKeyHint")}
   >
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <Input
         id="backend-api-key"
         type={revealed ? "text" : "password"}
-        class="h-9 font-mono"
+        class="h-9 min-w-0 flex-1 font-mono"
         value={apiKey}
         readonly
         autocomplete="off"
@@ -70,10 +105,24 @@
           {$t("app.settings.apiKeyCopy")}
         {/if}
       </Button>
+      <Button
+        variant={confirmingRotate ? "destructive" : "outline"}
+        size="sm"
+        type="button"
+        disabled={rotating}
+        onclick={confirmingRotate ? rotateApiKey : requestRotate}
+      >
+        {#if rotating}
+          <Loader2 class="size-3.5 animate-spin" />
+        {:else}
+          <RefreshCw class="size-3.5" />
+        {/if}
+        {confirmingRotate ? $t("app.settings.apiKeyCreateConfirm") : $t("app.settings.apiKeyCreate")}
+      </Button>
     </div>
   </SettingField>
 
-  {#if copyFailed}
-    <SettingsNotice>{$t("app.settings.apiKeyCopyFailed")}</SettingsNotice>
+  {#if errorMessage}
+    <SettingsNotice>{errorMessage}</SettingsNotice>
   {/if}
 </SettingsCard>

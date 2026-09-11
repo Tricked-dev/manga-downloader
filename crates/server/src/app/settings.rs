@@ -260,6 +260,36 @@ pub async fn update(
     })
 }
 
+/// Reader clients authenticate with the bearer key and read it from the settings UI,
+/// so one has to exist without an operator ever choosing a value.
+pub(crate) async fn ensure_backend_api_key(db: &Database) -> Result<String> {
+    let key = SettingKey::BackendApiKey.as_str();
+    if let Some(existing) = db.get_setting(key).await?
+        && !existing.trim().is_empty()
+    {
+        return Ok(existing);
+    }
+
+    let generated = uuid::Uuid::new_v4().to_string();
+    db.set_setting(key, &generated).await?;
+    tracing::info!("Backend API Key Generated");
+    Ok(generated)
+}
+
+/// Rotation invalidates every client holding the previous key, so it is an explicit
+/// action rather than anything the settings form can reach.
+#[autometrics(track_concurrency)]
+pub async fn regenerate_backend_api_key(state: &Arc<AppState>) -> Result<String, AppError> {
+    let generated = uuid::Uuid::new_v4().to_string();
+    state
+        .db
+        .set_setting(SettingKey::BackendApiKey.as_str(), &generated)
+        .await?;
+    crate::app::route_snapshot_invalidation::settings_changed(state);
+    tracing::info!("Backend API Key Rotated");
+    Ok(generated)
+}
+
 #[autometrics(track_concurrency)]
 pub async fn clear_cache(cache: &MangaCache) -> Result<OperationStatusResponse, AppError> {
     cache.clear().await?;

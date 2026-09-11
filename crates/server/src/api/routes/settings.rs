@@ -9,7 +9,7 @@ use crate::api::validation;
 use crate::{
     AppState,
     api::{
-        dto::{ErrorEnvelopeResponse, SettingsResponse},
+        dto::{BackendApiKeyResponse, ErrorEnvelopeResponse, SettingsResponse},
         error::AppError,
         response_cache,
     },
@@ -17,7 +17,9 @@ use crate::{
 };
 
 pub fn router() -> OpenApiRouter<Arc<AppState>> {
-    OpenApiRouter::new().routes(routes!(get_settings, update_settings))
+    OpenApiRouter::new()
+        .routes(routes!(get_settings, update_settings))
+        .routes(routes!(regenerate_backend_api_key))
 }
 
 #[utoipa::path(
@@ -34,6 +36,26 @@ async fn get_settings(State(state): State<Arc<AppState>>) -> Result<impl IntoRes
         settings::get(&state).await
     })
     .await
+}
+
+/// The bearer key is never written through `PUT /v1/settings`, so rotation needs its own
+/// route. The surrounding authorization layer already demands a matching origin for unsafe
+/// methods, which keeps a session cookie alone from rotating it cross-site.
+#[utoipa::path(
+    post,
+    path = "/v1/settings/api-key",
+    tag = "settings",
+    responses(
+        (status = OK, body = BackendApiKeyResponse),
+        (status = UNAUTHORIZED, body = ErrorEnvelopeResponse),
+        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
+    )
+)]
+async fn regenerate_backend_api_key(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
+    let backend_api_key = settings::regenerate_backend_api_key(&state).await?;
+    Ok(Json(BackendApiKeyResponse { backend_api_key }))
 }
 
 #[derive(Deserialize, ToSchema, garde::Validate)]

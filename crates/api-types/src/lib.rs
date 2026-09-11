@@ -140,6 +140,11 @@ pub struct SettingsResponse {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct BackendApiKeyResponse {
+    pub backend_api_key: String,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct OperationStatusResponse {
     pub ok: bool,
 }
