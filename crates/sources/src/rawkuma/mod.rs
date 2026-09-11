@@ -129,11 +129,16 @@ impl Source for RawkumaSource {
                     }
                 }
             }
-            const images = [...document.querySelectorAll(
-                '[data-image-data] img, img[src*="/wp-content/scr/"], img[data-src*="/wp-content/scr/"]'
-            )]
+            // The container is itself the scope that excludes logos, covers and ads, so its
+            // images are taken whatever host serves them. Themes without it served pages
+            // from /wp-content/scr/, which is the only case that still needs a path filter.
+            const container = document.querySelector('[data-image-data]');
+            const candidates = container
+                ? container.querySelectorAll('img')
+                : document.querySelectorAll('img[src*="/wp-content/scr/"], img[data-src*="/wp-content/scr/"]');
+            const images = [...candidates]
                 .map(img => img.getAttribute('data-src') || img.getAttribute('src'))
-                .filter(url => url && !url.startsWith('data:') && url.includes('/wp-content/scr/'));
+                .filter(url => url && !url.startsWith('data:'));
             return images.length ? [JSON.stringify({sources: [{images}]})] : [];
         })()"#;
         let done = format!("document.readyState !== 'loading' && ({expression}).length > 0");
