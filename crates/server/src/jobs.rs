@@ -63,11 +63,42 @@ impl UpscaleJob {
     }
 }
 
+/// `apalis.get_jobs` orders by `priority DESC, run_at ASC`, and larger runs sooner. A
+/// series keeps the rank it was first queued under so its chapters finish together
+/// before the next series starts, and lower chapter numbers outrank higher ones.
+async fn upscale_priority(state: &Arc<AppState>, download_id: &str) -> anyhow::Result<i32> {
+    let Some(download) = state.db.get_download_by_id(download_id).await? else {
+        return Ok(0);
+    };
+    let rank_key = format!("series.{}.upscale_rank", download.manga_id);
+    let rank = match state.db.get_setting(&rank_key).await?.and_then(|value| value.parse::<i64>().ok()) {
+        Some(rank) => rank,
+        None => {
+            let next = state
+                .db
+                .get_setting("upscale_rank_seq")
+                .await?
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or(0)
+                + 1;
+            state.db.set_setting("upscale_rank_seq", &next.to_string()).await?;
+            state.db.set_setting(&rank_key, &next.to_string()).await?;
+            next
+        }
+    };
+    // Two decimal places keep a fractional chapter like 15.5 between 15 and 16 while
+    // staying inside the priority budget.
+    let chapter = (download.chapter_number.max(0.0) * 100.0).round().min(999_999.0) as i64;
+    let ordinal = rank.saturating_mul(1_000_000).saturating_add(chapter);
+    Ok(i32::try_from(-ordinal).unwrap_or(i32::MIN))
+}
+
 pub(crate) async fn enqueue_upscale(
     state: &Arc<AppState>,
     download_id: &str,
     scale: u32,
 ) -> anyhow::Result<String> {
+    crate::app::settings::set_upscale_paused(&state.db, false).await?;
     state
         .db
         .set_upscale_progress(download_id, "queued", 0, 0, "Waiting for upscale worker")
@@ -92,7 +123,9 @@ async fn enqueue_upscale_job(
         let id = PgTaskId::new(ulid::Ulid::new());
         let mut task: PgTask<UpscaleJob> = Task::new(UpscaleJob::new(download_id, scale));
         task.parts.task_id = Some(id);
-        task.parts.ctx = PgContext::default().with_max_attempts(3);
+        task.parts.ctx = PgContext::default()
+            .with_max_attempts(3)
+            .with_priority(upscale_priority(state, download_id).await?);
         storage
             .push_task(task)
             .await

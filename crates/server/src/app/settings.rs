@@ -276,6 +276,23 @@ pub(crate) async fn ensure_backend_api_key(db: &Database) -> Result<String> {
     Ok(generated)
 }
 
+pub(crate) async fn upscale_paused(db: &Database) -> bool {
+    db.get_setting(SettingKey::UpscalePaused.as_str())
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|value| value == "true")
+}
+
+/// A restart always comes back paused, so a deploy never resumes a backlog on its own.
+pub(crate) async fn set_upscale_paused(db: &Database, paused: bool) -> Result<()> {
+    db.set_setting(
+        SettingKey::UpscalePaused.as_str(),
+        if paused { "true" } else { "false" },
+    )
+    .await
+}
+
 /// Rotation invalidates every client holding the previous key, so it is an explicit
 /// action rather than anything the settings form can reach.
 #[autometrics(track_concurrency)]

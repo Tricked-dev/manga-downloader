@@ -2,6 +2,8 @@
   import { BookOpen, Database, Image, LayoutGrid, Plug } from "@lucide/svelte";
 
   import UpscaleSettingsCard from "./UpscaleSettingsCard.svelte";
+  import UpscaleQueueCard from "./UpscaleQueueCard.svelte";
+  import ApiTokensCard from "$components/features/settings/ApiTokensCard.svelte";
   import AuthCard from "$components/features/settings/AuthCard.svelte";
   import BackendApiCard from "$components/features/settings/BackendApiCard.svelte";
   import CacheCard from "$components/features/settings/CacheCard.svelte";
@@ -90,9 +92,13 @@
 
         <DownloadConcurrencyCard bind:settings />
 
+        <UpscaleQueueCard bind:settings />
+
         <AuthCard bind:settings />
 
         <BackendApiCard bind:settings />
+
+        <ApiTokensCard />
 
         <DiscoveryCard bind:settings />
       </div>
@@ -161,6 +167,8 @@
       <div class="space-y-3">
         <AuthCard bind:settings />
         <BackendApiCard bind:settings />
+
+        <ApiTokensCard />
       </div>
     </div>
   </TabsContent>

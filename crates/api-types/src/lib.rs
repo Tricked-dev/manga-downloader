@@ -145,6 +145,29 @@ pub struct BackendApiKeyResponse {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct ApiTokenSummary {
+    pub id: String,
+    pub name: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ApiTokenListResponse {
+    pub items: Vec<ApiTokenSummary>,
+}
+
+/// The only time the token itself is returned. It is stored hashed, so a lost value
+/// cannot be recovered and has to be replaced.
+#[derive(Serialize, ToSchema)]
+pub struct CreatedApiTokenResponse {
+    pub id: String,
+    pub name: String,
+    pub token: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct OperationStatusResponse {
     pub ok: bool,
 }

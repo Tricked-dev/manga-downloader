@@ -159,6 +159,7 @@ async fn bootstrap_server(
         Some(key) => key,
         None => settings::ensure_backend_api_key(&db).await?,
     };
+    settings::set_upscale_paused(&db, true).await?;
 
     let settings = settings::interface(&db);
     let download_path = settings.download_path().await?;

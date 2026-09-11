@@ -205,6 +205,18 @@ pub(crate) struct PublicShare {
 }
 
 #[derive(Clone, Debug, toasty::Model)]
+#[table = "api_tokens"]
+pub(crate) struct ApiToken {
+    #[key]
+    pub(crate) id: String,
+    pub(crate) name: String,
+    #[index]
+    pub(crate) token_hash: String,
+    pub(crate) created_at: String,
+    pub(crate) last_used_at: Option<String>,
+}
+
+#[derive(Clone, Debug, toasty::Model)]
 #[table = "upscale_progress"]
 pub(crate) struct UpscaleProgress {
     #[key]

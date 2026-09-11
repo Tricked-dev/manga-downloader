@@ -26,6 +26,12 @@ struct ErrorPayload {
 }
 
 impl AppError {
+    /// Lets the authorization layer send a browser to sign-in while still handing an
+    /// API client the error envelope.
+    pub fn is_unauthorized(&self) -> bool {
+        self.status == StatusCode::UNAUTHORIZED
+    }
+
     pub fn new(
         status: StatusCode,
         code: &'static str,

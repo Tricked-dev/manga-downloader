@@ -27,7 +27,32 @@ pub(crate) async fn automatic_enabled(
     Ok(global && per_source)
 }
 
+/// Waiting here rather than declining the job keeps its place in the queue. The worker
+/// stays alive and heartbeating throughout, so nothing reclaims the lease.
+async fn wait_while_paused(state: &Arc<AppState>, download_id: &str) -> Result<()> {
+    let mut announced = false;
+    while super::settings::upscale_paused(&state.db).await {
+        if !announced {
+            let previous = state.db.get_upscale_progress(download_id).await?;
+            state
+                .db
+                .set_upscale_progress(
+                    download_id,
+                    "paused",
+                    previous.as_ref().map_or(0, |p| p.completed_pages as usize),
+                    previous.as_ref().map_or(0, |p| p.total_pages as usize),
+                    "Upscaling is paused",
+                )
+                .await?;
+            announced = true;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+    Ok(())
+}
+
 pub(crate) async fn run(state: Arc<AppState>, download_id: &str, scale: u32) -> Result<()> {
+    wait_while_paused(&state, download_id).await?;
     state
         .db
         .set_upscale_progress(download_id, "running", 0, 0, "Inspecting originals")

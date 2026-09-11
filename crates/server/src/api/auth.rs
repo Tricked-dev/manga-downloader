@@ -146,6 +146,7 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
         .route("/auth/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/auth/session", get(session))
+        .route("/auth/aidoku", get(aidoku_login))
         .route("/auth/logout", post(logout))
         .route("/auth/public-share/{id}/open", get(open_share))
         .route(
@@ -176,8 +177,18 @@ impl<B: Send + 'static> AsyncAuthorizeRequest<B> for BearerAuthorization {
             if request.method() == Method::OPTIONS || request.uri().path() == "/v1/health" {
                 return Ok(request);
             }
+            // A browser following a link wants the sign-in page, not an error envelope
+            // it will render as raw JSON. API clients still get the envelope.
+            let html_navigation = wants_html(request.headers(), request.method());
+            let target = request
+                .uri()
+                .path_and_query()
+                .map(|value| value.as_str().to_owned());
             match authorize(&state, request.headers(), request.method(), request.uri()).await {
                 Ok(()) => Ok(request),
+                Err(error) if error.is_unauthorized() && html_navigation => {
+                    Err(login_redirect(target.as_deref()))
+                }
                 Err(error) => Err(error.into_response()),
             }
         })
@@ -192,6 +203,13 @@ async fn authorize(
 ) -> Result<(), AppError> {
     let config = AuthConfig::read(state).await?;
     if config.valid_bearer(headers) {
+        return Ok(());
+    }
+    // Issued tokens sit alongside the single configured key rather than replacing it,
+    // so a client already holding that key keeps working.
+    if let Some(token) = bearer_token(headers)
+        && state.db.consume_api_token(&token_hash(token)).await?
+    {
         return Ok(());
     }
     if !config.protected() {
@@ -260,6 +278,54 @@ fn require_origin(config: &AuthConfig, headers: &HeaderMap) -> Result<(), AppErr
 struct LoginQuery {
     next: Option<String>,
 }
+#[derive(Deserialize)]
+struct AidokuLoginQuery {
+    name: Option<String>,
+}
+
+/// Reader clients cannot complete an OIDC redirect themselves, so they open this in a
+/// web view. Sign-in happens normally, then the minted token is handed over through
+/// local storage for the client to read back.
+async fn aidoku_login(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<AidokuLoginQuery>,
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    let config = AuthConfig::read(&state).await?;
+    if config.protected() && session_user(&state, &config, &headers).await?.is_none() {
+        return Ok(login_redirect(Some("/auth/aidoku")));
+    }
+
+    let token = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    let name = query
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Aidoku");
+    let row = state.db.create_api_token(name, &token_hash(&token)).await?;
+    tracing::info!(token_id = %row.id, name = %row.name, "Reader Token Issued");
+
+    // The token is hex, so it needs no escaping to sit inside a JSON string literal.
+    let page = format!(
+        r#"<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signed in</title></head>
+<body style="font-family:system-ui;margin:2rem;text-align:center">
+<h1>Signed in</h1>
+<p>You can close this page and return to the app.</p>
+<p style="color:#666;font-size:.9rem">Token name: {name}</p>
+<script>localStorage.setItem("mangaApiToken", "{token}");</script>
+</body></html>"#
+    );
+    Ok(no_store(axum::response::Html(page).into_response()))
+}
+
 async fn login(
     State(state): State<Arc<AppState>>,
     Query(query): Query<LoginQuery>,
@@ -536,6 +602,26 @@ fn cookie_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
             (key == name && !value.is_empty() && value.len() <= 256).then_some(value)
         })
 }
+fn wants_html(headers: &HeaderMap, method: &Method) -> bool {
+    safe_method(method)
+        && headers
+            .get(header::ACCEPT)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.contains("text/html"))
+}
+
+/// Sends the browser through sign-in and back to whatever it was trying to open.
+fn login_redirect(next: Option<&str>) -> Response {
+    let target = match next.filter(|value| value.starts_with('/')) {
+        Some(next) => format!(
+            "/auth/login?next={}",
+            url::form_urlencoded::byte_serialize(next.as_bytes()).collect::<String>()
+        ),
+        None => "/auth/login".to_owned(),
+    };
+    no_store(Redirect::temporary(&target).into_response())
+}
+
 fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     headers
         .get(header::AUTHORIZATION)?
@@ -544,7 +630,7 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
         .strip_prefix("Bearer ")
         .map(str::trim)
 }
-fn token_hash(value: &str) -> String {
+pub(crate) fn token_hash(value: &str) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(value.as_bytes()))
 }
 fn constant_time_equal(left: &str, right: &str) -> bool {

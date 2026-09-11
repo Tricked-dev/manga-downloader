@@ -18,6 +18,7 @@ pub enum SettingKey {
     CacheDiskPath,
     CacheMaxMemoryBytes,
     AutoUpscale,
+    UpscalePaused,
 }
 
 impl SettingKey {
@@ -43,6 +44,7 @@ impl SettingKey {
             Self::CacheDiskPath => "cache_disk_path",
             Self::CacheMaxMemoryBytes => "cache_max_memory_bytes",
             Self::AutoUpscale => "auto_upscale",
+            Self::UpscalePaused => "upscale_paused",
         }
     }
 
@@ -50,7 +52,7 @@ impl SettingKey {
     /// Returns the built-in default value for this setting.
     pub const fn default_value(self) -> &'static str {
         match self {
-            Self::AuthEnabled | Self::AutoDownloadNewChapters => "false",
+            Self::AuthEnabled | Self::AutoDownloadNewChapters | Self::UpscalePaused => "false",
             Self::AuthOidcIssuerUrl
             | Self::AuthOidcClientId
             | Self::AuthOidcClientSecret
@@ -91,6 +93,7 @@ impl SettingKey {
             Self::CacheDiskPath => "CACHE_DISK_PATH",
             Self::CacheMaxMemoryBytes => "CACHE_MAX_MEMORY_BYTES",
             Self::AutoUpscale => "AUTO_UPSCALE",
+            Self::UpscalePaused => "UPSCALE_PAUSED",
         }
     }
 
@@ -142,6 +145,7 @@ pub const SETTING_DEFINITIONS: &[SettingDefinition] = &[
     SettingDefinition::new(SettingKey::CacheDiskPath),
     SettingDefinition::new(SettingKey::CacheMaxMemoryBytes),
     SettingDefinition::new(SettingKey::AutoUpscale),
+    SettingDefinition::new(SettingKey::UpscalePaused),
 ];
 
 #[must_use]

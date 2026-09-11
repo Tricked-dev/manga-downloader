@@ -1,5 +1,7 @@
 #![allow(clippy::missing_errors_doc)]
 
+mod api_tokens;
+pub use api_tokens::ApiTokenRow;
 mod auth;
 mod background_jobs;
 mod chapters;
