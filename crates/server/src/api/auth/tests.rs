@@ -330,7 +330,12 @@ async fn settings_mask_oidc_secret_and_keep_the_readable_api_key_server_owned() 
         Some("private-value")
     );
     assert_eq!(
-        state.db.get_setting("backend_api_key").await.unwrap().as_deref(),
+        state
+            .db
+            .get_setting("backend_api_key")
+            .await
+            .unwrap()
+            .as_deref(),
         Some("private-key")
     );
 }

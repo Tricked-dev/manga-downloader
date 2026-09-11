@@ -322,7 +322,11 @@ impl ModelCache {
             let started = Instant::now();
             tracing::info!(model = %name, %device, "Loading upscale model");
             let model = if device == Device::Cpu {
-                UpscaleModel::open_cpu(&path, self.config.cpu_threads.clamp(1, 8), profile.as_deref())?
+                UpscaleModel::open_cpu(
+                    &path,
+                    self.config.cpu_threads.clamp(1, 8),
+                    profile.as_deref(),
+                )?
             } else {
                 UpscaleModel::open_gpu(&path, device, &options, profile.as_deref())?
             };

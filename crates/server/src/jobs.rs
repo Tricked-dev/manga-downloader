@@ -71,7 +71,12 @@ async fn upscale_priority(state: &Arc<AppState>, download_id: &str) -> anyhow::R
         return Ok(0);
     };
     let rank_key = format!("series.{}.upscale_rank", download.manga_id);
-    let rank = match state.db.get_setting(&rank_key).await?.and_then(|value| value.parse::<i64>().ok()) {
+    let rank = match state
+        .db
+        .get_setting(&rank_key)
+        .await?
+        .and_then(|value| value.parse::<i64>().ok())
+    {
         Some(rank) => rank,
         None => {
             let next = state
@@ -81,14 +86,19 @@ async fn upscale_priority(state: &Arc<AppState>, download_id: &str) -> anyhow::R
                 .and_then(|value| value.parse::<i64>().ok())
                 .unwrap_or(0)
                 + 1;
-            state.db.set_setting("upscale_rank_seq", &next.to_string()).await?;
+            state
+                .db
+                .set_setting("upscale_rank_seq", &next.to_string())
+                .await?;
             state.db.set_setting(&rank_key, &next.to_string()).await?;
             next
         }
     };
     // Two decimal places keep a fractional chapter like 15.5 between 15 and 16 while
     // staying inside the priority budget.
-    let chapter = (download.chapter_number.max(0.0) * 100.0).round().min(999_999.0) as i64;
+    let chapter = (download.chapter_number.max(0.0) * 100.0)
+        .round()
+        .min(999_999.0) as i64;
     let ordinal = rank.saturating_mul(1_000_000).saturating_add(chapter);
     Ok(i32::try_from(-ordinal).unwrap_or(i32::MIN))
 }
