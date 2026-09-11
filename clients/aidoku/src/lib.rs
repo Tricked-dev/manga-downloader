@@ -7,7 +7,7 @@ mod settings;
 use aidoku::{
     BaseUrlProvider, Chapter, DynamicListings, FilterValue, ImageRequestProvider, ImageResponse,
     Listing, ListingProvider, Manga, MangaPageResult, Page, PageContent, PageImageProcessor,
-    Result, Source,
+    NotificationHandler, Result, Source,
     alloc::{String, Vec, format},
     helpers::uri::{QueryParameters, encode_uri_component},
     imports::{canvas::ImageRef, net::Request},
@@ -407,6 +407,9 @@ impl MangaDownloader {
 
 impl Source for MangaDownloader {
     fn new() -> Self {
+        // The login control reads its URL from defaults, and the settings screen can be
+        // opened before any request has run, so publish it here rather than on first use.
+        settings::sync_login_url(&settings::server_base_url());
         Self
     }
 
@@ -609,13 +612,20 @@ impl BaseUrlProvider for MangaDownloader {
     }
 }
 
+impl NotificationHandler for MangaDownloader {
+    fn handle_notification(&self, _notification: String) {
+        settings::sync_login_url(&settings::server_base_url());
+    }
+}
+
 register_source!(
     MangaDownloader,
     BaseUrlProvider,
     ListingProvider,
     DynamicListings,
     PageImageProcessor,
-    ImageRequestProvider
+    ImageRequestProvider,
+    NotificationHandler
 );
 
 fn source_search_filters(filters: Vec<FilterValue>) -> SourceSearchFilters {

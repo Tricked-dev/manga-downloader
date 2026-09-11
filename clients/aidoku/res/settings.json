@@ -2,18 +2,27 @@
 	{
 		"type": "group",
 		"title": "Server",
+		"footer": "Use an address reachable from the device running Aidoku. Search queries every enabled source that supports it.",
 		"items": [
 			{
 				"type": "text",
 				"key": "serverBaseUrl",
-				"title": "Server Base URL",
-				"placeholder": "http://localhost:4000",
+				"title": "Server URL",
+				"placeholder": "https://manga.example.com",
 				"keyboardType": 3,
 				"returnKeyType": 9,
 				"autocorrectionDisabled": true,
 				"autocapitalizationType": 0,
+				"notification": "serverBaseUrlChanged",
 				"refreshes": ["content"]
-			},
+			}
+		]
+	},
+	{
+		"type": "group",
+		"title": "Account",
+		"footer": "Signing in creates a token for this device, which you can revoke from the server's settings page at any time. The API key is only needed if you would rather paste one in yourself.",
+		"items": [
 			{
 				"type": "login",
 				"key": "mangaLogin",
@@ -28,14 +37,13 @@
 			{
 				"type": "text",
 				"key": "backendApiKey",
-				"title": "Backend API Key",
+				"title": "API Key",
 				"placeholder": "Optional",
 				"returnKeyType": 9,
 				"autocorrectionDisabled": true,
 				"autocapitalizationType": 0,
 				"refreshes": ["content"]
 			}
-		],
-		"footer": "Use a URL reachable from the device running Aidoku. Search uses every enabled source that supports search."
+		]
 	}
 ]
