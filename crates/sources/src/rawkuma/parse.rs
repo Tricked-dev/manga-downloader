@@ -61,6 +61,11 @@ fn manga_id(url: &str) -> Option<String> {
         None
     }
 }
+fn google_drive_url(value: &str) -> Option<String> {
+    let url = url::Url::parse(value.trim()).ok()?;
+    let host = url.host_str()?.trim_end_matches('.').to_ascii_lowercase();
+    (host == "drive.google.com" || host == "docs.google.com").then(|| url.into())
+}
 fn is_nsfw(genres: &[String]) -> bool {
     genres
         .iter()
@@ -232,9 +237,9 @@ pub(super) fn chapters(html: &str) -> SourceResult<Vec<Chapter>> {
         let Some(href) = link.value().attr("href") else {
             continue;
         };
-        if href.starts_with("https://drive.google.com/") {
+        if let Some(download_url) = google_drive_url(href) {
             if let Some(chapter) = chapters.last_mut() {
-                chapter.download_url = Some(href.to_owned());
+                chapter.download_url = Some(download_url);
             }
             continue;
         }

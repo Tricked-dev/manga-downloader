@@ -28,7 +28,7 @@ pub(crate) use storage_usage::{
 use cancellation::{
     cancelled_error, is_cancelled_error, register_active_download, unregister_active_download,
 };
-use pages::{fetch_chapter_pages, get_page_refs_with_retry};
+use pages::{fetch_chapter_pages, get_page_refs_with_retry, try_fetch_google_drive_pages};
 use storage_usage::{
     enforce_download_storage_limit, move_archive_into_library,
     reserve_download_storage_for_archive, rollback_download_storage_reservation,
@@ -368,26 +368,6 @@ async fn download_chapter(
             .await?
             .ok_or_else(|| anyhow::anyhow!("Chapter not found"))?;
 
-        let page_refs =
-            get_page_refs_refreshing_stale_chapter(state, &manga, &mut chapter, cancel_flag)
-                .await?;
-
-        let total_pages = page_refs.len();
-        if total_pages == 0 {
-            return Err(anyhow::anyhow!("No pages found for chapter"));
-        }
-
-        ensure_not_cancelled(cancel_flag)?;
-
-        tracing::trace!(
-            download_id = %download.id,
-            chapter_id = %download.chapter_id,
-            source = %manga.source,
-            page_count = total_pages,
-            elapsed_ms = elapsed_ms(started_at),
-            "Chapter Pages Resolved",
-        );
-
         let media_client = {
             let pm = state.source_registry.read().await;
             pm.media_client(&manga.source)?
@@ -397,17 +377,61 @@ async fn download_chapter(
 
         work_state.fetching_pages().await?;
 
-        let pages = fetch_chapter_pages(
+        let pages = if let Some(pages) = try_fetch_google_drive_pages(
             state,
-            download,
-            &page_refs,
+            &manga,
+            &chapter,
             &media_client,
             cancel_flag,
-            started_at,
             &staging_dir,
-            page_fetch_concurrency,
         )
-        .await?;
+        .await?
+        {
+            let page_count = pages.len();
+            let mut fetch_progress = work_state.fetch_progress(page_count);
+            fetch_progress.refresh(page_count).await?;
+            tracing::trace!(
+                download_id = %download.id,
+                chapter_id = %download.chapter_id,
+                source = %manga.source,
+                page_count,
+                page_source = "google_drive",
+                elapsed_ms = elapsed_ms(started_at),
+                "Chapter Pages Resolved",
+            );
+            pages
+        } else {
+            let page_refs =
+                get_page_refs_refreshing_stale_chapter(state, &manga, &mut chapter, cancel_flag)
+                    .await?;
+            let total_pages = page_refs.len();
+            if total_pages == 0 {
+                return Err(anyhow::anyhow!("No pages found for chapter"));
+            }
+
+            ensure_not_cancelled(cancel_flag)?;
+            tracing::trace!(
+                download_id = %download.id,
+                chapter_id = %download.chapter_id,
+                source = %manga.source,
+                page_count = total_pages,
+                page_source = "reader",
+                elapsed_ms = elapsed_ms(started_at),
+                "Chapter Pages Resolved",
+            );
+
+            fetch_chapter_pages(
+                state,
+                download,
+                &page_refs,
+                &media_client,
+                cancel_flag,
+                started_at,
+                &staging_dir,
+                page_fetch_concurrency,
+            )
+            .await?
+        };
 
         drop(fetch_permit);
 
@@ -523,7 +547,6 @@ async fn download_chapter(
             chapter_id = %download.chapter_id,
             path = %archive_path.display(),
             pages = fetched_page_count,
-            source_pages = total_pages,
             archive_bytes = archive_size,
             archive_duration_ms = elapsed_ms(archive_started_at),
             elapsed_ms = elapsed_ms(started_at),

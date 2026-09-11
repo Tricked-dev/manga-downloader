@@ -2,12 +2,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use autometrics::autometrics;
 use axum::body::Bytes;
-use backend_sources::SourceMediaClient;
+use backend_persistence::{ChapterRow, MangaRow};
+use backend_sources::{SourceMediaClient, fetch::RequestProfile, media::MediaRefSpec};
 use backon::{ExponentialBuilder, Retryable};
 use futures_util::{StreamExt, stream};
+use std::io::{Cursor, Read};
+use zip::ZipArchive;
 
 use crate::{
     AppState,
@@ -40,6 +43,12 @@ struct SkippedPage {
     url: String,
     error: anyhow::Error,
     page_elapsed_ms: u64,
+}
+
+struct ExternalPage {
+    source_name: String,
+    extension: &'static str,
+    data: Vec<u8>,
 }
 
 enum PageFetchOutcome {
@@ -75,6 +84,185 @@ fn preferred_image_extension(content_type: &str) -> &'static str {
         "image/webp" => "webp",
         _ => "jpg",
     }
+}
+
+/// Tries Rawkuma's optional Google Drive download before resolving reader pages.
+///
+/// Rawkuma's link is intentionally treated as an optimization, not as the only
+/// source of truth. Missing links, unavailable Drive files, non-archives, and
+/// archives without supported images all return `Ok(None)` so the caller can use
+/// the normal reader-page downloader.
+pub(super) async fn try_fetch_google_drive_pages(
+    state: &Arc<crate::AppState>,
+    manga: &MangaRow,
+    chapter: &ChapterRow,
+    media_client: &SourceMediaClient,
+    cancel_flag: &super::DownloadCancellation,
+    staging_dir: &Path,
+) -> Result<Option<Vec<(String, PathBuf)>>> {
+    if manga.source != "rawkuma" {
+        return Ok(None);
+    }
+
+    let drive_url = {
+        let registry = state.source_registry.read().await;
+        match registry
+            .get_chapter_list(&manga.source, &manga.source_id)
+            .await
+        {
+            Ok(chapters) => chapters
+                .into_iter()
+                .find(|candidate| candidate.id == chapter.source_id)
+                .and_then(|candidate| candidate.download_url),
+            Err(error) => {
+                tracing::debug!(
+                    source = %manga.source,
+                    chapter_id = %chapter.id,
+                    error = %error,
+                    "Google Drive Chapter Lookup Failed; Falling Back To Reader Pages",
+                );
+                None
+            }
+        }
+    };
+    let Some(drive_url) = drive_url.filter(|url| !url.trim().is_empty()) else {
+        return Ok(None);
+    };
+
+    ensure_not_cancelled(cancel_flag)?;
+    let request_url = google_drive_download_url(&drive_url);
+    let media = MediaRefSpec {
+        url: request_url,
+        request: None,
+        transform: None,
+    };
+    let (body, content_type) = match tokio::select! {
+        () = cancel_flag.cancelled() => return Err(super::cancelled_error()),
+        result = media_client.fetch_media(&media, RequestProfile::BinaryAsset) => result,
+    } {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::debug!(
+                source = %manga.source,
+                chapter_id = %chapter.id,
+                url = %drive_url,
+                error = %error,
+                "Google Drive Chapter Fetch Failed; Falling Back To Reader Pages",
+            );
+            return Ok(None);
+        }
+    };
+
+    let external_pages = match extract_external_pages(&body, &drive_url) {
+        Ok(pages) => pages,
+        Err(error) => {
+            tracing::debug!(
+                source = %manga.source,
+                chapter_id = %chapter.id,
+                url = %drive_url,
+                error = %error,
+                "Google Drive Chapter Archive Invalid; Falling Back To Reader Pages",
+            );
+            None
+        }
+    };
+    let Some(external_pages) = external_pages else {
+        tracing::debug!(
+            source = %manga.source,
+            chapter_id = %chapter.id,
+            url = %drive_url,
+            content_type = %content_type,
+            bytes = body.len(),
+            "Google Drive Chapter Payload Unusable; Falling Back To Reader Pages",
+        );
+        return Ok(None);
+    };
+
+    let mut pages = Vec::with_capacity(external_pages.len());
+    for (index, page) in external_pages.into_iter().enumerate() {
+        ensure_not_cancelled(cancel_flag)?;
+        let filename = format!("{:04}.{}", index + 1, page.extension);
+        let path = super::stage_page_bytes(staging_dir, &filename, &page.data).await?;
+        pages.push((filename, path));
+    }
+    Ok(Some(pages))
+}
+
+fn extract_external_pages(
+    body: &[u8],
+    source_url: &str,
+) -> Result<Option<Vec<ExternalPage>>> {
+    if let Ok(extension) = backend_image::detect_supported_image_format(body) {
+        return Ok(Some(vec![ExternalPage {
+            source_name: source_url.to_string(),
+            extension,
+            data: body.to_vec(),
+        }]));
+    }
+
+    let mut archive = match ZipArchive::new(Cursor::new(body)) {
+        Ok(archive) => archive,
+        Err(_) => return Ok(None),
+    };
+    let mut pages = Vec::new();
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .with_context(|| format!("read Google Drive archive entry {index}"))?;
+        if entry.is_dir() {
+            continue;
+        }
+        let source_name = entry.name().to_string();
+        let mut data = Vec::new();
+        entry.read_to_end(&mut data)?;
+        let Ok(extension) = backend_image::detect_supported_image_format(&data) else {
+            continue;
+        };
+        pages.push(ExternalPage {
+            source_name,
+            extension,
+            data,
+        });
+    }
+    pages.sort_by(|left, right| natord::compare(&left.source_name, &right.source_name));
+    if pages.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(pages))
+}
+
+fn google_drive_download_url(value: &str) -> String {
+    let Ok(url) = url::Url::parse(value) else {
+        return value.to_owned();
+    };
+    if !url.host_str().is_some_and(|host| {
+        host.trim_end_matches('.')
+            .eq_ignore_ascii_case("drive.google.com")
+    }) {
+        return value.to_owned();
+    }
+
+    let segments = url.path_segments().into_iter().flatten().collect::<Vec<_>>();
+    let file_id = segments
+        .windows(2)
+        .find(|pair| pair[0] == "d")
+        .map(|pair| pair[1])
+        .or_else(|| {
+            url.query_pairs()
+                .find_map(|(key, value)| (key == "id").then_some(value))
+        })
+        .filter(|id| !id.is_empty());
+    let Some(file_id) = file_id else {
+        return value.to_owned();
+    };
+
+    let mut direct = url::Url::parse("https://drive.google.com/uc").expect("static Drive URL");
+    direct
+        .query_pairs_mut()
+        .append_pair("export", "download")
+        .append_pair("id", &file_id);
+    direct.into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -287,6 +475,64 @@ fn is_retriable_page_fetch_error(error: &anyhow::Error) -> bool {
         ]
         .iter()
         .any(|status| message.contains(status))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageFormat, RgbImage};
+    use std::io::Write;
+    use zip::{ZipWriter, write::SimpleFileOptions};
+
+    fn image_bytes() -> Vec<u8> {
+        let image = RgbImage::new(1, 1);
+        let mut bytes = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image)
+            .write_to(&mut bytes, ImageFormat::Png)
+            .unwrap();
+        bytes.into_inner()
+    }
+
+    #[test]
+    fn google_drive_archive_extracts_supported_pages_in_natural_order() {
+        let mut archive = ZipWriter::new(Cursor::new(Vec::new()));
+        for name in ["10.png", "cover.txt", "2.png"] {
+            archive
+                .start_file(name, SimpleFileOptions::default())
+                .unwrap();
+            if name.ends_with(".png") {
+                archive.write_all(&image_bytes()).unwrap();
+            } else {
+                archive.write_all(b"metadata").unwrap();
+            }
+        }
+        let bytes = archive.finish().unwrap().into_inner();
+
+        let pages =
+            extract_external_pages(&bytes, "application/zip", "https://drive.google.com/file")
+                .unwrap()
+                .expect("archive should contain supported pages");
+        assert_eq!(
+            pages
+                .iter()
+                .map(|page| page.source_name.as_str())
+                .collect::<Vec<_>>(),
+            ["2.png", "10.png"]
+        );
+    }
+
+    #[test]
+    fn unusable_google_drive_payload_requests_reader_fallback() {
+        assert!(
+            extract_external_pages(
+                b"Google Drive file is unavailable",
+                "text/html",
+                "https://drive.google.com/file"
+            )
+            .unwrap()
+            .is_none()
+        );
+    }
 }
 
 pub(super) async fn get_page_refs_with_retry(

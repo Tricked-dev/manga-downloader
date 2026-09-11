@@ -57,6 +57,7 @@ http.workspace = true
 jiff.workspace = true
 metrics.workspace = true
 mime_guess.workspace = true
+natord.workspace = true
 postcard.workspace = true
 rayon.workspace = true
 reqwest.workspace = true
