@@ -60,6 +60,10 @@ struct ServerOptions {
     #[arg(long)]
     upscale_openvino_device: Option<String>,
 
+    /// Intra-op threads for the ONNX Runtime CPU provider, 1 to 8.
+    #[arg(long)]
+    upscale_cpu_threads: Option<usize>,
+
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
     addr: Option<String>,
@@ -169,6 +173,7 @@ struct ConfigReport {
     models_dir: PathBuf,
     upscale_device: String,
     upscale_openvino_device: String,
+    upscale_cpu_threads: usize,
     server_addr: String,
     backend_api_key: SecretStatus,
 }
@@ -316,6 +321,10 @@ fn print_config_report(report: &ConfigReport) {
         report.upscale_openvino_device
     );
     println!(
+        "upscale_cpu_threads: {} (used only when upscale_device is cpu)",
+        report.upscale_cpu_threads
+    );
+    println!(
         "backend_api_key: {}",
         match report.backend_api_key {
             SecretStatus::Set => "set",
@@ -339,6 +348,7 @@ impl ServerOptions {
             upscale_openvino_device: overrides
                 .upscale_openvino_device
                 .or(self.upscale_openvino_device),
+            upscale_cpu_threads: overrides.upscale_cpu_threads.or(self.upscale_cpu_threads),
             addr: overrides.addr.or(self.addr),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
@@ -354,6 +364,7 @@ impl From<ServerOptions> for ServerConfigOverrides {
             models_dir: options.models_dir,
             upscale_device: options.upscale_device,
             upscale_openvino_device: options.upscale_openvino_device,
+            upscale_cpu_threads: options.upscale_cpu_threads,
             server_addr: options.addr,
             backend_api_key: options.backend_api_key,
         }
@@ -370,6 +381,7 @@ impl ConfigReport {
             models_dir: config.models_dir.clone(),
             upscale_device: config.upscale_device.clone(),
             upscale_openvino_device: config.upscale_openvino_device.clone(),
+            upscale_cpu_threads: config.upscale_cpu_threads,
             server_addr: config.server_addr.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set

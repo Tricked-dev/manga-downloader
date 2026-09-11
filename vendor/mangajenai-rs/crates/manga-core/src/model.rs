@@ -101,7 +101,7 @@ impl UpscaleModel {
         Self::from_builder(path, builder, Device::Cpu)
     }
 
-    /// Load on an explicit GPU with no CPU execution-provider fallback.
+    /// Load on an explicit accelerator provider with no CPU execution-provider fallback.
     /// Unsupported operators fail during session creation, before inference.
     pub fn open_gpu(
         path: &Path,
@@ -112,18 +112,22 @@ impl UpscaleModel {
         if !device.is_accelerator() {
             bail!("GPU inference requires an explicit accelerator; CPU and auto are forbidden");
         }
+        // The invariant being defended is that the target is named outright and never
+        // silently relocated, not that it is a GPU. OpenVINO's own CPU plugin satisfies
+        // that; AUTO does not, because it picks a device for itself.
         if device == Device::OpenVino
             && !options
                 .openvino_device_type
                 .as_deref()
                 .is_some_and(|value| {
                     value == "GPU"
+                        || value == "CPU"
                         || value
                             .strip_prefix("GPU.")
                             .is_some_and(|id| id.parse::<u32>().is_ok())
                 })
         {
-            bail!("GPU inference requires OpenVINO GPU or GPU.N, with no CPU or AUTO target");
+            bail!("OpenVINO inference requires an explicit CPU, GPU or GPU.N target, not AUTO");
         }
         // Builder errors own a non-Send recovery value. Discard that value
         // while retaining the error text before crossing our anyhow boundary.

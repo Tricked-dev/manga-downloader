@@ -68,6 +68,10 @@ pub struct UpscaleConfig {
     /// OpenVINO's `device_type`. `GPU` keeps a missing accelerator an error rather
     /// than a silent CPU run; `CPU` selects OpenVINO's own CPU plugin deliberately.
     pub openvino_device: String,
+    /// Intra-op threads for the ONNX Runtime CPU provider, which is otherwise the
+    /// binding constraint on that path regardless of the cgroup CPU quota. Accelerator
+    /// providers manage their own pools and ignore this.
+    pub cpu_threads: usize,
     pub tile_size: u32,
     pub overlap: u32,
     /// Optional ONNX execution profiles for a diagnostic run.
@@ -79,6 +83,7 @@ impl Default for UpscaleConfig {
             models_dir: "./data/models".into(),
             device: UpscaleDevice::default(),
             openvino_device: "GPU".into(),
+            cpu_threads: 2,
             tile_size: 256,
             overlap: 32,
             profile_dir: None,
@@ -300,7 +305,7 @@ impl ModelCache {
             let started = Instant::now();
             tracing::info!(model = %name, %device, "Loading upscale model");
             let model = if device == Device::Cpu {
-                UpscaleModel::open_cpu(&path, 2, profile.as_deref())?
+                UpscaleModel::open_cpu(&path, self.config.cpu_threads.clamp(1, 8), profile.as_deref())?
             } else {
                 UpscaleModel::open_gpu(&path, device, &options, profile.as_deref())?
             };

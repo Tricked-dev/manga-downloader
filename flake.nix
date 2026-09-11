@@ -40,6 +40,8 @@
         packages = {
           default = build.server;
           manga-server = build.server;
+          manga-web = build.web;
+          manga-web-deps = build.bunDeps;
         };
         apps.default = {
           type = "app";

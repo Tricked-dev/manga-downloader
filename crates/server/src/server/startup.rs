@@ -139,6 +139,7 @@ async fn bootstrap_server(
         models_dir,
         upscale_device,
         upscale_openvino_device,
+        upscale_cpu_threads,
         server_addr,
         backend_api_key,
     } = config;
@@ -199,6 +200,7 @@ async fn bootstrap_server(
         models_dir,
         device: upscale_device.parse()?,
         openvino_device: upscale_openvino_device,
+        cpu_threads: upscale_cpu_threads,
         ..Default::default()
     })?;
     let upscale_queue = crate::jobs::UpscaleQueue::open(&db).await?;

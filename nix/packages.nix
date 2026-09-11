@@ -48,33 +48,64 @@ let
       doCheck = false;
     }
   );
-  web = pkgs.stdenvNoCC.mkDerivation {
-    # Fixed-output paths otherwise reuse an old web bundle when inputs change.
-    # The headless build depends on this source tree and supplies the API schema.
-    pname = "manga-web-${builtins.substring 0 12 (builtins.hashString "sha256" (toString headless))}";
+  # Only `bun install` needs the network, so it is the only part that has to be
+  # fixed-output. Keying the hash to the lockfile this way means edits under web/
+  # no longer invalidate it, which building the bundle in here did.
+  bunDeps = pkgs.stdenvNoCC.mkDerivation {
+    pname = "manga-web-deps";
     inherit version src;
     nativeBuildInputs = [
       bun
-      pkgs.nodejs
       pkgs.cacert
     ];
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
-    outputHash = "sha256-PHTIMVBE7MOE8U0OEwd5kffFxGyP4NrWWE7kh2c7Vm8=";
+    outputHash = "sha256-tXdugZG4ygYpBTxF2pxbQWX1fWJZ1itja2ISVGNZAEI=";
     dontConfigure = true;
     dontFixup = true;
     SOURCE_DATE_EPOCH = "1";
     buildPhase = ''
       runHook preBuild
+      export HOME="$TMPDIR"
       export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
       export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-      ${headless}/bin/manga-server openapi export > web/packages/api-client/openapi.json
       bun install --frozen-lockfile --ignore-scripts
+      runHook postBuild
+    '';
+    # Each tree is kept at its workspace-relative path so the bundle build can drop
+    # them straight back in; -a because the workspace links must stay symlinks.
+    installPhase = ''
+      runHook preInstall
+      find . -type d -name node_modules -prune -print0 | while IFS= read -r -d "" dir; do
+        mkdir -p "$out/$(dirname "$dir")"
+        cp -a "$dir" "$out/$dir"
+      done
+      runHook postInstall
+    '';
+  };
+  # An ordinary derivation: no network, so no pinned hash and no re-pinning when the
+  # UI changes. The headless build supplies the API schema.
+  web = pkgs.stdenvNoCC.mkDerivation {
+    pname = "manga-web";
+    inherit version src;
+    nativeBuildInputs = [
+      bun
+      pkgs.nodejs
+    ];
+    dontConfigure = true;
+    dontFixup = true;
+    SOURCE_DATE_EPOCH = "1";
+    buildPhase = ''
+      runHook preBuild
+      cp -a ${bunDeps}/. .
+      chmod -R u+w .
+      export HOME="$TMPDIR"
+      export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
+      ${headless}/bin/manga-server openapi export > web/packages/api-client/openapi.json
       patchShebangs node_modules web/node_modules web/packages/api-client/node_modules
       bun run --cwd web prepare
       bun run --cwd web/packages/api-client generate:client
-      # SvelteKit otherwise embeds Date.now() as its app version. Hash only
-      # frontend inputs and the exported schema, independently of this FOD hash.
+      # SvelteKit otherwise embeds Date.now() as its app version.
       export MANGA_WEB_VERSION="$(
         {
           printf '%s\0' package.json bun.lock web/package.json web/svelte.config.js web/vite.config.ts web/packages/api-client/openapi.json
@@ -118,6 +149,7 @@ in
     commonArgs
     cargoArtifacts
     headless
+    bunDeps
     web
     clients
     ;
