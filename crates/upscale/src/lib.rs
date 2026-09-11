@@ -68,6 +68,12 @@ pub struct UpscaleConfig {
     /// OpenVINO's `device_type`. `GPU` keeps a missing accelerator an error rather
     /// than a silent CPU run; `CPU` selects OpenVINO's own CPU plugin deliberately.
     pub openvino_device: String,
+    /// Threads for OpenVINO's own pool, or 0 to let it size itself. It sizes from the
+    /// visible cores and cannot see a cgroup quota, so it undershoots a generous one.
+    pub openvino_threads: usize,
+    /// OpenVINO inference precision. `FP32` keeps output identical to the CPU
+    /// provider rather than letting the plugin downcast for speed.
+    pub openvino_precision: String,
     /// Intra-op threads for the ONNX Runtime CPU provider, which is otherwise the
     /// binding constraint on that path regardless of the cgroup CPU quota. Accelerator
     /// providers manage their own pools and ignore this.
@@ -83,6 +89,8 @@ impl Default for UpscaleConfig {
             models_dir: "./data/models".into(),
             device: UpscaleDevice::default(),
             openvino_device: "GPU".into(),
+            openvino_threads: 0,
+            openvino_precision: "FP32".into(),
             cpu_threads: 2,
             tile_size: 256,
             overlap: 32,
@@ -295,6 +303,9 @@ impl ModelCache {
             );
             let options = DeviceOptions {
                 openvino_device_type: Some(self.config.openvino_device.clone()),
+                openvino_num_threads: (self.config.openvino_threads > 0)
+                    .then_some(self.config.openvino_threads),
+                openvino_precision: Some(self.config.openvino_precision.clone()),
             };
             let profile = if let Some(directory) = &self.config.profile_dir {
                 std::fs::create_dir_all(directory)?;

@@ -43,6 +43,14 @@ pub struct DeviceOptions {
     /// the intent explicit and turns a missing GPU into an error rather than a
     /// silent CPU run.
     pub openvino_device_type: Option<String>,
+    /// OpenVINO's `inference_num_threads`. Left unset the CPU plugin sizes its own
+    /// pool from the visible cores, which undershoots when a cgroup quota allows
+    /// more than it picks; a cgroup limit is not something it can see.
+    pub openvino_num_threads: Option<usize>,
+    /// OpenVINO's inference precision, e.g. `FP32`. Left unset the CPU plugin may
+    /// downcast on hardware that supports it, which trades output fidelity for
+    /// speed without saying so.
+    pub openvino_precision: Option<String>,
 }
 
 /// Which hardware backend to run on.
@@ -165,6 +173,12 @@ impl Device {
                 let mut provider = ort::ep::OpenVINO::default();
                 if let Some(device_type) = &options.openvino_device_type {
                     provider = provider.with_device_type(device_type);
+                }
+                if let Some(num_threads) = options.openvino_num_threads {
+                    provider = provider.with_num_threads(num_threads);
+                }
+                if let Some(precision) = &options.openvino_precision {
+                    provider = provider.with_precision(precision);
                 }
                 provider.register(builder)?
             }

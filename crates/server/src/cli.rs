@@ -64,6 +64,14 @@ struct ServerOptions {
     #[arg(long)]
     upscale_cpu_threads: Option<usize>,
 
+    /// Threads for OpenVINO's own pool, or 0 to let it size itself.
+    #[arg(long)]
+    upscale_openvino_threads: Option<usize>,
+
+    /// OpenVINO inference precision, e.g. FP32.
+    #[arg(long)]
+    upscale_openvino_precision: Option<String>,
+
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
     addr: Option<String>,
@@ -174,6 +182,8 @@ struct ConfigReport {
     upscale_device: String,
     upscale_openvino_device: String,
     upscale_cpu_threads: usize,
+    upscale_openvino_threads: usize,
+    upscale_openvino_precision: String,
     server_addr: String,
     backend_api_key: SecretStatus,
 }
@@ -325,6 +335,14 @@ fn print_config_report(report: &ConfigReport) {
         report.upscale_cpu_threads
     );
     println!(
+        "upscale_openvino_threads: {} (0 lets OpenVINO size its own pool)",
+        report.upscale_openvino_threads
+    );
+    println!(
+        "upscale_openvino_precision: {}",
+        report.upscale_openvino_precision
+    );
+    println!(
         "backend_api_key: {}",
         match report.backend_api_key {
             SecretStatus::Set => "set",
@@ -349,6 +367,12 @@ impl ServerOptions {
                 .upscale_openvino_device
                 .or(self.upscale_openvino_device),
             upscale_cpu_threads: overrides.upscale_cpu_threads.or(self.upscale_cpu_threads),
+            upscale_openvino_threads: overrides
+                .upscale_openvino_threads
+                .or(self.upscale_openvino_threads),
+            upscale_openvino_precision: overrides
+                .upscale_openvino_precision
+                .or(self.upscale_openvino_precision),
             addr: overrides.addr.or(self.addr),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
@@ -365,6 +389,8 @@ impl From<ServerOptions> for ServerConfigOverrides {
             upscale_device: options.upscale_device,
             upscale_openvino_device: options.upscale_openvino_device,
             upscale_cpu_threads: options.upscale_cpu_threads,
+            upscale_openvino_threads: options.upscale_openvino_threads,
+            upscale_openvino_precision: options.upscale_openvino_precision,
             server_addr: options.addr,
             backend_api_key: options.backend_api_key,
         }
@@ -382,6 +408,8 @@ impl ConfigReport {
             upscale_device: config.upscale_device.clone(),
             upscale_openvino_device: config.upscale_openvino_device.clone(),
             upscale_cpu_threads: config.upscale_cpu_threads,
+            upscale_openvino_threads: config.upscale_openvino_threads,
+            upscale_openvino_precision: config.upscale_openvino_precision.clone(),
             server_addr: config.server_addr.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set
