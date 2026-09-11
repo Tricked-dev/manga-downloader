@@ -123,13 +123,22 @@ async fn enqueue_upscale_job(
         let id = PgTaskId::new(ulid::Ulid::new());
         let mut task: PgTask<UpscaleJob> = Task::new(UpscaleJob::new(download_id, scale));
         task.parts.task_id = Some(id);
+        let priority = upscale_priority(state, download_id).await?;
         task.parts.ctx = PgContext::default()
             .with_max_attempts(3)
-            .with_priority(upscale_priority(state, download_id).await?);
+            .with_priority(priority);
         storage
             .push_task(task)
             .await
             .map_err(|error| anyhow::anyhow!("failed to enqueue upscale: {error}"))?;
+        // The context priority does not reach the stored row through this path, and the
+        // ordering `apalis.get_jobs` applies reads the column, so set it there.
+        sqlx::query("UPDATE apalis.jobs SET priority = $1 WHERE id = $2")
+            .bind(priority)
+            .bind(id.to_string())
+            .execute(pool)
+            .await
+            .map_err(|error| anyhow::anyhow!("failed to set upscale priority: {error}"))?;
         return Ok(id.to_string());
     }
     let mut storage = ToastyJobStorage::<UpscaleJob>::new(state.db.clone(), UPSCALE_QUEUE);
