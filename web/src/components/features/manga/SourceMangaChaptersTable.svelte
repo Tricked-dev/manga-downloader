@@ -60,6 +60,17 @@
       {:else if cell.column.id === "actions"}
         <TableCell class="pr-5 text-right">
           <div class="flex justify-end gap-2">
+            {#if chapter.download_url}
+              <Button
+                href={chapter.download_url}
+                target="_blank"
+                rel="noreferrer"
+                variant="default"
+                size="sm"
+              >
+                Google Drive
+              </Button>
+            {/if}
             <Button
               href={`/read/${encodeURIComponent(sourceName)}/${encodeURIComponent(chapter.id)}`}
               variant="secondary"
@@ -98,7 +109,18 @@
       <SourceChapterStatusBadge {downloading} {queued} />
     </div>
 
-    <div class="grid grid-cols-2 gap-2">
+    <div class={chapter.download_url ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
+      {#if chapter.download_url}
+        <Button
+          href={chapter.download_url}
+          target="_blank"
+          rel="noreferrer"
+          variant="default"
+          size="sm"
+        >
+          Google Drive
+        </Button>
+      {/if}
       <Button
         href={`/read/${encodeURIComponent(sourceName)}/${encodeURIComponent(chapter.id)}`}
         variant="secondary"

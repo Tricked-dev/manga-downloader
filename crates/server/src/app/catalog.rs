@@ -565,6 +565,7 @@ pub async fn get_chapter_list(
                 title: chapter.title,
                 chapter_number: chapter.number,
                 date_uploaded: chapter.published_at,
+                download_url: chapter.download_url,
             })
             .collect(),
     );

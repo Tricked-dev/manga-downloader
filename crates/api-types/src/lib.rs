@@ -73,6 +73,8 @@ pub struct ChapterResponse {
     pub title: String,
     pub chapter_number: f64,
     pub date_uploaded: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
 }
 
 #[derive(

@@ -227,9 +227,23 @@ pub(super) fn manga(html: &str, url: &str) -> SourceResult<Manga> {
 pub(super) fn chapters(html: &str) -> SourceResult<Vec<Chapter>> {
     let doc = Html::parse_document(html);
     let mut seen = HashSet::new();
-    let mut chapters = Vec::new();
+    let mut chapters: Vec<Chapter> = Vec::new();
     for link in doc.select(&selector("#chapter-list a[href], #chapterlist a[href]")) {
-        let url = document_url(link.value().attr("href").unwrap_or_default())?;
+        let Some(href) = link.value().attr("href") else {
+            continue;
+        };
+        if href.starts_with("https://drive.google.com/") {
+            if let Some(chapter) = chapters.last_mut() {
+                chapter.download_url = Some(href.to_owned());
+            }
+            continue;
+        }
+        // Rawkuma places external download links (currently Google Drive) in the
+        // same chapter container. They are not chapter identities; skip them and
+        // keep parsing the actual Rawkuma chapter anchors.
+        let Ok(url) = document_url(href) else {
+            continue;
+        };
         if !seen.insert(url.clone()) {
             continue;
         }
@@ -265,6 +279,7 @@ pub(super) fn chapters(html: &str) -> SourceResult<Vec<Chapter>> {
             number,
             volume: None,
             published_at,
+            download_url: None,
         });
     }
     if doc
@@ -333,6 +348,22 @@ mod tests {
         assert_eq!(chapters.len(), 2);
         assert_eq!(chapters[0].number, 284.5);
         assert_eq!(chapters[1].published_at, "2026-09-09T15:24:20Z");
+    }
+    #[test]
+    fn chapters_ignore_unrelated_download_links() {
+        let html = r#"
+            <div id="chapter-list">
+                <a href="https://rawkuma.net/manga/one-punch-man/chapter-1.1/"><span>Chapter 1</span></a>
+                <a href="https://drive.google.com/uc?id=example&amp;export=download">Download</a>
+            </div>
+        "#;
+        let chapters = chapters(html).expect("unrelated links should not invalidate chapters");
+        assert_eq!(chapters.len(), 1);
+        assert_eq!(chapters[0].number, 1.0);
+        assert_eq!(
+            chapters[0].download_url.as_deref(),
+            Some("https://drive.google.com/uc?id=example&export=download")
+        );
     }
     #[test]
     fn reader_json_preserves_native_urls_order_and_referer() {

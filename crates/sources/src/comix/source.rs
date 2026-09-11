@@ -908,6 +908,7 @@ impl From<ComixChapter> for Chapter {
             number: f64::from(value.number),
             volume: None,
             published_at,
+            download_url: None,
         }
     }
 }

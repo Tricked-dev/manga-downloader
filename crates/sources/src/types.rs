@@ -80,6 +80,7 @@ pub struct Chapter {
     pub number: f64,
     pub volume: Option<f64>,
     pub published_at: String,
+    pub download_url: Option<String>,
 }
 
 #[derive(Clone, Debug)]
