@@ -15,6 +15,9 @@ pub struct ServerConfig {
     #[setting(default = default_upscale_device(), env = "UPSCALE_DEVICE", parse_env = schematic::env::ignore_empty)]
     pub upscale_device: String,
 
+    #[setting(default = "GPU", env = "UPSCALE_OPENVINO_DEVICE", parse_env = schematic::env::ignore_empty)]
+    pub upscale_openvino_device: String,
+
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
@@ -35,6 +38,7 @@ pub struct ServerConfigOverrides {
     pub database_url: Option<String>,
     pub models_dir: Option<PathBuf>,
     pub upscale_device: Option<String>,
+    pub upscale_openvino_device: Option<String>,
     pub server_addr: Option<String>,
     pub backend_api_key: Option<String>,
 }
@@ -64,6 +68,9 @@ impl ServerConfig {
         }
         if let Some(upscale_device) = overrides.upscale_device {
             self.upscale_device = upscale_device;
+        }
+        if let Some(upscale_openvino_device) = overrides.upscale_openvino_device {
+            self.upscale_openvino_device = upscale_openvino_device;
         }
         if let Some(database_url) = overrides.database_url {
             self.database_url = database_url;

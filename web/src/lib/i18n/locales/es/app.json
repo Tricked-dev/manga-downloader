@@ -509,9 +509,12 @@
   },
   "settings": {
     "apiKey": "Clave API",
-    "apiKeyHint": "Se guarda como ajuste de la aplicación y se aplica cuando inicia el backend. Reinicia el backend después de guardar para exigir este token.",
-    "apiKeyPlaceholder": "Introduce la clave API",
-    "apiRestartNotice": "Los cambios de clave API se aplican al guardar. Actualiza la clave en tus aplicaciones de lectura.",
+    "apiKeyCopied": "Copiada",
+    "apiKeyCopy": "Copiar",
+    "apiKeyCopyFailed": "No se pudo copiar la clave API. Muéstrala y cópiala manualmente.",
+    "apiKeyHide": "Ocultar clave API",
+    "apiKeyHint": "Generada por el servidor y almacenada en la base de datos. Cópiala en Aidoku, Mihon o cualquier otro cliente de API; aquí no se puede editar.",
+    "apiKeyReveal": "Mostrar clave API",
     "auth": {
       "address": "Claims de dirección cuando estén disponibles.",
       "clientId": "ID de cliente OIDC",

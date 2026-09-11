@@ -110,6 +110,23 @@ fn systemd_listener_fd_from_env(
     }
 }
 
+/// Reader clients authenticate with the bearer key and read it from the settings UI,
+/// so one has to exist without an operator ever choosing a value. Generated once and
+/// then owned by the database; `BACKEND_API_KEY` still wins where it is set.
+async fn ensure_backend_api_key(db: &backend_persistence::Database) -> anyhow::Result<String> {
+    let key = backend_core::settings::SettingKey::BackendApiKey.as_str();
+    if let Some(existing) = db.get_setting(key).await?
+        && !existing.trim().is_empty()
+    {
+        return Ok(existing);
+    }
+
+    let generated = uuid::Uuid::new_v4().to_string();
+    db.set_setting(key, &generated).await?;
+    tracing::info!("Backend API Key Generated");
+    Ok(generated)
+}
+
 fn tcp_listener_from_raw_fd(fd: RawFd) -> anyhow::Result<TcpListener> {
     // SAFETY: systemd socket activation transfers ownership of listening file
     // descriptors starting at fd 3 to the service process. This function is
@@ -138,6 +155,7 @@ async fn bootstrap_server(
         database_url,
         models_dir,
         upscale_device,
+        upscale_openvino_device,
         server_addr,
         backend_api_key,
     } = config;
@@ -150,6 +168,10 @@ async fn bootstrap_server(
     }
     let db = backend_persistence::Database::open(&database_url).await?;
     db.apply_env_overrides().await?;
+    let backend_api_key = match backend_api_key {
+        Some(key) => key,
+        None => ensure_backend_api_key(&db).await?,
+    };
 
     let settings = settings::interface(&db);
     let download_path = settings.download_path().await?;
@@ -172,7 +194,7 @@ async fn bootstrap_server(
         );
     }
 
-    let backend_api_key = backend_api_key.map(SecretString::from);
+    let backend_api_key = Some(SecretString::from(backend_api_key));
     let cache = MangaCache::new(&cache_disk_path, cache_max_memory_bytes).await?;
     let build_info = build_info::server_build_info();
     tracing::info!(
@@ -193,6 +215,7 @@ async fn bootstrap_server(
     let upscaler = backend_upscale::Upscaler::start(backend_upscale::UpscaleConfig {
         models_dir,
         device: upscale_device.parse()?,
+        openvino_device: upscale_openvino_device,
         ..Default::default()
     })?;
     let upscale_queue = crate::jobs::UpscaleQueue::open(&db).await?;

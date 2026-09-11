@@ -15,7 +15,13 @@ use backend_persistence::Database;
 use tokio::time::Duration;
 
 const SECRET_PLACEHOLDER: &str = "********";
-const SECRET_KEYS: [&str; 2] = ["auth_oidc_client_secret", "backend_api_key"];
+/// Withheld from responses. Clients echo the placeholder back unchanged, which must
+/// not overwrite the stored secret.
+const MASKED_KEYS: [&str; 1] = ["auth_oidc_client_secret"];
+/// Owned by the server and returned in full so the UI can display and copy them.
+/// Clients never write these; a submitted value is dropped rather than rejected so
+/// that saving an unrelated setting still succeeds.
+const READ_ONLY_KEYS: [&str; 1] = ["backend_api_key"];
 
 const DEFAULT_UPDATE_INTERVAL: Duration = Duration::from_hours(1);
 const SECONDS_PER_HOUR: f64 = 3600.0;
@@ -216,7 +222,7 @@ impl SettingsInterface<'_> {
 #[autometrics]
 pub async fn get(state: &Arc<AppState>) -> Result<SettingsResponse, AppError> {
     let mut settings = state.db.get_all_settings().await?;
-    for key in SECRET_KEYS {
+    for key in MASKED_KEYS {
         if let Some(value) = settings.get_mut(key)
             && !value.is_empty()
         {
@@ -233,8 +239,9 @@ pub async fn update(
 ) -> Result<SettingsUpdateResult, AppError> {
     let settings = settings
         .iter()
+        .filter(|(key, _)| !READ_ONLY_KEYS.contains(&key.as_str()))
         .filter(|(key, value)| {
-            !(SECRET_KEYS.contains(&key.as_str()) && value.as_str() == SECRET_PLACEHOLDER)
+            !(MASKED_KEYS.contains(&key.as_str()) && value.as_str() == SECRET_PLACEHOLDER)
         })
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect();

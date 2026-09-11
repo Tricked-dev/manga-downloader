@@ -297,7 +297,7 @@ async fn public_shares_validate_chapter_ownership_and_media_spec_and_can_be_revo
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn settings_mask_secrets_and_preserve_unchanged_masked_values() {
+async fn settings_mask_oidc_secret_and_keep_the_readable_api_key_server_owned() {
     let state = state("auth-settings").await;
     state
         .db
@@ -309,9 +309,14 @@ async fn settings_mask_secrets_and_preserve_unchanged_masked_values() {
         .set_setting("backend_api_key", "private-key")
         .await
         .unwrap();
-    let settings = crate::app::settings::get(&state).await.unwrap();
+    let mut settings = crate::app::settings::get(&state).await.unwrap();
     assert_eq!(settings.settings["auth_oidc_client_secret"], "********");
-    assert_eq!(settings.settings["backend_api_key"], "********");
+    // Reader clients copy the bearer key out of the settings UI, so it is returned whole.
+    assert_eq!(settings.settings["backend_api_key"], "private-key");
+
+    settings
+        .settings
+        .insert("backend_api_key".into(), "client-chosen".into());
     crate::app::settings::update(&state, &settings.settings)
         .await
         .unwrap();
@@ -323,6 +328,10 @@ async fn settings_mask_secrets_and_preserve_unchanged_masked_values() {
             .unwrap()
             .as_deref(),
         Some("private-value")
+    );
+    assert_eq!(
+        state.db.get_setting("backend_api_key").await.unwrap().as_deref(),
+        Some("private-key")
     );
 }
 

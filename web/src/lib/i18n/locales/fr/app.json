@@ -509,9 +509,12 @@
   },
   "settings": {
     "apiKey": "Clé API",
-    "apiKeyHint": "Stocké en tant que paramètre d'application et appliqué au démarrage du backend. Redémarrez le backend après l'enregistrement pour exiger ce jeton.",
-    "apiKeyPlaceholder": "Saisissez la clé API",
-    "apiRestartNotice": "La clé API est modifiée dès l’enregistrement. Mettez-la à jour dans vos applications de lecture.",
+    "apiKeyCopied": "Copiée",
+    "apiKeyCopy": "Copier",
+    "apiKeyCopyFailed": "Impossible de copier la clé API. Affichez-la et copiez-la manuellement.",
+    "apiKeyHide": "Masquer la clé API",
+    "apiKeyHint": "Générée par le serveur et enregistrée dans la base de données. Copiez-la dans Aidoku, Mihon ou tout autre client API ; elle n’est pas modifiable ici.",
+    "apiKeyReveal": "Afficher la clé API",
     "auth": {
       "address": "Répondez aux réclamations lorsqu’elles sont prises en charge.",
       "clientId": "ID client OIDC",

@@ -65,6 +65,9 @@ impl UpscaleDevice {
 pub struct UpscaleConfig {
     pub models_dir: PathBuf,
     pub device: UpscaleDevice,
+    /// OpenVINO's `device_type`. `GPU` keeps a missing accelerator an error rather
+    /// than a silent CPU run; `CPU` selects OpenVINO's own CPU plugin deliberately.
+    pub openvino_device: String,
     pub tile_size: u32,
     pub overlap: u32,
     /// Optional ONNX execution profiles for a diagnostic run.
@@ -75,6 +78,7 @@ impl Default for UpscaleConfig {
         Self {
             models_dir: "./data/models".into(),
             device: UpscaleDevice::default(),
+            openvino_device: "GPU".into(),
             tile_size: 256,
             overlap: 32,
             profile_dir: None,
@@ -285,7 +289,7 @@ impl ModelCache {
                 "requested provider {device} is unavailable; CPU fallback is disabled"
             );
             let options = DeviceOptions {
-                openvino_device_type: Some("GPU".into()),
+                openvino_device_type: Some(self.config.openvino_device.clone()),
             };
             let profile = if let Some(directory) = &self.config.profile_dir {
                 std::fs::create_dir_all(directory)?;

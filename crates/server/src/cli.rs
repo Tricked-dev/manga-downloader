@@ -56,6 +56,10 @@ struct ServerOptions {
     #[arg(long, value_parser = ["cpu", "migraphx", "cuda", "openvino", "coreml"])]
     upscale_device: Option<String>,
 
+    /// OpenVINO device_type, e.g. CPU, GPU, GPU.0, NPU or HETERO:NPU,GPU.
+    #[arg(long)]
+    upscale_openvino_device: Option<String>,
+
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
     addr: Option<String>,
@@ -164,6 +168,7 @@ struct ConfigReport {
     database_backend: backend_persistence::DatabaseBackend,
     models_dir: PathBuf,
     upscale_device: String,
+    upscale_openvino_device: String,
     server_addr: String,
     backend_api_key: SecretStatus,
 }
@@ -307,6 +312,10 @@ fn print_config_report(report: &ConfigReport) {
         report.upscale_device
     );
     println!(
+        "upscale_openvino_device: {} (used only when upscale_device is openvino)",
+        report.upscale_openvino_device
+    );
+    println!(
         "backend_api_key: {}",
         match report.backend_api_key {
             SecretStatus::Set => "set",
@@ -327,6 +336,9 @@ impl ServerOptions {
             database_url: overrides.database_url.or(self.database_url),
             models_dir: overrides.models_dir.or(self.models_dir),
             upscale_device: overrides.upscale_device.or(self.upscale_device),
+            upscale_openvino_device: overrides
+                .upscale_openvino_device
+                .or(self.upscale_openvino_device),
             addr: overrides.addr.or(self.addr),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
@@ -341,6 +353,7 @@ impl From<ServerOptions> for ServerConfigOverrides {
             database_url: options.database_url,
             models_dir: options.models_dir,
             upscale_device: options.upscale_device,
+            upscale_openvino_device: options.upscale_openvino_device,
             server_addr: options.addr,
             backend_api_key: options.backend_api_key,
         }
@@ -356,6 +369,7 @@ impl ConfigReport {
             database_backend: backend_persistence::DatabaseBackend::from_url(&config.database_url),
             models_dir: config.models_dir.clone(),
             upscale_device: config.upscale_device.clone(),
+            upscale_openvino_device: config.upscale_openvino_device.clone(),
             server_addr: config.server_addr.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set

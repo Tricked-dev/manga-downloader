@@ -509,9 +509,12 @@
   },
   "settings": {
     "apiKey": "API-Schlüssel",
-    "apiKeyHint": "Wird als Anwendungseinstellung gespeichert und beim Start des Backends angewendet. Starten Sie das Backend nach dem Speichern neu, um dieses Token anzufordern.",
-    "apiKeyPlaceholder": "Geben Sie den API-Schlüssel ein",
-    "apiRestartNotice": "Änderungen am API-Schlüssel gelten nach dem Speichern. Aktualisieren Sie den Schlüssel in Ihren Lese-Apps.",
+    "apiKeyCopied": "Kopiert",
+    "apiKeyCopy": "Kopieren",
+    "apiKeyCopyFailed": "Der API-Schlüssel konnte nicht kopiert werden. Blenden Sie ihn ein und kopieren Sie ihn manuell.",
+    "apiKeyHide": "API-Schlüssel verbergen",
+    "apiKeyHint": "Wird vom Server erzeugt und in der Datenbank gespeichert. Kopieren Sie ihn in Aidoku, Mihon oder einen anderen API-Client; hier ist er nicht bearbeitbar.",
+    "apiKeyReveal": "API-Schlüssel anzeigen",
     "auth": {
       "address": "Gehen Sie auf Ansprüche ein, wenn diese unterstützt werden.",
       "clientId": "OIDC-Client-ID",
