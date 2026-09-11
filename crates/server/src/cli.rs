@@ -72,6 +72,10 @@ struct ServerOptions {
     #[arg(long)]
     upscale_openvino_precision: Option<String>,
 
+    /// Keep the model's dynamic input shape. The OpenVINO GPU plugin requires this off.
+    #[arg(long)]
+    upscale_openvino_dynamic_shapes: Option<bool>,
+
     /// HTTP bind address.
     #[arg(long, alias = "server-addr")]
     addr: Option<String>,
@@ -184,6 +188,7 @@ struct ConfigReport {
     upscale_cpu_threads: usize,
     upscale_openvino_threads: usize,
     upscale_openvino_precision: String,
+    upscale_openvino_dynamic_shapes: bool,
     server_addr: String,
     backend_api_key: SecretStatus,
 }
@@ -343,6 +348,10 @@ fn print_config_report(report: &ConfigReport) {
         report.upscale_openvino_precision
     );
     println!(
+        "upscale_openvino_dynamic_shapes: {} (the GPU plugin requires false)",
+        report.upscale_openvino_dynamic_shapes
+    );
+    println!(
         "backend_api_key: {}",
         match report.backend_api_key {
             SecretStatus::Set => "set",
@@ -373,6 +382,9 @@ impl ServerOptions {
             upscale_openvino_precision: overrides
                 .upscale_openvino_precision
                 .or(self.upscale_openvino_precision),
+            upscale_openvino_dynamic_shapes: overrides
+                .upscale_openvino_dynamic_shapes
+                .or(self.upscale_openvino_dynamic_shapes),
             addr: overrides.addr.or(self.addr),
             backend_api_key: overrides.backend_api_key.or(self.backend_api_key),
         }
@@ -391,6 +403,7 @@ impl From<ServerOptions> for ServerConfigOverrides {
             upscale_cpu_threads: options.upscale_cpu_threads,
             upscale_openvino_threads: options.upscale_openvino_threads,
             upscale_openvino_precision: options.upscale_openvino_precision,
+            upscale_openvino_dynamic_shapes: options.upscale_openvino_dynamic_shapes,
             server_addr: options.addr,
             backend_api_key: options.backend_api_key,
         }
@@ -410,6 +423,7 @@ impl ConfigReport {
             upscale_cpu_threads: config.upscale_cpu_threads,
             upscale_openvino_threads: config.upscale_openvino_threads,
             upscale_openvino_precision: config.upscale_openvino_precision.clone(),
+            upscale_openvino_dynamic_shapes: config.upscale_openvino_dynamic_shapes,
             server_addr: config.server_addr.clone(),
             backend_api_key: if config.backend_api_key.is_some() {
                 SecretStatus::Set

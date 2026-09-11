@@ -51,6 +51,10 @@ pub struct DeviceOptions {
     /// downcast on hardware that supports it, which trades output fidelity for
     /// speed without saying so.
     pub openvino_precision: Option<String>,
+    /// Whether OpenVINO may keep the model's dynamic input shape. The GPU plugin
+    /// cannot build a kernel for an unbounded dynamic dimension and fails outright,
+    /// so it needs this off; tiles are a fixed size, so one static shape covers them.
+    pub openvino_dynamic_shapes: Option<bool>,
 }
 
 /// Which hardware backend to run on.
@@ -179,6 +183,9 @@ impl Device {
                 }
                 if let Some(precision) = &options.openvino_precision {
                     provider = provider.with_precision(precision);
+                }
+                if let Some(dynamic_shapes) = options.openvino_dynamic_shapes {
+                    provider = provider.with_dynamic_shapes(dynamic_shapes);
                 }
                 provider.register(builder)?
             }

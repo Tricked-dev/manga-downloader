@@ -27,6 +27,9 @@ pub struct ServerConfig {
     #[setting(default = "FP32", env = "UPSCALE_OPENVINO_PRECISION", parse_env = schematic::env::ignore_empty)]
     pub upscale_openvino_precision: String,
 
+    #[setting(default = true, env = "UPSCALE_OPENVINO_DYNAMIC_SHAPES", parse_env = schematic::env::parse_bool)]
+    pub upscale_openvino_dynamic_shapes: bool,
+
     #[setting(default = "0.0.0.0:4000", env = "SERVER_ADDR", parse_env = schematic::env::ignore_empty)]
     pub server_addr: String,
 
@@ -51,6 +54,7 @@ pub struct ServerConfigOverrides {
     pub upscale_cpu_threads: Option<usize>,
     pub upscale_openvino_threads: Option<usize>,
     pub upscale_openvino_precision: Option<String>,
+    pub upscale_openvino_dynamic_shapes: Option<bool>,
     pub server_addr: Option<String>,
     pub backend_api_key: Option<String>,
 }
@@ -92,6 +96,9 @@ impl ServerConfig {
         }
         if let Some(upscale_openvino_precision) = overrides.upscale_openvino_precision {
             self.upscale_openvino_precision = upscale_openvino_precision;
+        }
+        if let Some(upscale_openvino_dynamic_shapes) = overrides.upscale_openvino_dynamic_shapes {
+            self.upscale_openvino_dynamic_shapes = upscale_openvino_dynamic_shapes;
         }
         if let Some(database_url) = overrides.database_url {
             self.database_url = database_url;

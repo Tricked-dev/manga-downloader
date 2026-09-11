@@ -142,6 +142,7 @@ async fn bootstrap_server(
         upscale_cpu_threads,
         upscale_openvino_threads,
         upscale_openvino_precision,
+        upscale_openvino_dynamic_shapes,
         server_addr,
         backend_api_key,
     } = config;
@@ -204,6 +205,7 @@ async fn bootstrap_server(
         openvino_device: upscale_openvino_device,
         openvino_threads: upscale_openvino_threads,
         openvino_precision: upscale_openvino_precision,
+        openvino_dynamic_shapes: upscale_openvino_dynamic_shapes,
         cpu_threads: upscale_cpu_threads,
         ..Default::default()
     })?;

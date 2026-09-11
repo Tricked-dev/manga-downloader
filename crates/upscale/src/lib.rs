@@ -74,6 +74,10 @@ pub struct UpscaleConfig {
     /// OpenVINO inference precision. `FP32` keeps output identical to the CPU
     /// provider rather than letting the plugin downcast for speed.
     pub openvino_precision: String,
+    /// Whether to leave the model's input shape dynamic. The GPU plugin refuses an
+    /// unbounded dynamic dimension, and every tile is the same size, so turning this
+    /// off costs nothing and is required there.
+    pub openvino_dynamic_shapes: bool,
     /// Intra-op threads for the ONNX Runtime CPU provider, which is otherwise the
     /// binding constraint on that path regardless of the cgroup CPU quota. Accelerator
     /// providers manage their own pools and ignore this.
@@ -91,6 +95,7 @@ impl Default for UpscaleConfig {
             openvino_device: "GPU".into(),
             openvino_threads: 0,
             openvino_precision: "FP32".into(),
+            openvino_dynamic_shapes: true,
             cpu_threads: 2,
             tile_size: 256,
             overlap: 32,
@@ -306,6 +311,7 @@ impl ModelCache {
                 openvino_num_threads: (self.config.openvino_threads > 0)
                     .then_some(self.config.openvino_threads),
                 openvino_precision: Some(self.config.openvino_precision.clone()),
+                openvino_dynamic_shapes: Some(self.config.openvino_dynamic_shapes),
             };
             let profile = if let Some(directory) = &self.config.profile_dir {
                 std::fs::create_dir_all(directory)?;
