@@ -18,6 +18,7 @@
   import EmptyState from "$components/common/EmptyState.svelte";
   import DownloadsSummary from "$components/features/downloads/DownloadsSummary.svelte";
   import DownloadsTable from "$components/features/downloads/DownloadsTable.svelte";
+  import UpscaleQueuePanel from "$components/features/downloads/UpscaleQueuePanel.svelte";
   import { t } from "$lib/i18n";
   import { selectItems } from "$lib/query-selectors";
   import { QUERY_CACHE_TIMES, visibleRefetchInterval } from "$lib/query-client";
@@ -108,6 +109,8 @@
       </div>
     {/snippet}
   </PageHeader>
+
+  <UpscaleQueuePanel />
 
   {#if loading}
     <Card class="gap-0">

@@ -11,6 +11,7 @@
   import StatsLoadingSkeleton from "$components/features/stats/StatsLoadingSkeleton.svelte";
   import StatsRecentReadsCard from "$components/features/stats/StatsRecentReadsCard.svelte";
   import StatsSourcesCard from "$components/features/stats/StatsSourcesCard.svelte";
+  import StatsSeriesStorageCard from "$components/features/stats/StatsSeriesStorageCard.svelte";
   import StatsStorageCard from "$components/features/stats/StatsStorageCard.svelte";
   import StatsSummaryCards from "$components/features/stats/StatsSummaryCards.svelte";
   import type { ActivityDatum } from "$lib/features/stats/types";
@@ -186,6 +187,12 @@
           {formatBytes}
           {formatPercent}
           storage={stats.storage}
+        />
+        <StatsSeriesStorageCard
+          {formatBytes}
+          {formatNumber}
+          recordedBytes={stats.recorded_bytes}
+          series={stats.series_storage}
         />
         <StatsSourcesCard
           formatNumber={formatNumber}

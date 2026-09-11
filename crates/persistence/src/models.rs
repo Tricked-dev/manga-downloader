@@ -97,6 +97,9 @@ pub struct StatsOverview {
     pub totals: StatsTotals,
     pub cache: StatsCacheSummary,
     pub storage: StatsStorageSummary,
+    /// Largest series first, so the view can show what is worth deleting without sorting.
+    pub series_storage: Vec<StatsSeriesStorage>,
+    pub recorded_bytes: u64,
     pub activity: Vec<StatsActivityPoint>,
     pub source_breakdown: Vec<StatsSourceBreakdown>,
     pub recent_reads: Vec<StatsRecentChapter>,
@@ -116,6 +119,19 @@ pub struct StatsStorageSummary {
     pub used_bytes: u64,
     pub limit_bytes: Option<u64>,
     pub usage_rate: f64,
+}
+
+/// What one series costs on disk. The bytes come from the size each completed download
+/// recorded, so they add up to `recorded_bytes` rather than to a directory walk: a file
+/// removed behind the server's back still counts here until its download is deleted.
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+pub struct StatsSeriesStorage {
+    pub series_id: String,
+    pub title: String,
+    pub source: String,
+    pub bytes: u64,
+    pub chapters: usize,
+    pub upscaled_chapters: usize,
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

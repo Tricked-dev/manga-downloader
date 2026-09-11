@@ -19,7 +19,7 @@
   let rotating = $state(false);
   let errorMessage = $state("");
 
-  let confirmTimer: ReturnType<typeof window.setTimeout> | undefined;
+  let confirmTimer: number | undefined;
 
   async function copyApiKey() {
     errorMessage = "";

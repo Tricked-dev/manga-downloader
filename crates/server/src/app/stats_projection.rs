@@ -101,7 +101,8 @@ fn storage_usage_rate(used_bytes: u64, limit_bytes: Option<u64>) -> f64 {
 mod tests {
     use super::*;
     use backend_persistence::{
-        StatsActivityPoint, StatsRecentChapter, StatsSourceBreakdown, StatsTotals,
+        StatsActivityPoint, StatsRecentChapter, StatsSeriesStorage, StatsSourceBreakdown,
+        StatsTotals,
     };
 
     #[test]
@@ -121,6 +122,15 @@ mod tests {
             },
             cache: StatsCacheSummary::default(),
             storage: StatsStorageSummary::default(),
+            series_storage: vec![StatsSeriesStorage {
+                series_id: "series-1".into(),
+                title: "Series One".into(),
+                source: "comix".into(),
+                bytes: 2048,
+                chapters: 2,
+                upscaled_chapters: 1,
+            }],
+            recorded_bytes: 2048,
             activity: vec![StatsActivityPoint {
                 day: 42,
                 chapters_read: 1,
@@ -167,6 +177,8 @@ mod tests {
 
         assert_eq!(assembled.cache.hits, 8);
         assert_eq!(assembled.storage.used_bytes, 50);
+        assert_eq!(assembled.recorded_bytes, 2048);
+        assert_eq!(assembled.series_storage.len(), 1);
         assert_eq!(assembled.totals.pages_read, 10);
         assert_eq!(assembled.activity.len(), 1);
         assert_eq!(assembled.source_breakdown.len(), 1);

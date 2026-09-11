@@ -49,3 +49,7 @@ vite.config.ts.timestamp-*
 web/build/
 web/packages/api-client/openapi.json
 web/packages/api-client/src/generated/
+
+# Browser-test artifacts
+web/.vitest-attachments/
+**/__screenshots__/

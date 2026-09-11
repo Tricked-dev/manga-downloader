@@ -14,7 +14,7 @@ mod models;
 mod schema;
 mod settings;
 mod upscale_progress;
-pub use upscale_progress::UpscaleProgressRow;
+pub use upscale_progress::{UpscaleProgressRow, UpscaleQueueEntryRow};
 mod setup;
 mod sources;
 mod stats;
@@ -37,7 +37,7 @@ pub use maintenance::DatabaseCleanupResult;
 pub use models::{
     ChapterInsert, ChapterRow, DownloadMetricRow, DownloadRow, MangaInsert, MangaRow,
     SourceCountRow, SourceRecordInput, StatsActivityPoint, StatsCacheSummary, StatsOverview,
-    StatsRecentChapter, StatsSourceBreakdown, StatsStorageSummary, StatsTotals,
+    StatsRecentChapter, StatsSeriesStorage, StatsSourceBreakdown, StatsStorageSummary, StatsTotals,
 };
 pub use setup::{
     DatabaseMigration, SqliteDatabaseOptions, apply_sqlite_migrations, configure_sqlite_connection,

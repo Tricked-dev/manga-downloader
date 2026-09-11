@@ -15,7 +15,7 @@ use crate::{
     api::{
         dto::{
             ApiTokenListResponse, ApiTokenSummary, BackendApiKeyResponse, CreatedApiTokenResponse,
-            ErrorEnvelopeResponse, OperationStatusResponse, SettingsResponse,
+            ErrorEnvelopeResponse, OperationStatusResponse, SettingsResponse, UpscaleQueueResponse,
         },
         error::AppError,
         response_cache,
@@ -27,6 +27,7 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(get_settings, update_settings))
         .routes(routes!(regenerate_backend_api_key))
+        .routes(routes!(upscale_queue))
         .routes(routes!(pause_upscaling))
         .routes(routes!(resume_upscaling))
         .routes(routes!(list_api_tokens, create_api_token))
@@ -127,6 +128,21 @@ async fn delete_api_token(
     }
     tracing::info!(token_id = %id, "API Token Deleted");
     Ok(Json(OperationStatusResponse::ok()))
+}
+
+/// The queue view's single source: what is still owed, whether it is paused, and how long
+/// a restart waits before resuming itself.
+#[utoipa::path(
+    get,
+    path = "/v1/upscale/queue",
+    tag = "settings",
+    responses(
+        (status = OK, body = UpscaleQueueResponse),
+        (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
+    )
+)]
+async fn upscale_queue(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
+    Ok(Json(settings::upscale_queue(&state.db).await?))
 }
 
 /// Paused work keeps its place in the queue rather than failing. A restart comes back

@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::models::{
     ChapterRow, StatsActivityPoint, StatsCacheSummary, StatsOverview, StatsRecentChapter,
-    StatsSourceBreakdown, StatsStorageSummary, StatsTotals,
+    StatsSeriesStorage, StatsSourceBreakdown, StatsStorageSummary, StatsTotals,
 };
 use crate::schema::{Chapter, Download, LibrarySeries, Source, StatsEvent};
 use crate::{Database, decode_chapter_number, now_timestamp};
@@ -134,10 +134,19 @@ impl Database {
 
         let mut completed_chapter_ids = HashSet::new();
         let mut pages_downloaded = 0usize;
+        let mut series_storage = HashMap::<&str, SeriesStorageAccumulator>::new();
         for download in &completed_downloads {
             completed_chapter_ids.insert(download.chapter_id.as_str());
             let downloaded_pages = usize::try_from(download.page_count).unwrap_or_default();
             pages_downloaded += downloaded_pages;
+
+            let storage = series_storage
+                .entry(download.series_id.as_str())
+                .or_default();
+            storage.bytes +=
+                u64::try_from(download.file_size_bytes.unwrap_or_default()).unwrap_or_default();
+            storage.chapters += 1;
+            storage.upscaled_chapters += usize::from(download.upscaled_at.is_some());
 
             if let Some(series) = series_by_id.get(download.series_id.as_str()) {
                 let stats = source_breakdown
@@ -147,6 +156,28 @@ impl Database {
                 stats.chapters_downloaded += 1;
             }
         }
+
+        let mut series_storage = series_storage
+            .into_iter()
+            .filter_map(|(series_id, storage)| {
+                let series = series_by_id.get(series_id)?;
+                Some(StatsSeriesStorage {
+                    series_id: series_id.to_owned(),
+                    title: series.title.clone(),
+                    source: series.source_key.clone(),
+                    bytes: storage.bytes,
+                    chapters: storage.chapters,
+                    upscaled_chapters: storage.upscaled_chapters,
+                })
+            })
+            .collect::<Vec<_>>();
+        series_storage.sort_by(|left, right| {
+            right
+                .bytes
+                .cmp(&left.bytes)
+                .then_with(|| left.title.cmp(&right.title))
+        });
+        let recorded_bytes = series_storage.iter().map(|series| series.bytes).sum();
 
         let activity = build_activity(today, start_day, &events, &chapters, &completed_downloads);
         let source_breakdown = source_breakdown
@@ -178,6 +209,8 @@ impl Database {
             },
             cache: StatsCacheSummary::default(),
             storage: StatsStorageSummary::default(),
+            series_storage,
+            recorded_bytes,
             activity,
             source_breakdown,
             recent_reads: recent_reads(chapters, &series_by_id),
@@ -206,6 +239,13 @@ async fn insert_stats_event(
         .exec(db)
         .await?;
     Ok(())
+}
+
+#[derive(Default)]
+struct SeriesStorageAccumulator {
+    bytes: u64,
+    chapters: usize,
+    upscaled_chapters: usize,
 }
 
 #[derive(Default)]

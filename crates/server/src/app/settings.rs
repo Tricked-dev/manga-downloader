@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     AppState,
     api::{
-        dto::{OperationStatusResponse, SettingsResponse},
+        dto::{OperationStatusResponse, SettingsResponse, UpscaleQueueEntry, UpscaleQueueResponse},
         error::AppError,
     },
 };
@@ -307,6 +307,39 @@ fn upscale_auto_resume_delay_from_minutes(value: Option<&str>) -> Option<Duratio
 
 pub(crate) async fn upscale_auto_resume_delay(db: &Database) -> Result<Option<Duration>> {
     interface(db).upscale_auto_resume_delay().await
+}
+
+/// Work the queue still owes. A finished or skipped chapter keeps its progress row for
+/// the series view, but listing it here would make the queue look permanently backed up.
+const ACTIVE_UPSCALE_STATUSES: [&str; 4] = ["queued", "running", "paused", "failed"];
+
+pub(crate) async fn upscale_queue(db: &Database) -> Result<UpscaleQueueResponse> {
+    let items = db
+        .list_upscale_queue()
+        .await?
+        .into_iter()
+        .filter(|row| ACTIVE_UPSCALE_STATUSES.contains(&row.status.as_str()))
+        .map(|row| UpscaleQueueEntry {
+            download_id: row.download_id,
+            manga_id: row.manga_id,
+            manga_title: row.manga_title,
+            chapter_number: row.chapter_number,
+            chapter_title: row.chapter_title,
+            status: row.status,
+            completed_pages: row.completed_pages,
+            total_pages: row.total_pages,
+            message: row.message,
+            updated_at: row.updated_at,
+        })
+        .collect();
+
+    Ok(UpscaleQueueResponse {
+        paused: upscale_paused(db).await,
+        auto_resume_minutes: upscale_auto_resume_delay(db)
+            .await?
+            .map_or(0, |delay| delay.as_secs() / 60),
+        items,
+    })
 }
 
 /// A restart comes back paused, so a deploy never resumes a backlog while the rest of the

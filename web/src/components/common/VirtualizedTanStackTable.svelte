@@ -75,6 +75,11 @@
   }>();
 
   let tableScrollElement: HTMLDivElement | undefined;
+  // Rows off screen are never measured, so they keep whatever estimate is in force. Feeding
+  // the measured height back replaces the caller's guess for them too, which is what keeps
+  // the scroll area from running past the last row before anyone has scrolled that far.
+  let measuredRowSize = $state(0);
+  const effectiveEstimateSize = $derived(measuredRowSize > 0 ? measuredRowSize : estimateSize);
   const mobileQuery = new MediaQuery("(max-width: 767px)");
 
   const rowVirtualizer = createVirtualizer<HTMLDivElement, HTMLTableRowElement>({
@@ -96,15 +101,56 @@
   $effect(() => {
     const count = rows.length;
     const scrollElement = tableScrollElement ?? null;
+    const rowSize = effectiveEstimateSize;
 
     untrack(() => {
       $rowVirtualizer.setOptions({
         count,
-        estimateSize: () => estimateSize,
+        estimateSize: () => rowSize,
         getScrollElement: () => scrollElement,
         overscan,
       });
     });
+  });
+
+  // `estimateSize` is only a first guess, and a row that renders shorter than it leaves the
+  // scroll area longer than the rows it holds: the scrollbar runs past the last chapter into
+  // empty space, and the gap grows with every extra row. Measuring the rows that are on
+  // screen replaces the guess with their real height.
+  $effect(() => {
+    const items = virtualRows;
+    const scrollElement = tableScrollElement;
+    if (!scrollElement) {
+      return;
+    }
+
+    const rowElements = scrollElement.querySelectorAll<HTMLTableRowElement>(
+      "tbody > tr:not([data-virtual-padding])",
+    );
+    let total = 0;
+    let measured = 0;
+    items.forEach((item, position) => {
+      const element = rowElements[position];
+      if (!element) {
+        return;
+      }
+      element.dataset.index = String(item.index);
+      $rowVirtualizer.measureElement(element);
+      const height = element.getBoundingClientRect().height;
+      if (height > 0) {
+        total += height;
+        measured += 1;
+      }
+    });
+
+    if (measured === 0) {
+      return;
+    }
+    const average = Math.round(total / measured);
+    // Only a real difference is worth another pass; rounding noise would loop forever.
+    if (Math.abs(average - effectiveEstimateSize) > 1) {
+      measuredRowSize = average;
+    }
   });
 
 </script>
@@ -160,7 +206,7 @@
     </TableHeader>
     <TableBody>
       {#if virtualPaddingTop > 0}
-        <TableRow class="hover:bg-transparent">
+        <TableRow data-virtual-padding="top" class="hover:bg-transparent">
           <td colspan={resolvedColumnCount} class="h-[var(--virtual-padding)] p-0" style:--virtual-padding={`${virtualPaddingTop}px`}></td>
         </TableRow>
       {/if}
@@ -183,7 +229,7 @@
         {/if}
       {/each}
       {#if virtualPaddingBottom > 0}
-        <TableRow class="hover:bg-transparent">
+        <TableRow data-virtual-padding="bottom" class="hover:bg-transparent">
           <td colspan={resolvedColumnCount} class="h-[var(--virtual-padding)] p-0" style:--virtual-padding={`${virtualPaddingBottom}px`}></td>
         </TableRow>
       {/if}

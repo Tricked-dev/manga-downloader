@@ -159,11 +159,43 @@ async fn enqueue_upscale_job(
     Ok(storage.last_enqueued_id.unwrap_or_default())
 }
 
+/// A worker registers under one fixed name, so the backend's own orphan sweep never frees
+/// what a previous process left locked: it compares against the worker row the live process
+/// keeps refreshing. One worker runs per process, so a task still marked running at startup
+/// belongs to a process that is gone, and its attempt count should not pay for the restart.
+async fn reclaim_orphaned_upscale_jobs(pool: &PgPool) -> anyhow::Result<u64> {
+    let reclaimed = sqlx::query(
+        "UPDATE apalis.jobs SET status = 'Pending', lock_by = NULL, lock_at = NULL, done_at = NULL \
+         WHERE job_type = $1 AND lock_by IS NOT NULL AND status IN ('Running', 'Queued')",
+    )
+    .bind(UPSCALE_QUEUE)
+    .execute(pool)
+    .await
+    .map_err(|error| anyhow::anyhow!("failed to reclaim orphaned upscale tasks: {error}"))?
+    .rows_affected();
+
+    Ok(reclaimed)
+}
+
 pub(crate) async fn run_upscale_worker(
     state: Arc<AppState>,
     shutdown: ShutdownGuard,
 ) -> anyhow::Result<()> {
     if let UpscaleQueue::Postgres(pool) = &state.upscale_queue {
+        let interrupted = state.db.fail_interrupted_upscale_progress().await?;
+        if interrupted > 0 {
+            tracing::warn!(interrupted, "Interrupted Upscale Progress Marked Failed");
+        }
+
+        let reclaimed = reclaim_orphaned_upscale_jobs(pool).await?;
+        if reclaimed > 0 {
+            tracing::warn!(
+                reclaimed,
+                queue = UPSCALE_QUEUE,
+                "Interrupted Background Jobs Recovered On Startup",
+            );
+        }
+
         let storage = PostgresStorage::<UpscaleJob>::new_with_notify(pool, &postgres_config());
         let worker =
             WorkerBuilder::new(UPSCALE_WORKER)
@@ -187,6 +219,11 @@ pub(crate) async fn run_upscale_worker(
             .map_err(|error| anyhow::anyhow!("upscale worker failed: {error}"))?;
         return Ok(());
     }
+    let interrupted = state.db.fail_interrupted_upscale_progress().await?;
+    if interrupted > 0 {
+        tracing::warn!(interrupted, "Interrupted Upscale Progress Marked Failed");
+    }
+
     let recovered = state
         .db
         .recover_interrupted_background_jobs(UPSCALE_QUEUE)

@@ -157,6 +157,30 @@ pub struct ApiTokenListResponse {
     pub items: Vec<ApiTokenSummary>,
 }
 
+/// One chapter's upscale work as the queue view shows it.
+#[derive(Serialize, ToSchema)]
+pub struct UpscaleQueueEntry {
+    pub download_id: String,
+    pub manga_id: String,
+    pub manga_title: String,
+    pub chapter_number: f64,
+    pub chapter_title: String,
+    pub status: String,
+    pub completed_pages: i64,
+    pub total_pages: i64,
+    pub message: String,
+    pub updated_at: String,
+}
+
+/// Queue state and the work still in it. Completed and skipped chapters are left out:
+/// the downloads table already lists them, and a queue that never shrinks reads as stuck.
+#[derive(Serialize, ToSchema)]
+pub struct UpscaleQueueResponse {
+    pub paused: bool,
+    pub auto_resume_minutes: u64,
+    pub items: Vec<UpscaleQueueEntry>,
+}
+
 /// The only time the token itself is returned. It is stored hashed, so a lost value
 /// cannot be recovered and has to be replaced.
 #[derive(Serialize, ToSchema)]
