@@ -12,6 +12,7 @@
     "delete": "Eliminar",
     "deleteSelected": "Eliminar seleccionados",
     "deleting": "Eliminando...",
+    "retry": "Reintentar",
     "reset": "Restablecer",
     "selectDownloads": "Selecciona descargas",
     "signInWithSso": "Iniciar sesión con SSO",

@@ -159,22 +159,37 @@ async fn enqueue_upscale_job(
     Ok(storage.last_enqueued_id.unwrap_or_default())
 }
 
+/// The message a chapter job carries when the drain cut it short rather than the work
+/// itself going wrong. Matching on it is what separates "the server went down" from a
+/// chapter that genuinely cannot be upscaled.
+const SHUTDOWN_INTERRUPTION: &str = "shutdown interrupted chapter upscaling";
+
 /// A worker registers under one fixed name, so the backend's own orphan sweep never frees
 /// what a previous process left locked: it compares against the worker row the live process
 /// keeps refreshing. One worker runs per process, so a task still marked running at startup
 /// belongs to a process that is gone, and its attempt count should not pay for the restart.
-async fn reclaim_orphaned_upscale_jobs(pool: &PgPool) -> anyhow::Result<u64> {
-    let reclaimed = sqlx::query(
-        "UPDATE apalis.jobs SET status = 'Pending', lock_by = NULL, lock_at = NULL, done_at = NULL \
-         WHERE job_type = $1 AND lock_by IS NOT NULL AND status IN ('Running', 'Queued')",
+///
+/// A graceful drain is the same story told differently: the task returns an error, so the
+/// backend spends one of its three attempts, and three deploys during one chapter retire it
+/// for good. Refunding that attempt is what keeps a deploy from deleting queued work.
+/// Returns the downloads whose chapters are queued again.
+async fn requeue_upscale_jobs_a_restart_stopped(pool: &PgPool) -> anyhow::Result<Vec<String>> {
+    let rows: Vec<(Option<String>,)> = sqlx::query_as(
+        "UPDATE apalis.jobs SET status = 'Pending', lock_by = NULL, lock_at = NULL, \
+         done_at = NULL, attempts = GREATEST(attempts - CASE WHEN status = 'Running' THEN 0 ELSE 1 END, 0) \
+         WHERE job_type = $1 AND ( \
+             (lock_by IS NOT NULL AND status IN ('Running', 'Queued')) \
+             OR (status IN ('Killed', 'Failed') AND last_result::text LIKE $2) \
+         ) \
+         RETURNING convert_from(job, 'UTF8')::jsonb ->> 'download_id'",
     )
     .bind(UPSCALE_QUEUE)
-    .execute(pool)
+    .bind(format!("%{SHUTDOWN_INTERRUPTION}%"))
+    .fetch_all(pool)
     .await
-    .map_err(|error| anyhow::anyhow!("failed to reclaim orphaned upscale tasks: {error}"))?
-    .rows_affected();
+    .map_err(|error| anyhow::anyhow!("failed to requeue interrupted upscale tasks: {error}"))?;
 
-    Ok(reclaimed)
+    Ok(rows.into_iter().filter_map(|(id,)| id).collect())
 }
 
 pub(crate) async fn run_upscale_worker(
@@ -182,18 +197,20 @@ pub(crate) async fn run_upscale_worker(
     shutdown: ShutdownGuard,
 ) -> anyhow::Result<()> {
     if let UpscaleQueue::Postgres(pool) = &state.upscale_queue {
+        let requeued = requeue_upscale_jobs_a_restart_stopped(pool).await?;
+        if !requeued.is_empty() {
+            tracing::warn!(
+                requeued = requeued.len(),
+                queue = UPSCALE_QUEUE,
+                "Interrupted Background Jobs Requeued On Startup",
+            );
+        }
+        state.db.queue_requeued_upscale_progress(&requeued).await?;
+
+        // Whatever still claims to be mid-upscale has no task behind it any more.
         let interrupted = state.db.fail_interrupted_upscale_progress().await?;
         if interrupted > 0 {
             tracing::warn!(interrupted, "Interrupted Upscale Progress Marked Failed");
-        }
-
-        let reclaimed = reclaim_orphaned_upscale_jobs(pool).await?;
-        if reclaimed > 0 {
-            tracing::warn!(
-                reclaimed,
-                queue = UPSCALE_QUEUE,
-                "Interrupted Background Jobs Recovered On Startup",
-            );
         }
 
         let storage = PostgresStorage::<UpscaleJob>::new_with_notify(pool, &postgres_config());

@@ -75,6 +75,34 @@ impl Database {
         )
     }
 
+    /// A chapter whose task is queued again should read as waiting, not as a failure an
+    /// operator has to retry by hand.
+    pub async fn queue_requeued_upscale_progress(&self, download_ids: &[String]) -> Result<()> {
+        if download_ids.is_empty() {
+            return Ok(());
+        }
+
+        let _write = self.write_guard().await;
+        let mut db = self.executor();
+        let sql = match self.backend() {
+            crate::DatabaseBackend::Sqlite => {
+                "UPDATE upscale_progress SET status = 'queued', message = ?1, updated_at = ?2 WHERE download_id = ?3"
+            }
+            crate::DatabaseBackend::Postgres => {
+                "UPDATE upscale_progress SET status = 'queued', message = $1, updated_at = $2 WHERE download_id = $3"
+            }
+        };
+        for download_id in download_ids {
+            toasty::sql::statement(sql)
+                .bind("Requeued after a server restart")
+                .bind(now_timestamp())
+                .bind(download_id.as_str())
+                .exec(&mut db)
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Nothing can be mid-upscale while the server is starting, so a row left claiming it is
     /// a job the previous process took down with it. Saying so lets the queue view offer a
     /// retry instead of showing work that will never move; a job that is re-queued overwrites

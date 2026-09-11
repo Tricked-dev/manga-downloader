@@ -12,6 +12,7 @@
     "delete": "Delete",
     "deleteSelected": "Delete selected",
     "deleting": "Deleting...",
+    "retry": "Retry",
     "reset": "Reset",
     "selectDownloads": "Select downloads",
     "signInWithSso": "Sign in with SSO",
