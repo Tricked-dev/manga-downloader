@@ -42,7 +42,9 @@ pub fn router() -> OpenApiRouter<Arc<AppState>> {
         (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
     )
 )]
-async fn list_api_tokens(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
+async fn list_api_tokens(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
     let items = state
         .db
         .list_api_tokens()
@@ -127,8 +129,9 @@ async fn delete_api_token(
     Ok(Json(OperationStatusResponse::ok()))
 }
 
-/// Paused work keeps its place in the queue rather than failing. A restart always
-/// comes back paused, and enqueuing any new upscale resumes everything.
+/// Paused work keeps its place in the queue rather than failing. A restart comes back
+/// paused, and enqueuing any new upscale resumes everything. Pausing also
+/// cancels a pending startup auto-resume, so the operator's pause is the last word.
 #[utoipa::path(
     post,
     path = "/v1/upscale/pause",
@@ -138,7 +141,10 @@ async fn delete_api_token(
         (status = INTERNAL_SERVER_ERROR, body = ErrorEnvelopeResponse)
     )
 )]
-async fn pause_upscaling(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
+async fn pause_upscaling(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
+    state.upscale_auto_resume_cancel.notify_one();
     settings::set_upscale_paused(&state.db, true).await?;
     tracing::info!("Upscaling Paused");
     Ok(Json(OperationStatusResponse::ok()))

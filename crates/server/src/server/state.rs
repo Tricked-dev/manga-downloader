@@ -41,6 +41,9 @@ pub(crate) struct AppState {
     pub(crate) active_download_cancellations:
         Mutex<HashMap<String, Arc<downloader::DownloadCancellation>>>,
     pub(crate) download_storage_usage: Mutex<DownloadStorageUsage>,
+    /// Signalled when an operator pauses upscaling, so a pending startup auto-resume
+    /// never overrides a pause the operator asked for during its grace period.
+    pub(crate) upscale_auto_resume_cancel: Notify,
     pub(crate) shutdown_drain: ShutdownDrain,
 }
 
@@ -77,6 +80,7 @@ pub(crate) fn build_app_state(parts: AppStateParts) -> Arc<AppState> {
         download_queue_notify: Notify::new(),
         active_download_cancellations: Mutex::new(HashMap::new()),
         download_storage_usage: Mutex::new(DownloadStorageUsage::default()),
+        upscale_auto_resume_cancel: Notify::new(),
         shutdown_drain: ShutdownDrain::default(),
     })
 }

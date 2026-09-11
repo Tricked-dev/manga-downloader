@@ -40,6 +40,13 @@ spinning disabled. One chapter job runs at a time. Accelerators are opt-in and m
 the installed ONNX Runtime; they never silently fall back to CPU. Missing manifests or model files
 produce a terminal skip. Models added later are detected when the chapter is queued again.
 
+A restart parks the queue: the server sets the paused state itself on boot, so a deploy never
+resumes a backlog while the rest of the service is still coming up. `upscale_auto_resume_minutes`
+(`UPSCALE_AUTO_RESUME_MINUTES`) sets a grace period after which the server resumes on its own; `0`,
+the default, keeps it paused until an operator resumes it. Pausing during the grace period cancels
+the pending resume, so an explicit pause is never overridden. Queuing a new upscale still resumes
+everything immediately, whatever the setting.
+
 To measure the same worker independently:
 
 ```sh

@@ -228,8 +228,45 @@ async fn bootstrap_server(
         telemetry,
     });
     super::router::spawn_metrics_refresh_loop(Arc::clone(&state));
+    spawn_upscale_auto_resume(Arc::clone(&state)).await?;
 
     Ok(ServerContext { state, server_addr })
+}
+
+/// A restart parks the backlog so a deploy never wakes up mid-upscale, but a server that
+/// is meant to keep grinding should not need an operator to press resume. The configured
+/// grace period covers the noisy part of a boot; an operator pause during it wins.
+async fn spawn_upscale_auto_resume(state: Arc<AppState>) -> anyhow::Result<()> {
+    let Some(delay) = settings::upscale_auto_resume_delay(&state.db).await? else {
+        return Ok(());
+    };
+
+    tracing::info!(
+        delay_seconds = delay.as_secs(),
+        "Upscale Auto Resume Scheduled",
+    );
+    tokio::spawn(async move {
+        tokio::select! {
+            () = tokio::time::sleep(delay) => {}
+            () = state.upscale_auto_resume_cancel.notified() => {
+                tracing::info!("Upscale Auto Resume Canceled By Pause");
+                return;
+            }
+        }
+
+        match settings::set_upscale_paused(&state.db, false).await {
+            Ok(()) => {
+                crate::app::route_snapshot_invalidation::settings_changed(&state);
+                tracing::info!(
+                    delay_seconds = delay.as_secs(),
+                    "Upscaling Resumed After Startup Grace Period",
+                );
+            }
+            Err(error) => tracing::warn!(error = %error, "Upscale Auto Resume Failed"),
+        }
+    });
+
+    Ok(())
 }
 
 #[cfg(test)]

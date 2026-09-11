@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Loader2, Pause, Play } from "@lucide/svelte";
   import { Button } from "$lib/ui/button";
+  import { Input } from "$lib/ui/input";
   import SettingField from "./SettingField.svelte";
   import SettingsCard from "./SettingsCard.svelte";
   import SettingsNotice from "./SettingsNotice.svelte";
@@ -14,6 +15,20 @@
 
   let busy = $state(false);
   let errorMessage = $state("");
+
+  function normalizeAutoResumeMinutes(value: string): string {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return "0";
+    }
+    return String(Math.min(parsed, 1440));
+  }
+
+  function updateAutoResumeMinutes(event: Event) {
+    settings.upscale_auto_resume_minutes = normalizeAutoResumeMinutes(
+      (event.currentTarget as HTMLInputElement).value,
+    );
+  }
 
   async function setPaused(next: boolean) {
     busy = true;
@@ -63,6 +78,23 @@
         {paused ? $t("app.settings.upscaleQueuePaused") : $t("app.settings.upscaleQueueRunning")}
       </span>
     </div>
+  </SettingField>
+
+  <SettingField
+    id="upscale-auto-resume-minutes"
+    label={$t("app.settings.upscaleQueueAutoResume")}
+    hint={$t("app.settings.upscaleQueueAutoResumeHint")}
+  >
+    <Input
+      id="upscale-auto-resume-minutes"
+      type="number"
+      min="0"
+      step="1"
+      max="1440"
+      value={settings.upscale_auto_resume_minutes ?? "0"}
+      oninput={updateAutoResumeMinutes}
+      class="h-9 max-w-28"
+    />
   </SettingField>
 
   {#if errorMessage}

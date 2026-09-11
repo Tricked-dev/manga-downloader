@@ -19,6 +19,7 @@ pub enum SettingKey {
     CacheMaxMemoryBytes,
     AutoUpscale,
     UpscalePaused,
+    UpscaleAutoResumeMinutes,
 }
 
 impl SettingKey {
@@ -45,6 +46,7 @@ impl SettingKey {
             Self::CacheMaxMemoryBytes => "cache_max_memory_bytes",
             Self::AutoUpscale => "auto_upscale",
             Self::UpscalePaused => "upscale_paused",
+            Self::UpscaleAutoResumeMinutes => "upscale_auto_resume_minutes",
         }
     }
 
@@ -60,6 +62,7 @@ impl SettingKey {
             | Self::AutoDownloadCategory
             | Self::MaxDownloadStorageBytes => "",
             Self::DownloadConcurrentChapters | Self::DownloadPageFetchConcurrency => "2",
+            Self::UpscaleAutoResumeMinutes => "0",
             Self::AuthOidcScopes => "openid profile email",
             Self::AuthOidcProviderId => "oidc",
             Self::UpdateIntervalHours => "1",
@@ -94,6 +97,7 @@ impl SettingKey {
             Self::CacheMaxMemoryBytes => "CACHE_MAX_MEMORY_BYTES",
             Self::AutoUpscale => "AUTO_UPSCALE",
             Self::UpscalePaused => "UPSCALE_PAUSED",
+            Self::UpscaleAutoResumeMinutes => "UPSCALE_AUTO_RESUME_MINUTES",
         }
     }
 
@@ -146,6 +150,7 @@ pub const SETTING_DEFINITIONS: &[SettingDefinition] = &[
     SettingDefinition::new(SettingKey::CacheMaxMemoryBytes),
     SettingDefinition::new(SettingKey::AutoUpscale),
     SettingDefinition::new(SettingKey::UpscalePaused),
+    SettingDefinition::new(SettingKey::UpscaleAutoResumeMinutes),
 ];
 
 #[must_use]

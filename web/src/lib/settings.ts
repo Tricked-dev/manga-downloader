@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   library_categories: DEFAULT_LIBRARY_CATEGORIES.join(","),
   max_download_storage_bytes: "",
   update_interval_hours: "1",
+  upscale_auto_resume_minutes: "0",
 };
 
 export const UPDATE_INTERVAL_OPTIONS = [

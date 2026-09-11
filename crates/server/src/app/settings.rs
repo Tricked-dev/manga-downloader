@@ -210,6 +210,16 @@ impl SettingsInterface<'_> {
             .min(max.max(1)))
     }
 
+    /// `None` means a restart stays paused until an operator resumes it, which is the
+    /// default. Any positive value is the grace period before the server resumes itself.
+    pub(crate) async fn upscale_auto_resume_delay(&self) -> Result<Option<Duration>> {
+        Ok(upscale_auto_resume_delay_from_minutes(
+            self.raw(SettingKey::UpscaleAutoResumeMinutes)
+                .await?
+                .as_deref(),
+        ))
+    }
+
     pub(crate) async fn max_download_storage_bytes(&self) -> Result<Option<u64>> {
         let Some(value) = self.raw(SettingKey::MaxDownloadStorageBytes).await? else {
             return Ok(None);
@@ -284,7 +294,23 @@ pub(crate) async fn upscale_paused(db: &Database) -> bool {
         .is_some_and(|value| value == "true")
 }
 
-/// A restart always comes back paused, so a deploy never resumes a backlog on its own.
+/// Minutes below one disable the timer rather than resuming immediately, so a stray
+/// `0.5` cannot turn the grace period into no grace period at all.
+fn upscale_auto_resume_delay_from_minutes(value: Option<&str>) -> Option<Duration> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|minutes| *minutes > 0)
+        .map(|minutes| Duration::from_secs(minutes.saturating_mul(60)))
+}
+
+pub(crate) async fn upscale_auto_resume_delay(db: &Database) -> Result<Option<Duration>> {
+    interface(db).upscale_auto_resume_delay().await
+}
+
+/// A restart comes back paused, so a deploy never resumes a backlog while the rest of the
+/// service is still starting. See [`upscale_auto_resume_delay`] for resuming on a timer.
 pub(crate) async fn set_upscale_paused(db: &Database, paused: bool) -> Result<()> {
     db.set_setting(
         SettingKey::UpscalePaused.as_str(),
@@ -408,6 +434,19 @@ mod tests {
 
         assert!(changes.contains_family(SettingsChangeFamily::DownloadRuntime));
         assert_eq!(changes.updated_count(), 2);
+    }
+
+    #[test]
+    fn upscale_auto_resume_delay_requires_a_whole_positive_minute() {
+        assert_eq!(upscale_auto_resume_delay_from_minutes(None), None);
+        assert_eq!(upscale_auto_resume_delay_from_minutes(Some("")), None);
+        assert_eq!(upscale_auto_resume_delay_from_minutes(Some("0")), None);
+        assert_eq!(upscale_auto_resume_delay_from_minutes(Some("0.5")), None);
+        assert_eq!(upscale_auto_resume_delay_from_minutes(Some("never")), None);
+        assert_eq!(
+            upscale_auto_resume_delay_from_minutes(Some(" 10 ")),
+            Some(Duration::from_secs(600)),
+        );
     }
 
     #[test]
