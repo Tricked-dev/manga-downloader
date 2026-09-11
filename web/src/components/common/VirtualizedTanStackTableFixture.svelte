@@ -48,6 +48,9 @@
 {#snippet fixtureRow(_row: FixtureTableRow, original: FixtureRow)}
   <TableRow>
     <TableCell class="p-0">
+      <!-- Selection checkboxes in the real tables are `sr-only`, which is absolutely
+           positioned. Reproduced here because that is what used to stretch the page. -->
+      <input class="fixture-sr-only" type="checkbox" aria-label={original.label} />
       <div style:height={`${rowHeight}px`}>{original.label}</div>
     </TableCell>
   </TableRow>
@@ -77,5 +80,18 @@
   :global(.fixture-scroll table) {
     border-collapse: collapse;
     width: 100%;
+  }
+
+  /* Tailwind's `sr-only`, spelled out because the harness has no compiled CSS. */
+  :global(.fixture-sr-only) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 </style>

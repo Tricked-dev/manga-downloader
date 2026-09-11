@@ -170,7 +170,7 @@
   />
 {/if}
 
-<div bind:this={tableScrollElement} class={containerClass}>
+<div bind:this={tableScrollElement} class={`virtual-table-scroll ${containerClass}`}>
   {#if showMobileRows && mobileRow}
     <div class="divide-y divide-border md:hidden">
       {#if rows.length === 0}
@@ -246,3 +246,12 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  /* Rows carry `sr-only` selection checkboxes, and `sr-only` is absolutely positioned.
+     Without a positioned ancestor their containing block is the document, so every
+     rendered row stretched the page instead of staying inside this scroll box. */
+  .virtual-table-scroll {
+    position: relative;
+  }
+</style>

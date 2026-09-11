@@ -35,3 +35,27 @@ test("sizes the scroll area from the rendered rows, not from estimateSize", asyn
   expect(drift).toBeLessThan(0.1);
   expect(fromTallEstimate).toBeLessThan(ROW_COUNT * ROW_HEIGHT * 1.5);
 });
+
+/**
+ * Rows carry `sr-only` selection checkboxes, and `sr-only` is absolutely positioned. With no
+ * positioned ancestor their containing block was the document, so every rendered row pushed
+ * the page scrollbar further down and scrolling the list made it grow again.
+ */
+test("keeps absolutely positioned row content out of the page scroll height", async () => {
+  const screen = await render(Fixture, {
+    estimateSize: ROW_HEIGHT,
+    rowCount: ROW_COUNT,
+    rowHeight: ROW_HEIGHT,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  const container = screen.container.querySelector<HTMLElement>(".fixture-scroll");
+  expect(container).not.toBeNull();
+  const beforeScrolling = document.documentElement.scrollHeight;
+
+  container!.scrollTop = container!.scrollHeight;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  expect(document.documentElement.scrollHeight).toBe(beforeScrolling);
+  expect(document.documentElement.scrollHeight).toBeLessThan(ROW_COUNT * ROW_HEIGHT);
+});
