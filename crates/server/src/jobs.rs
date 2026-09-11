@@ -13,10 +13,17 @@ use futures_util::{
 };
 use serde::{Serialize, de::DeserializeOwned};
 use tokio_graceful::ShutdownGuard;
+use tower::limit::ConcurrencyLimitLayer;
 
 use crate::{AppState, app::upscaling};
 
 const UPSCALE_QUEUE: &str = "upscale";
+/// One chapter at a time. The worker would otherwise run every task its backend hands it
+/// at once, which upscales a page from each series in turn instead of finishing a series,
+/// and shares one GPU between jobs that each expect it to themselves. A blocking
+/// concurrency limit also stops the backend polling, so tasks stay queued rather than
+/// being claimed and left half-done when the server stops.
+const UPSCALE_CONCURRENCY: usize = 1;
 const UPSCALE_WORKER: &str = "upscale-worker";
 const DEFAULT_MAX_ATTEMPTS: i64 = 3;
 const JOB_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -214,13 +221,13 @@ pub(crate) async fn run_upscale_worker(
         }
 
         let storage = PostgresStorage::<UpscaleJob>::new_with_notify(pool, &postgres_config());
-        let worker =
-            WorkerBuilder::new(UPSCALE_WORKER)
-                .backend(storage)
-                .build(move |job: UpscaleJob| {
-                    let state = Arc::clone(&state);
-                    async move { upscaling::run(state, &job.download_id, job.scale).await }
-                });
+        let worker = WorkerBuilder::new(UPSCALE_WORKER)
+            .backend(storage)
+            .layer(ConcurrencyLimitLayer::new(UPSCALE_CONCURRENCY))
+            .build(move |job: UpscaleJob| {
+                let state = Arc::clone(&state);
+                async move { upscaling::run(state, &job.download_id, job.scale).await }
+            });
         let shutdown = shutdown.clone_weak();
         tracing::info!(
             queue = UPSCALE_QUEUE,
@@ -258,6 +265,7 @@ pub(crate) async fn run_upscale_worker(
     let worker = WorkerBuilder::new(UPSCALE_WORKER)
         .backend(storage)
         .ack_with(ack)
+        .layer(ConcurrencyLimitLayer::new(UPSCALE_CONCURRENCY))
         .build(move |job: UpscaleJob| {
             let state = Arc::clone(&state);
             async move { upscaling::run(state, &job.download_id, job.scale).await }

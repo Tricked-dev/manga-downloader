@@ -36,9 +36,13 @@ Readers keep the original variant until publication. An interrupted job cannot p
 section; a rerun replaces the upscaled page references while retaining the original payloads.
 
 Linux defaults to explicit CPU inference with two intra-op threads, one inter-op thread, and
-spinning disabled. One chapter job runs at a time. Accelerators are opt-in and must be supported by
-the installed ONNX Runtime; they never silently fall back to CPU. Missing manifests or model files
-produce a terminal skip. Models added later are detected when the chapter is queued again.
+spinning disabled. One chapter job runs at a time: the worker carries a concurrency limit of
+one, which also keeps the backend from claiming the next chapter until the current one is
+finished. Chapters are ordered by the series they belong to and then by chapter number, so a
+series is upscaled through before the next one starts rather than a page from each in turn.
+Accelerators are opt-in and must be supported by the installed ONNX Runtime; they never silently
+fall back to CPU. Missing manifests or model files produce a terminal skip. Models added later are
+detected when the chapter is queued again.
 
 A restart parks the queue: the server sets the paused state itself on boot, so a deploy never
 resumes a backlog while the rest of the service is still coming up. `upscale_auto_resume_minutes`
