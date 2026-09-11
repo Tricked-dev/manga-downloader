@@ -15,6 +15,17 @@
 				"refreshes": ["content"]
 			},
 			{
+				"type": "login",
+				"key": "mangaLogin",
+				"title": "Sign In",
+				"method": "web",
+				"urlKey": "loginUrl",
+				"localStorageKeys": ["mangaApiToken"],
+				"logoutTitle": "Sign Out",
+				"clearCookiesOnLogOut": true,
+				"refreshes": ["content"]
+			},
+			{
 				"type": "text",
 				"key": "backendApiKey",
 				"title": "Backend API Key",

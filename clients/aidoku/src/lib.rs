@@ -186,6 +186,7 @@ struct ApiClient {
 impl ApiClient {
     fn new() -> Self {
         let base_url = settings::server_base_url();
+        settings::sync_login_url(&base_url);
         let api_base = format!("{base_url}/v1");
         let api_key = settings::backend_api_key();
         let auth_header = if api_key.is_empty() {
